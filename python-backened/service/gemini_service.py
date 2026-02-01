@@ -1,11 +1,12 @@
-from google import genai
-from google.genai import types
+from adapters.gemini_adapter import GeminiAdapter
 from schemas import CustomGeminiClientSettings, GeminiGenerationConfig
 
-
 class GeminiService:
-    @staticmethod
+    def __init__(self, adapter: GeminiAdapter):
+        self.adapter = adapter
+
     def gemini_generate_content(
+        self,
         model: str,
         user_input: str,
         settings: CustomGeminiClientSettings,
@@ -16,18 +17,11 @@ class GeminiService:
         if not settings.gemini_base_url:
             raise ValueError("gemini_base_url is required")
 
-        client = genai.Client(
-            api_key=settings.gemini_api_key,
-            http_options=types.HttpOptions(
-                base_url=settings.gemini_base_url,
-                api_version="v1beta"
-            )
-        )
-
-        response = client.models.generate_content(
+        sdk_config = config.to_sdk_config() if config is not None else None
+        response = self.adapter.generate(
             model=model,
             contents=user_input,
-            config=config.to_sdk_config() if config is not None else None
+            config=sdk_config
         )
 
-        return response.model_dump(mode="json", exclude_none=True)
+        return response.model_dump(mode="json")

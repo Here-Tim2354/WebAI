@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from service.gemini_service import GeminiService
+from adapters.gemini_adapter import GeminiAdapter
 from schemas import JavaChatRequest
 from env_client_config import NativeGeminiClientSettings, get_settings
 import uvicorn
@@ -20,7 +21,13 @@ async def chat_endpoint(
     final_settings = env_settings.model_copy(update=custom_dict)
 
     try:
-        return GeminiService.gemini_generate_content(
+        adapter = GeminiAdapter(
+            api_key=final_settings.gemini_api_key,
+            base_url=final_settings.gemini_base_url,
+        )
+        service = GeminiService(adapter)
+
+        return service.gemini_generate_content(
             model=java_request.model,
             user_input=java_request.user_input,
             settings=final_settings,
