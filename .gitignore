@@ -26,3 +26,17 @@ python-module/python-module.iml
 python-module/__pycache__/system_prompt.cpython-314.pyc
 python-module/__pycache__/utils.cpython-314.pyc
 python-backened/.env
+python-backened/__pycache__/env_client_config.cpython-314.pyc
+python-backened/__pycache__/schemas.cpython-314.pyc
+python-backened/adapters/__pycache__/gemini_adapter.cpython-314.pyc
+python-backened/service/__pycache__/gemini_service.cpython-314.pyc
+.gitignore
+.vscode/settings.json
+output_cache/production/WebAI/.gitignore
+output_cache/production/WebAI/java-backened.iml
+output_cache/production/WebAI/.idea/.gitignore
+output_cache/production/WebAI/.idea/copilot.data.migration.ask2agent.xml
+output_cache/production/WebAI/.idea/misc.xml
+output_cache/production/WebAI/.idea/modules.xml
+output_cache/production/WebAI/.idea/vcs.xml
+output_cache/production/WebAI/src/ChatEndpointTest.class
