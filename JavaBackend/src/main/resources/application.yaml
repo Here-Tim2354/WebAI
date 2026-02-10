@@ -1,3 +1,16 @@
 spring:
   application:
     name: JavaBackend
+
+  datasource:
+    # URL 格式：jdbc:postgresql://主机名:端口号/数据库名
+    url: jdbc:postgresql://localhost:5432/webai_db
+    username: postgres  # 你的 Postgres 用户名，默认通常是 postgres
+    password: bbb2523071971  # 你的 Postgres 密码
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
