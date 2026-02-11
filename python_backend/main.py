@@ -8,7 +8,7 @@ import uvicorn
 app = FastAPI()
 
 
-@app.post("/chat")
+@app.post("/api/v1/chat/completions")
 async def chat_endpoint(
     java_request: JavaChatRequest,
     env_settings: NativeGeminiClientSettings = Depends(get_settings),
@@ -18,6 +18,7 @@ async def chat_endpoint(
         if java_request.custom_settings
         else {}
     )
+    # 合并原始设置和自定义设置
     final_settings = env_settings.model_copy(update=custom_dict)
 
     try:

@@ -1,4 +1,4 @@
-package com.tim.webai.javabackend.model.dto;
+package com.tim.webai.javabackend.model.dto.react;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

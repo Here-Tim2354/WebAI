@@ -55,7 +55,7 @@ class GeminiGenerationConfig(BaseModel):
     include_thoughts: Optional[bool] = Field(default=False)
     thought_budget_token_count: Optional[int] = Field(default=None)
 
-    # 系统提示词,思考和工具.其中工具部分是对接JAVA传递的布尔值
+    # 系统提示词,思考和工具. 其中工具部分是对接JAVA传递的布尔值
     thinking_config: Optional[GeminiThinkingConfig] = Field(default=None)
     system_instruction: Optional[str] = None
     tools: Optional[GeminiTools] = Field(default=None)
@@ -69,6 +69,7 @@ class GeminiGenerationConfig(BaseModel):
     response_logprobs: Optional[bool] = Field(default=False)
     logprobs: Optional[int] = Field(default=None)
 
+
     def to_sdk_tools(self) -> Optional[List[types.Tool]]:
         if not self.tools:
             return None
@@ -81,23 +82,28 @@ class GeminiGenerationConfig(BaseModel):
                     if key == "enable_url_context":
                         sdk_tools.append(types.Tool(url_context=types.UrlContext()))
             return sdk_tools if sdk_tools else None
+        
+
+    def to_sdk_thinking(self) -> Optional[types.ThinkingConfig]:
+        """转换为 SDK ThinkingConfig 对象"""
+        sdk_thinking_config=None
+        if self.thinking_config:
+            sdk_thinking_config=types.ThinkingConfig(
+                **self.thinking_config.model_dump(
+                    exclude_none=True,
+                    mode="json"
+                )
+            )
+        return sdk_thinking_config
+
 
     def to_sdk_config(self) -> types.GenerateContentConfig:
         """转换为 SDK GenerateContentConfig 对象"""
 
         # 处理 thinking_config 转换
-        sdk_thinking_config = None
-        if self.thinking_config:
-            sdk_thinking_config = types.ThinkingConfig(
-                **self.thinking_config.model_dump(
-                    exclude_none=True,
-                    mode="json",
-                    exclude={"thinking_level"},
-                )
-            )
+        sdk_thinking_config=self.to_sdk_thinking()
 
         # 处理工具转换
-
         sdk_tools = self.to_sdk_tools()
 
         return types.GenerateContentConfig(
