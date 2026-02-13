@@ -45,7 +45,9 @@ class GeminiGenerationConfig(BaseModel):
 
     # 结构化输出与格式(JSON输出待完善)
     response_mime_type: Optional[str] = Field(default="text/plain")
-    response_schema: Optional[Union[Dict[str, Any], Type[BaseModel], Type[Enum]]] = Field(default=None)
+    response_schema: Optional[Union[Dict[str, Any], Type[BaseModel], Type[Enum]]] = (
+        Field(default=None)
+    )
 
     # 上下文控制
     presence_penalty: Optional[float] = Field(default=None)
@@ -69,7 +71,6 @@ class GeminiGenerationConfig(BaseModel):
     response_logprobs: Optional[bool] = Field(default=False)
     logprobs: Optional[int] = Field(default=None)
 
-
     def to_sdk_tools(self) -> Optional[List[types.Tool]]:
         if not self.tools:
             return None
@@ -82,26 +83,21 @@ class GeminiGenerationConfig(BaseModel):
                     if key == "enable_url_context":
                         sdk_tools.append(types.Tool(url_context=types.UrlContext()))
             return sdk_tools if sdk_tools else None
-        
 
     def to_sdk_thinking(self) -> Optional[types.ThinkingConfig]:
         """转换为 SDK ThinkingConfig 对象"""
-        sdk_thinking_config=None
+        sdk_thinking_config = None
         if self.thinking_config:
-            sdk_thinking_config=types.ThinkingConfig(
-                **self.thinking_config.model_dump(
-                    exclude_none=True,
-                    mode="json"
-                )
+            sdk_thinking_config = types.ThinkingConfig(
+                **self.thinking_config.model_dump(exclude_none=True, mode="json")
             )
         return sdk_thinking_config
-
 
     def to_sdk_config(self) -> types.GenerateContentConfig:
         """转换为 SDK GenerateContentConfig 对象"""
 
         # 处理 thinking_config 转换
-        sdk_thinking_config=self.to_sdk_thinking()
+        sdk_thinking_config = self.to_sdk_thinking()
 
         # 处理工具转换
         sdk_tools = self.to_sdk_tools()
@@ -136,8 +132,8 @@ class GeminiGenerationConfig(BaseModel):
 
 
 class CustomGeminiClientSettings(BaseModel):
-    gemini_api_key : Optional[str] = None
-    gemini_base_url : Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    gemini_base_url: Optional[str] = None
 
 
 class JavaChatRequest(BaseModel):
@@ -146,7 +142,7 @@ class JavaChatRequest(BaseModel):
     其中custom_settings是可选项，用于覆盖环境默认值
     """
 
-    model: str
+    model: Optional[str] = None
     user_input: str
     custom_settings: Optional[CustomGeminiClientSettings] = None
     config: Optional[GeminiGenerationConfig] = None
