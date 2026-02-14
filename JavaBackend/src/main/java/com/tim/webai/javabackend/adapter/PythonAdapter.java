@@ -13,20 +13,19 @@ public class PythonAdapter {
     private final String chatCompletionsPath;
 
     public PythonAdapter(
-        WebClient.Builder webClientBuilder,
-        @Value("${python.base-url:http://127.0.0.1:5000}") String pythonBaseUrl,
-        @Value("${python.chat-completions-path:/api/v1/chat/completions}") String chatCompletionsPath
-    ) {
+            WebClient.Builder webClientBuilder,
+            @Value("${python.base-url:http://127.0.0.1:5000}") String pythonBaseUrl,
+            @Value("${python.chat-completions-path:/api/v1/chat/completions}") String chatCompletionsPath) {
         this.webClient = webClientBuilder.baseUrl(pythonBaseUrl).build();
         this.chatCompletionsPath = chatCompletionsPath;
     }
 
     public PythonChatResponse ask(PythonChatRequest request) {
         return webClient.post()
-            .uri(chatCompletionsPath)
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono(PythonChatResponse.class)
-            .block();
+                .uri(chatCompletionsPath)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(PythonChatResponse.class)
+                .block();
     }
 }
