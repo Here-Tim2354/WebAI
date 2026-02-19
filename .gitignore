@@ -13,3 +13,4 @@ python_backend/.env
 
 example-code/
 output_cache/
+frontend/.env.development
