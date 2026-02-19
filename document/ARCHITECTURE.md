@@ -4,7 +4,7 @@
 ```
 WebAI
 ├── docs                    # 文档
-├── frontend                # React 前端
+├── frontend                # Vite构建的React前端
 ├── JavaBackend             # Java代码
 ├── python_backend          # Python代码
 ├── README.md               # 展示用文档
@@ -13,7 +13,7 @@ WebAI
 前端为React，Java负责复杂的业务逻辑，Python端仅提供API端的服务。
 
 # 目前阶段
-目前处于MVP(最小可行性验证)的开发中，即为项目初期阶段。
+目前处于MVP(最小可行性验证)的基本实现，即将迈入第二阶段。
 
 ## 开发日历表  
 当前处于第一阶段：实现最基本的前后端业务跑通。具体为在网页发送一个消息，能得到一个返回的结构(暂不采用流式)
@@ -25,14 +25,17 @@ WebAI
 **Feat**：初步实现从React到Java端的基本业务逻辑（即Request链路已完成）。测试类能够接受完整的JSON类型（尽管使用的是String.class）  
 **Todo**：从Python端到JAVA端，以及从JAVA端到React端的业务逻辑还没实现（即Response端待开发）。比如PythonAdapter.java并没有好好根据Python端返回的完整API JSON写具体的处理逻辑。返回给React端的部分同样。
 
+2025-02-19：  
+**Feat**：初步实现了最基本的聊天对话页面，同时也完成了Request和Response全链路流程的构建。  
+**Todo**：实现SSE流式传输。
+
 # 具体技术栈
 以下展示了三个语言的技术栈，以及相对应的依赖文件。
 
 根据提交的最新进展实时更新内容。
 
 ## 总结
-1. 前端（待写）  
-   拟采用React + TypeScript + SSE
+1. React + TypeScript + SSE 构建前端网页
 2. Java 中台（最小实现）  
    Spring Boot 提供统一 API，`Controller -> Service -> Adapter` 分层，使用 `WebClient` 调用 Python 服务并做响应转换；JPA + PostgreSQL 用于后续会话持久化。
 3. Python AI 服务（最小实现）  
@@ -63,10 +66,11 @@ flowchart LR
 
 
 ## 前端
-目前仅新建文件夹，暂空
+已完成最基本的对话网页
+**技术栈**：React + Vite
 
 ## Java
-目前已完成基础Request链路，负责承接前端请求并转发至Python服务。
+目前已完成基础Request和Response链路
 
 **技术栈**：Spring Boot + WebMVC + Maven + WebFlux + Validation + Spring Data JPA + PostgreSQL + Lombok（参考 `JavaBackend/pom.xml`）
 
