@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
 import { generateAssistantReply } from "@/lib/ai/gemini";
+import { ServerEnvError } from "@/lib/env/server";
 import {
   chatRequestSchema,
   chatResponseSchema,
@@ -9,8 +9,35 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
-    const { messages } = chatRequestSchema.parse(payload);
+    let payload: unknown;
+
+    try {
+      payload = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: {
+            message: "请求体必须是合法 JSON。",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsedRequest = chatRequestSchema.safeParse(payload);
+
+    if (!parsedRequest.success) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "请求数据格式不正确，请检查消息结构。",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const { messages } = parsedRequest.data;
 
     const reply = await generateAssistantReply(messages);
 
@@ -24,14 +51,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json(responseBody);
   } catch (error) {
-    if (error instanceof ZodError) {
+    if (error instanceof ServerEnvError) {
       return NextResponse.json(
         {
           error: {
-            message: "请求数据格式不正确，请检查消息结构。",
+            message: error.message,
           },
         },
-        { status: 400 },
+        { status: 500 },
       );
     }
 

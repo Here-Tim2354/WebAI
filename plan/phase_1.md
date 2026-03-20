@@ -8,7 +8,7 @@
 ## 本阶段结论
 - 技术栈：Next.js App Router + TypeScript + Zod
 - Gemini 接入：服务端使用 `@google/genai`
-- 模型：`gemini-3-flash-preview`
+- 模型：`gemini-2.5-flash`
 - 会话策略：应用侧维护完整消息历史；服务端每次整理历史后调用模型
 - `Interactions API`：仅预留适配空间，不作为本阶段主实现
 - system instruction：保留代码入口，默认返回空字符串

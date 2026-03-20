@@ -17,6 +17,7 @@
 ## 预期技术栈
 - 前后端统一采用 TypeScript
 - Web 框架采用 Next.js App Router
+- 采用Figma MCP进行用户与AI协作开发
 - 跨端数据校验采用 Zod
 - Gemini 接入首版直接放在 Next 服务端
 - 持久化方案预留给 Supabase

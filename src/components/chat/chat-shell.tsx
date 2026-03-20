@@ -26,12 +26,20 @@ export function ChatShell() {
   const conversationCount = messages.filter(
     (message) => message.role === "user",
   ).length;
-
-  const recentChatLabels = [
-    "Phase 1 聊天主链路",
-    "Gemini 接口联调",
-    "输入体验优化",
-    "Markdown 渲染",
+  const phaseNotes = [
+    {
+      title: "当前阶段",
+      description: "Phase 1 · 聊天主链路 MVP",
+    },
+    {
+      title: "本轮重点",
+      description: "先收口高亮、错误分类和界面边界，再考虑正式验收。",
+    },
+  ];
+  const productBoundaries = [
+    "单页单会话",
+    "支持多轮对话",
+    "刷新后不保留历史",
   ];
 
   useEffect(() => {
@@ -137,29 +145,28 @@ export function ChatShell() {
             + New chat
           </button>
 
-          <nav className="sidebar__nav">
-            <button className="sidebar__nav-item" type="button">
-              Search chats
-            </button>
-            <button className="sidebar__nav-item" type="button">
-              Images
-            </button>
-            <button className="sidebar__nav-item" type="button">
-              Apps
-            </button>
-            <button className="sidebar__nav-item" type="button">
-              Projects
-            </button>
-          </nav>
+          <section className="sidebar__overview" aria-label="当前产品状态">
+            <span className="sidebar__section-title">当前状态</span>
+            <div className="sidebar__overview-list">
+              {phaseNotes.map((note) => (
+                <div key={note.title} className="sidebar__overview-card">
+                  <strong>{note.title}</strong>
+                  <span>{note.description}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
-        <div className="sidebar__history">
-          <span className="sidebar__section-title">Recent</span>
-          {recentChatLabels.map((label) => (
-            <button key={label} className="sidebar__history-item" type="button">
-              {label}
-            </button>
-          ))}
+        <div className="sidebar__history" aria-label="当前产品边界">
+          <span className="sidebar__section-title">当前边界</span>
+          <div className="sidebar__history-list">
+            {productBoundaries.map((label) => (
+              <div key={label} className="sidebar__history-item">
+                {label}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="sidebar__footer">
