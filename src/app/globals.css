@@ -106,9 +106,7 @@ a {
   font-weight: 700;
 }
 
-.sidebar__new-chat,
-.sidebar__nav-item,
-.sidebar__history-item {
+.sidebar__new-chat {
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -123,32 +121,51 @@ a {
   box-shadow: var(--shadow);
 }
 
-.sidebar__nav {
-  display: grid;
-  gap: 4px;
-}
-
-.sidebar__nav-item,
-.sidebar__history-item {
-  padding: 10px 12px;
-  border-radius: 12px;
-  color: #34363b;
-}
-
-.sidebar__nav-item:hover,
-.sidebar__history-item:hover {
-  background: rgba(15, 23, 42, 0.04);
-}
-
+.sidebar__overview,
 .sidebar__history {
   display: grid;
-  gap: 4px;
+  gap: 10px;
+}
+
+.sidebar__overview-list,
+.sidebar__history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar__overview-card,
+.sidebar__history-item {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.sidebar__overview-card strong,
+.sidebar__overview-card span {
+  display: block;
 }
 
 .sidebar__section-title {
   padding: 0 12px;
   color: var(--ink-soft);
   font-size: 0.82rem;
+}
+
+.sidebar__overview-card strong,
+.sidebar__history-item {
+  font-size: 0.92rem;
+}
+
+.sidebar__overview-card span {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  font-size: 0.84rem;
+}
+
+.sidebar__history-item {
+  color: #34363b;
 }
 
 .sidebar__footer {
@@ -545,6 +562,11 @@ a {
   margin: 0;
   padding: 16px;
   overflow-x: auto;
+}
+
+.code-block code {
+  display: block;
+  font-family: var(--font-mono), monospace;
 }
 
 @media (max-width: 1080px) {
