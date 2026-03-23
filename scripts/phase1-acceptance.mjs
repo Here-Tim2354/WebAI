@@ -1,8 +1,6 @@
 ﻿import http from "node:http";
 import { spawn, spawnSync } from "node:child_process";
 
-const NEXT_PORT = 3100;
-const MOCK_PORT = 4318;
 const HOST = "127.0.0.1";
 const NODE_EXE = `${process.env.ProgramFiles}\\nodejs\\node.exe`;
 const NEXT_BIN = "node_modules/next/dist/bin/next";
@@ -21,6 +19,27 @@ const mockReply = [
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getAvailablePort() {
+  const server = http.createServer();
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, HOST, resolve);
+  });
+
+  const address = server.address();
+  const port =
+    address && typeof address === "object" ? address.port : undefined;
+
+  await closeServer(server);
+
+  if (!port) {
+    throw new Error("无法分配可用端口。");
+  }
+
+  return port;
 }
 
 function createMockGeminiServer() {
@@ -153,37 +172,60 @@ function assert(condition, message) {
 async function runSuccessfulFlowChecks() {
   const mockServer = createMockGeminiServer();
   let nextServer;
+  const nextPort = await getAvailablePort();
 
-  await new Promise((resolve) => mockServer.listen(MOCK_PORT, HOST, resolve));
+  await new Promise((resolve, reject) => {
+    mockServer.once("error", reject);
+    mockServer.listen(0, HOST, resolve);
+  });
+
+  const mockAddress = mockServer.address();
+  const mockPort =
+    mockAddress && typeof mockAddress === "object" ? mockAddress.port : undefined;
+
+  if (!mockPort) {
+    throw new Error("无法启动 Gemini mock 服务。");
+  }
 
   try {
     nextServer = startProcess(
       NODE_EXE,
-      [NEXT_BIN, "start", "--port", String(NEXT_PORT)],
+      [NEXT_BIN, "start", "--port", String(nextPort)],
       {
         env: {
           ...process.env,
-          PORT: String(NEXT_PORT),
+          PORT: String(nextPort),
           GEMINI_API_KEY: "phase1-local-mock-key",
           GEMINI_MODEL: "gemini-2.5-flash",
-          GEMINI_BASE_URL: `http://${HOST}:${MOCK_PORT}`,
+          GEMINI_BASE_URL: `http://${HOST}:${mockPort}`,
         },
       },
     );
 
-    const homeResponse = await waitForHttp(`http://${HOST}:${NEXT_PORT}/`);
+    const homeResponse = await waitForHttp(`http://${HOST}:${nextPort}/`);
     const homeHtml = await homeResponse.text();
 
     assert(homeHtml.includes("WebAI"), "首页没有渲染 WebAI 标识。");
-    assert(homeHtml.includes("Ask anything"), "首页没有渲染输入区空态。");
+    assert(
+      homeHtml.includes("你好，今天想聊点什么？"),
+      "首页没有渲染当前空态问候语。",
+    );
+    assert(homeHtml.includes("发一条消息..."), "首页没有渲染输入区占位。");
+    assert(
+      homeHtml.includes("产品") &&
+        homeHtml.includes("代码") &&
+        homeHtml.includes("计划") &&
+        homeHtml.includes("文档"),
+      "首页没有渲染当前的轻量分组入口。",
+    );
     assert(
       !homeHtml.includes("Search chats") &&
         !homeHtml.includes("Images") &&
         !homeHtml.includes("Projects"),
-      "首页仍然暴露了 Phase 1 之外的伪功能入口。",
+      "首页仍然暴露了过时的伪功能入口。",
     );
 
-    const successResponse = await fetch(`http://${HOST}:${NEXT_PORT}/api/chat`, {
+    const successResponse = await fetch(`http://${HOST}:${nextPort}/api/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -218,7 +260,7 @@ async function runSuccessfulFlowChecks() {
     );
 
     const invalidJsonResponse = await fetch(
-      `http://${HOST}:${NEXT_PORT}/api/chat`,
+      `http://${HOST}:${nextPort}/api/chat`,
       {
         method: "POST",
         headers: {
@@ -230,7 +272,7 @@ async function runSuccessfulFlowChecks() {
     assert(invalidJsonResponse.status === 400, "非法 JSON 没有返回 400。");
 
     const invalidSchemaResponse = await fetch(
-      `http://${HOST}:${NEXT_PORT}/api/chat`,
+      `http://${HOST}:${nextPort}/api/chat`,
       {
         method: "POST",
         headers: {
@@ -250,9 +292,10 @@ async function runSuccessfulFlowChecks() {
 }
 
 async function runServerEnvChecks() {
+  const basePort = await getAvailablePort();
   const cases = [
     {
-      port: 3101,
+      port: basePort,
       env: {
         GEMINI_API_KEY: "",
         GEMINI_MODEL: "gemini-2.5-flash",
@@ -262,7 +305,7 @@ async function runServerEnvChecks() {
       label: "缺少 GEMINI_API_KEY",
     },
     {
-      port: 3102,
+      port: basePort + 1,
       env: {
         GEMINI_API_KEY: "phase1-local-mock-key",
         GEMINI_MODEL: "gemini-2.5-flash",

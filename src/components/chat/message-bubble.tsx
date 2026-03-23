@@ -19,11 +19,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     system: "message__bubble message__bubble--assistant",
     error: "message__bubble message__bubble--error",
   }[message.role];
+  const statusLabel =
+    message.status === "pending"
+      ? "生成中"
+      : message.status === "error"
+        ? "失败"
+        : null;
 
   return (
-    <article className={`message message--${message.role}`}>
-      {message.role === "error" ? (
-        <span className="message__label">{roleLabelMap[message.role]}</span>
+    <article
+      className={`message message--${message.role} message--status-${message.status}`}
+    >
+      {message.role === "error" || statusLabel ? (
+        <div className="message__meta">
+          <span className="message__label">{roleLabelMap[message.role]}</span>
+          {statusLabel ? (
+            <span className="message__status">{statusLabel}</span>
+          ) : null}
+        </div>
       ) : null}
       <div className={bubbleClassName}>
         {message.status === "pending" && message.content.length === 0 ? (
@@ -31,7 +44,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <span className="message__pending-dot" />
             <span className="message__pending-dot" />
             <span className="message__pending-dot" />
-            <span>思考中</span>
+            <span>生成中</span>
           </span>
         ) : (
           <MarkdownMessage content={message.content} />

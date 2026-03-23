@@ -5,42 +5,52 @@ import { MessageBubble } from "./message-bubble";
 type MessageListProps = {
   messages: ChatMessage[];
   messageEndRef: RefObject<HTMLDivElement | null>;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
   onPromptSelect: (prompt: string) => void;
+  onScroll: () => void;
+  onJumpToLatest: () => void;
+  showJumpToLatest: boolean;
 };
 
 const promptCards = [
   {
-    title: "产品判断",
-    prompt: "帮我定义一个 AI 聊天首页的空态文案。",
+    title: "产品",
+    prompt: "帮我定义一个 AI 聊天首页的空态文案和视觉重点。",
   },
   {
-    title: "代码输出",
+    title: "代码",
     prompt: "用 TypeScript 写一个带类型守卫的消息格式化函数。",
   },
   {
-    title: "连续对话",
-    prompt: "先记住我在做 WebAI，下一轮再提醒我当前 phase。",
+    title: "计划",
+    prompt: "帮我整理 WebAI Phase 2 的设计与实现任务顺序。",
   },
   {
-    title: "Markdown",
-    prompt: "把一个 Phase 1 开工计划整理成清晰的 Markdown 列表。",
+    title: "文档",
+    prompt: "把当前产品思路整理成一份清晰的 Markdown 说明。",
   },
 ];
 
 export function MessageList({
   messages,
   messageEndRef,
+  scrollContainerRef,
   onPromptSelect,
+  onScroll,
+  onJumpToLatest,
+  showJumpToLatest,
 }: MessageListProps) {
   return (
-    <div className="message-list">
+    <div
+      ref={scrollContainerRef}
+      className="message-list"
+      onScroll={onScroll}
+    >
       {messages.length === 0 ? (
         <div className="chat-empty">
           <div className="chat-empty__inner">
-            <h1 className="chat-empty__title">What are you working on?</h1>
-            <p className="chat-empty__copy">
-              把聊天主链路先做顺手。这里先专注单页单会话、多轮对话和稳定自然的输入体验。
-            </p>
+            <div className="chat-empty__eyebrow">WebAI</div>
+            <h1 className="chat-empty__title">你好，今天想聊点什么？</h1>
             <div className="chat-empty__grid">
               {promptCards.map((card) => (
                 <button
@@ -50,7 +60,6 @@ export function MessageList({
                   onClick={() => onPromptSelect(card.prompt)}
                 >
                   <strong>{card.title}</strong>
-                  <span>{card.prompt}</span>
                 </button>
               ))}
             </div>
@@ -62,6 +71,15 @@ export function MessageList({
             <MessageBubble key={message.id} message={message} />
           ))}
           <div ref={messageEndRef} />
+          {showJumpToLatest ? (
+            <button
+              className="message-list__jump"
+              type="button"
+              onClick={onJumpToLatest}
+            >
+              最新
+            </button>
+          ) : null}
         </div>
       )}
     </div>

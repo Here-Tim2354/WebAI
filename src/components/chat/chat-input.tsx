@@ -19,6 +19,7 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = value.trim().length > 0 && !isSubmitting;
+  const helperText = isSubmitting ? "生成中" : "Enter 发送";
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -38,11 +39,23 @@ export function ChatInput({
   }, [isSubmitting]);
 
   return (
-    <div className={`composer ${hasMessages ? "composer--dock" : "composer--hero"}`}>
+    <div
+      className={`composer ${hasMessages ? "composer--dock" : "composer--hero"}`}
+    >
+      <div className="composer__meta">
+        <span className="composer__eyebrow">
+          {hasMessages ? "Thread" : "Prompt"}
+        </span>
+        {isSubmitting ? (
+          <span className="composer__status composer__status--live">
+            Gemini
+          </span>
+        ) : null}
+      </div>
       <textarea
         ref={textareaRef}
         className="composer__input"
-        placeholder="Ask anything"
+        placeholder="发一条消息..."
         value={value}
         rows={1}
         onChange={(event) => onChange(event.target.value)}
@@ -55,14 +68,9 @@ export function ChatInput({
       />
 
       <div className="composer__footer">
-        <div className="composer__hint">
-          Enter 发送，Shift + Enter 换行。支持 Markdown、代码块高亮和复制。
-        </div>
+        <div className="composer__hint">{helperText}</div>
 
         <div className="composer__actions">
-          {isSubmitting ? (
-            <span className="composer__status">正在等待 Gemini 回复…</span>
-          ) : null}
           <button
             className="composer__button"
             type="button"
