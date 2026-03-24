@@ -26,11 +26,11 @@
 - 已补充自动验收脚本：`npm run check:phase1`
 - 已完成本地 Phase 1 验收：`npm run check:phase1`
 - 已完成基础工程校验：`npm run lint`、`npm run typecheck`、`npm run build`
-- 已更新 `phase_overview.md`，明确新的项目定位与 phase 顺序
+- 已更新 `plan/phase/phase_overview.md`，明确新的项目定位与 phase 顺序
 - 已确认课程作业主线将前置 `Supabase 持久化与会话 CRUD 系统`
-- 已补充 `plan/phase_2.md`，确认 `Phase 2` 的阶段目标、边界与流式取舍
+- 已补充 `plan/phase/phase_2.md`，确认 `Phase 2` 的阶段目标、边界与流式取舍
 - 已引入并评估 `frontend-skill`，用于指导 `Phase 2` 的前端体验和视觉优化
-- 已整理 `plan/phase_2_frontend_checklist.md`，作为 `Phase 2` 的前端专项执行清单
+- 已整理 `plan/phase/phase_2_frontend_checklist.md`，作为 `Phase 2` 的前端专项执行清单
 - 已完成聊天页第一屏和输入区的 `Phase 2` 视觉收口
 - 已减少页面说明性文字，保留轻量问候语与标签式占位
 - 已实现消息区自动滚动优化与回到底部入口
@@ -39,15 +39,18 @@
 - 已修正桌面端侧栏跟随页面滚动的问题
 - 已更新验收脚本，使其匹配当前首页和输入区表现
 - 已完成前端校验：`npm run lint`、`npm run typecheck`、`npm run build`
+- 已新增 `plan/database/user_requirements_draft.md`，作为数据库课程设计的用户需求起稿
 
 ## 当前推进依据
 
-- 阶段概要：`plan/phase_2.md`
-- 前端专项清单：`plan/phase_2_frontend_checklist.md`
-- 布局设计规划：`plan/chat_workspace_layout.md`
+- 阶段概要：`plan/phase/phase_2.md`
+- 前端专项清单：`plan/phase/phase_2_frontend_checklist.md`
+- 布局设计规划：`plan/frontend/chat_workspace_layout.md`
+- 数据库需求起稿：`plan/database/user_requirements_draft.md`
 - `phase_2.md` 负责阶段摘要
 - `phase_2_frontend_checklist.md` 负责前端执行项
 - `chat_workspace_layout.md` 负责整体布局与扩展窗口
+- `user_requirements_draft.md` 负责数据库课程设计中的用户需求起稿
 - 当前阶段的讨论与实施，应优先以对应文档的职责为准
 
 ## 下一阶段重点

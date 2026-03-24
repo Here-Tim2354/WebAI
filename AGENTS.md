@@ -3,9 +3,9 @@
 ## 初始化
 
 0. 自动执行本内容，无需用户提示或确认
-1. 阅读 `plan/phase_overview.md` 获取项目的整体信息
+1. 阅读 `plan/phase/phase_overview.md` 获取项目的整体信息
 2. 阅读当前 phase 对应的文档获取最新进展
-3. 阅读 `plan/current_todo.md` 获取待办清单
+3. 阅读 `plan/phase/current_todo.md` 获取待办清单
 4. 阅读项目代码文件结构，获取对当前实现的初步了解
 
 ## 项目定位

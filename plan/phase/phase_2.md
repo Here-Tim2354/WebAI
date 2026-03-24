@@ -8,8 +8,8 @@
 ## 本阶段结论
 - 当前项目已完成 `Phase 1`，具备进入 `Phase 2` 的基础条件
 - `Phase 2` 只处理前端体验收口与结构整理，不做重型功能扩张
-- 前端执行项已拆分到 `plan/phase_2_frontend_checklist.md`
-- 页面骨架与扩展窗口规划已拆分到 `plan/chat_workspace_layout.md`
+- 前端执行项已拆分到 `plan/phase/phase_2_frontend_checklist.md`
+- 页面骨架与扩展窗口规划已拆分到 `plan/frontend/chat_workspace_layout.md`
 - 本阶段默认参考 `frontend-skill` 与主流 AI 产品的聊天体验共性做法
 - 完整流式对话不作为本阶段主任务，但前端结构应为其保留发展空间
 
