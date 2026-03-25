@@ -1,12 +1,8 @@
-CREATE TYPE "user_role" AS ENUM (
-  'normal',
-  'admin'
-);
-
-CREATE TYPE "account_status" AS ENUM (
-  'active',
-  'banned'
-);
+-- Phase 3.1 note:
+-- This file keeps a SQL-oriented schema draft for reference.
+-- The dbdiagram-ready source of truth is `overall_er_graph.dbml`.
+-- Current Phase 3 first-batch implementation should prioritize:
+-- auth.users / profiles / conversations / messages
 
 CREATE TYPE "conversation_status" AS ENUM (
   'active',
@@ -18,11 +14,9 @@ CREATE TYPE "message_sender_type" AS ENUM (
   'assistant'
 );
 
-CREATE TABLE "users" (
+CREATE TABLE "auth"."users" (
   "id" uuid PRIMARY KEY NOT NULL,
   "email" varchar(255) UNIQUE NOT NULL,
-  "role" user_role NOT NULL DEFAULT 'normal',
-  "account_status" account_status NOT NULL DEFAULT 'active',
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
@@ -66,42 +60,37 @@ CREATE TABLE "search_records" (
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
-CREATE INDEX ON "users" ("role");
-
-CREATE INDEX ON "users" ("account_status");
-
 CREATE INDEX ON "conversations" ("user_id");
-
 CREATE INDEX ON "conversations" ("updated_at");
-
 CREATE INDEX ON "conversations" ("user_id", "status");
 
 CREATE INDEX ON "messages" ("conversation_id");
-
 CREATE INDEX ON "messages" ("created_at");
-
 CREATE INDEX ON "messages" ("conversation_id", "created_at");
 
 CREATE INDEX ON "favorites" ("user_id");
-
 CREATE INDEX ON "favorites" ("message_id");
-
 CREATE UNIQUE INDEX ON "favorites" ("user_id", "message_id");
 
 CREATE INDEX ON "search_records" ("user_id");
-
 CREATE INDEX ON "search_records" ("created_at");
 
 COMMENT ON COLUMN "conversations"."system_prompt" IS 'Conversation-level markdown prompt';
 
-ALTER TABLE "profiles" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "profiles"
+  ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "conversations" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "conversations"
+  ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "messages" ADD FOREIGN KEY ("conversation_id") REFERENCES "conversations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "messages"
+  ADD FOREIGN KEY ("conversation_id") REFERENCES "conversations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "favorites" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "favorites"
+  ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "favorites" ADD FOREIGN KEY ("message_id") REFERENCES "messages" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "favorites"
+  ADD FOREIGN KEY ("message_id") REFERENCES "messages" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "search_records" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "search_records"
+  ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;

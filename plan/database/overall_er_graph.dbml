@@ -1,0 +1,123 @@
+Project WebAI_Phase3 {
+  database_type: "PostgreSQL"
+  Note: '''
+  WebAI database design for Phase 3.
+  First-batch implementation priority:
+  auth.users / profiles / conversations / messages
+  favorites and search_records stay in the overall design, but are not first-batch mandatory.
+  '''
+}
+
+Enum conversation_status {
+  active
+  archived
+}
+
+Enum message_sender_type {
+  user
+  assistant
+}
+
+Table auth.users [headercolor: #D9EAFE] {
+  id uuid [pk, not null, note: 'Supabase Auth user id']
+  email varchar(255) [not null, unique]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+  Authentication identity is provided by Supabase Auth.
+  This table is referenced by business tables and should not be treated as a duplicated custom auth table.
+  '''
+}
+
+Table profiles [headercolor: #EEF6FF] {
+  user_id uuid [pk, not null, note: 'References auth.users.id']
+  display_name varchar(100)
+  avatar_url varchar(500)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+  User-facing profile information for display and account entry.
+  '''
+}
+
+Table conversations [headercolor: #CFE7FF] {
+  id uuid [pk, not null]
+  user_id uuid [not null]
+  title varchar(100) [not null]
+  system_prompt text [note: 'Conversation-level prompt, optional']
+  status conversation_status [not null, default: 'active']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+    updated_at
+    (user_id, status)
+  }
+
+  Note: '''
+  Core conversation entity.
+  Supports create, open, rename, delete and later archive/recover.
+  '''
+}
+
+Table messages [headercolor: #B7DBFF] {
+  id uuid [pk, not null]
+  conversation_id uuid [not null]
+  sender_type message_sender_type [not null]
+  content text [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    conversation_id
+    created_at
+    (conversation_id, created_at)
+  }
+
+  Note: '''
+  Stores user prompts and assistant replies.
+  '''
+}
+
+Table favorites [headercolor: #F4F8FC] {
+  id uuid [pk, not null]
+  user_id uuid [not null]
+  message_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+    message_id
+    (user_id, message_id) [unique]
+  }
+
+  Note: '''
+  Extension entity for message favorites.
+  Not first-batch mandatory in Phase 3.
+  '''
+}
+
+Table search_records [headercolor: #F4F8FC] {
+  id uuid [pk, not null]
+  user_id uuid [not null]
+  keyword varchar(100) [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+    created_at
+  }
+
+  Note: '''
+  Extension entity for user search history.
+  Not first-batch mandatory in Phase 3.
+  '''
+}
+
+Ref: profiles.user_id - auth.users.id
+Ref: conversations.user_id > auth.users.id
+Ref: messages.conversation_id > conversations.id
+Ref: favorites.user_id > auth.users.id
+Ref: favorites.message_id > messages.id
+Ref: search_records.user_id > auth.users.id

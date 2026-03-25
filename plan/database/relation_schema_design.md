@@ -21,7 +21,7 @@
 
 当前系统的核心关系模式为：
 
-- `users`
+- `auth.users`
 - `profiles`
 - `conversations`
 - `messages`
@@ -30,9 +30,37 @@
 
 其中：
 
-- `users` 与 `profiles` 共同承载用户身份与展示资料
+- `auth.users` 与 `profiles` 共同承载用户身份与展示资料
 - `conversations` 与 `messages` 构成聊天主线
 - `favorites` 与 `search_records` 承接消息收藏与搜索行为
+
+结合当前 `Phase 3` 的实施范围，第一批实际落地的最小关系模式应优先为：
+
+- `auth.users`
+- `profiles`
+- `conversations`
+- `messages`
+
+`favorites` 与 `search_records` 保留在整体设计中，但不作为当前首批 migration 的强制范围。
+
+这是一项有意为之的阶段性取舍，而不是设计遗漏。
+
+原因包括：
+
+- 当前阶段的最高优先级是完成数据库课程设计主线
+- 当前最小可演示闭环聚焦于会话 CRUD 与消息持久化
+- 若在首批实现中同时落地 `favorites` 与 `search_records`，会扩大改动面并分散主线开发注意力
+
+因此当前应将这两张表理解为：
+
+- 在整体数据库设计中保留
+- 在整体 ER 图中展示
+- 在后续扩展批次中再进入 Supabase 实际落地
+
+也就是说：
+
+- 整体设计范围不等于首批实现范围
+- 当前 Supabase 中未落地 `favorites` 与 `search_records`，属于阶段性控制，不代表其被从系统设计中删除
 
 ---
 
@@ -41,16 +69,19 @@
 ### 1. 用户表
 
 - 中文表名：用户
-- 英文表名：`users`
-- 作用：保存系统用户身份、角色与账号状态
+- 英文表名：`auth.users`
+- 作用：由 `Supabase Auth` 提供认证主身份，不作为当前项目优先自建的业务表
 
 | 字段名 | 类型 | 可空 | 主键 | 外键 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | 否 | 是 | 否 | 无 | 用户唯一标识 |
 | `email` | `varchar(255)` | 否 | 否 | 否 | 无 | 用户邮箱，要求唯一 |
-| `role` | `user_role` | 否 | 否 | 否 | `normal` | 用户角色，区分普通用户与管理员 |
-| `account_status` | `account_status` | 否 | 否 | 否 | `active` | 用户账号状态 |
 | `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 用户创建时间 |
+
+说明：
+
+- 若需要角色、账号状态等业务字段，可在后续扩展到 `profiles` 或单独业务表
+- 当前阶段不建议为了课程文档表达而重复自建完整认证主表
 
 ### 2. 用户资料表
 
@@ -60,7 +91,7 @@
 
 | 字段名 | 类型 | 可空 | 主键 | 外键 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `user_id` | `uuid` | 否 | 是 | 是 | 无 | 对应用户 ID，同时与用户表形成一对一关系 |
+| `user_id` | `uuid` | 否 | 是 | 是 | 无 | 对应 `auth.users.id`，同时形成一对一关系 |
 | `display_name` | `varchar(100)` | 是 | 否 | 否 | 无 | 展示名称或昵称 |
 | `avatar_url` | `varchar(500)` | 是 | 否 | 否 | 无 | 用户头像地址 |
 | `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 资料创建时间 |
@@ -128,7 +159,7 @@
 
 ### 主键
 
-- `users.id`
+- `auth.users.id`
 - `profiles.user_id`
 - `conversations.id`
 - `messages.id`
@@ -137,12 +168,12 @@
 
 ### 外键
 
-- `profiles.user_id -> users.id`
-- `conversations.user_id -> users.id`
+- `profiles.user_id -> auth.users.id`
+- `conversations.user_id -> auth.users.id`
 - `messages.conversation_id -> conversations.id`
-- `favorites.user_id -> users.id`
+- `favorites.user_id -> auth.users.id`
 - `favorites.message_id -> messages.id`
-- `search_records.user_id -> users.id`
+- `search_records.user_id -> auth.users.id`
 
 ---
 
@@ -150,13 +181,11 @@
 
 ### 1. 唯一约束
 
-- `users.email` 唯一，用于保证邮箱不重复
+- `auth.users.email` 唯一，用于保证邮箱不重复
 - `favorites(user_id, message_id)` 唯一，用于保证同一用户对同一消息只能收藏一次
 
 ### 2. 枚举约束
 
-- `users.role` 只能取 `normal`、`admin`
-- `users.account_status` 只能取 `active`、`banned`
 - `conversations.status` 只能取 `active`、`archived`
 - `messages.sender_type` 只能取 `user`、`assistant`
 
@@ -214,12 +243,11 @@
 
 ### 1. 用户表索引
 
-- `users.role`
-- `users.account_status`
+- `auth.users.email`
 
 作用：
 
-- 便于管理员按角色或账号状态进行筛选
+- 支撑登录身份唯一性与认证查询
 
 ### 2. 会话表索引
 
@@ -272,7 +300,7 @@
 
 可将当前关系模式概括为：
 
-- `users(id, email, role, account_status, created_at)`
+- `auth.users(id, email, created_at, ...)`
 - `profiles(user_id, display_name, avatar_url, created_at, updated_at)`
 - `conversations(id, user_id, title, system_prompt, status, created_at, updated_at)`
 - `messages(id, conversation_id, sender_type, content, created_at)`
@@ -283,4 +311,4 @@
 
 ## 八、一句话总结
 
-当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录等核心需求，并可作为后续 Supabase 建表与课程文档撰写的直接基础。
+当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录等核心需求；其中 `Phase 3` 首批实现应优先落地 `auth.users / profiles / conversations / messages`，并以此作为后续 Supabase migration 与课程文档撰写的直接基础。
