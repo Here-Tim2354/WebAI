@@ -14,20 +14,20 @@ type MessageListProps = {
 
 const promptCards = [
   {
-    title: "产品",
-    prompt: "帮我定义一个 AI 聊天首页的空态文案和视觉重点。",
+    title: "梳理思路",
+    prompt: "帮我把一个想法拆成几个清晰的执行步骤。",
   },
   {
-    title: "代码",
+    title: "写点代码",
     prompt: "用 TypeScript 写一个带类型守卫的消息格式化函数。",
   },
   {
-    title: "计划",
-    prompt: "帮我整理 WebAI Phase 2 的设计与实现任务顺序。",
+    title: "制定计划",
+    prompt: "帮我整理一个功能从设计到实现的任务顺序。",
   },
   {
-    title: "文档",
-    prompt: "把当前产品思路整理成一份清晰的 Markdown 说明。",
+    title: "整理文档",
+    prompt: "把当前思路整理成一份清晰的 Markdown 说明。",
   },
 ];
 
@@ -50,7 +50,7 @@ export function MessageList({
         <div className="chat-empty">
           <div className="chat-empty__inner">
             <div className="chat-empty__eyebrow">WebAI</div>
-            <h1 className="chat-empty__title">你好，今天想聊点什么？</h1>
+            <h1 className="chat-empty__title">想聊点什么？</h1>
             <div className="chat-empty__grid">
               {promptCards.map((card) => (
                 <button

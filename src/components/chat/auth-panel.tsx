@@ -146,20 +146,17 @@ export function AuthPanel({
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="auth-card__eyebrow">Phase 3.4</div>
-        <h1 className="auth-card__title">先登录，再进入你的会话工作区</h1>
-        <p className="auth-card__description">
-          这一阶段会把会话真正挂到 Supabase 用户下，列表、重命名、删除都会基于真实账户生效。
-        </p>
+        <div className="auth-card__eyebrow">WebAI</div>
+        <h1 className="auth-card__title">继续使用你的对话</h1>
+        <p className="auth-card__description">输入邮箱，获取登录链接。</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-form__field">
-            <span>邮箱</span>
             <input
               ref={inputRef}
               type="email"
               value={email}
-              placeholder="you@example.com"
+              placeholder="邮箱地址"
               autoFocus
               onChange={(event) => setEmail(event.target.value)}
             />
@@ -169,8 +166,8 @@ export function AuthPanel({
             {isSubmitting
               ? "发送中..."
               : feedbackCode === "otp_expired"
-                ? "重新发送登录链接"
-                : "发送登录链接"}
+                ? "重新发送"
+                : "发送链接"}
           </button>
         </form>
 

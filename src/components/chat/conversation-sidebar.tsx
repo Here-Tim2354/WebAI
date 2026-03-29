@@ -82,14 +82,14 @@ export function ConversationSidebar({
           onClick={() => void onCreateConversation()}
           disabled={isCreating}
         >
-          {isCreating ? "创建中..." : "New"}
+          {isCreating ? "创建中..." : "新对话"}
         </button>
 
         <section className="sidebar__overview" aria-label="会话列表">
-          <span className="sidebar__section-title">Conversations</span>
+          <span className="sidebar__section-title">最近对话</span>
           <div className="sidebar__conversation-list">
             {conversations.length === 0 ? (
-              <div className="sidebar__empty">还没有会话，先新建一个。</div>
+              <div className="sidebar__empty">还没有对话。</div>
             ) : (
               conversations.map((conversation) => {
                 const isActive = conversation.id === activeConversationId;
@@ -162,7 +162,7 @@ export function ConversationSidebar({
       </div>
 
       <div className="sidebar__footer">
-        <strong>{conversations.length > 0 ? `${conversations.length} chats` : "0 chats"}</strong>
+        <strong>{conversations.length > 0 ? `${conversations.length} 个对话` : "暂无对话"}</strong>
         <button
           className="sidebar__sign-out"
           type="button"

@@ -23,7 +23,7 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "操作失败，请稍后再试。";
+  return "暂时无法完成操作，请稍后再试。";
 }
 
 export function ChatShell({
@@ -220,19 +220,19 @@ export function ChatShell({
       <main className="main-panel">
         <header className="chat-header">
           <div>
-            <div className="chat-header__eyebrow">Conversation</div>
+            <div className="chat-header__eyebrow">WebAI</div>
             <div className="chat-header__brand">
-              {activeConversation?.title ?? "请选择或新建一个会话"}
+              {activeConversation?.title ?? "开始一个新对话"}
             </div>
           </div>
           <div className="chat-header__pill">
             {isSubmitting
-              ? "Live"
+              ? "生成中"
               : activeConversation
                 ? hasMessages
-                  ? "Open"
-                  : "Ready"
-                : "Idle"}
+                  ? "进行中"
+                  : "已就绪"
+                : "未开始"}
           </div>
         </header>
 
@@ -268,18 +268,16 @@ export function ChatShell({
         ) : (
           <section className="workspace-empty">
             <div className="workspace-empty__inner">
-              <div className="chat-empty__eyebrow">Conversations</div>
-              <h2 className="workspace-empty__title">先创建一个真实会话，再开始聊天</h2>
-              <p className="workspace-empty__description">
-                这一步已经接入 Supabase 用户与会话表，左侧的新建、切换、重命名和删除都会直接作用到数据库。
-              </p>
+              <div className="chat-empty__eyebrow">WebAI</div>
+              <h2 className="workspace-empty__title">新建一个对话，继续你的思路</h2>
+              <p className="workspace-empty__description">你的对话会保存在侧边栏里，方便随时回来继续。</p>
               <button
                 className="workspace-empty__button"
                 type="button"
                 onClick={() => void handleCreateConversation()}
                 disabled={isCreatingConversation}
               >
-                {isCreatingConversation ? "创建中..." : "新建会话"}
+                {isCreatingConversation ? "创建中..." : "新建对话"}
               </button>
             </div>
           </section>

@@ -22,10 +22,10 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
   const helperText = disabled
-    ? "先新建或打开一个会话"
+    ? "先新建或打开一个对话"
     : isSubmitting
       ? "生成中"
-      : "Enter 发送";
+      : "回车发送";
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -49,19 +49,17 @@ export function ChatInput({
       className={`composer ${hasMessages ? "composer--dock" : "composer--hero"}`}
     >
       <div className="composer__meta">
-        <span className="composer__eyebrow">
-          {hasMessages ? "Thread" : "Prompt"}
-        </span>
+        <span className="composer__eyebrow">{hasMessages ? "对话中" : "开始对话"}</span>
         {isSubmitting ? (
           <span className="composer__status composer__status--live">
-            Gemini
+            回复中
           </span>
         ) : null}
       </div>
       <textarea
         ref={textareaRef}
         className="composer__input"
-        placeholder={disabled ? "先新建或打开一个会话..." : "发一条消息..."}
+        placeholder={disabled ? "先新建或打开一个对话..." : "发一条消息..."}
         value={value}
         rows={1}
         disabled={disabled}
@@ -85,7 +83,7 @@ export function ChatInput({
             disabled={!canSend}
             aria-label="发送消息"
           >
-            Send
+            发送
           </button>
         </div>
       </div>
