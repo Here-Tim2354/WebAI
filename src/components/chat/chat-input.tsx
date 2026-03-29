@@ -8,6 +8,7 @@ type ChatInputProps = {
   onSubmit: () => Promise<void>;
   isSubmitting: boolean;
   hasMessages: boolean;
+  disabled?: boolean;
 };
 
 export function ChatInput({
@@ -16,10 +17,15 @@ export function ChatInput({
   onSubmit,
   isSubmitting,
   hasMessages,
+  disabled = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const canSend = value.trim().length > 0 && !isSubmitting;
-  const helperText = isSubmitting ? "生成中" : "Enter 发送";
+  const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
+  const helperText = disabled
+    ? "先新建或打开一个会话"
+    : isSubmitting
+      ? "生成中"
+      : "Enter 发送";
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -55,9 +61,10 @@ export function ChatInput({
       <textarea
         ref={textareaRef}
         className="composer__input"
-        placeholder="发一条消息..."
+        placeholder={disabled ? "先新建或打开一个会话..." : "发一条消息..."}
         value={value}
         rows={1}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {

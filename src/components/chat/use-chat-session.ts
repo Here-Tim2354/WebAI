@@ -16,12 +16,40 @@ function getErrorMessage(error: unknown) {
 }
 
 export function useChatSession() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<
+    Record<string, ChatMessage[]>
+  >({});
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleResetConversation() {
-    setMessages([]);
+  function getMessages(conversationId: string | null) {
+    if (!conversationId) {
+      return [];
+    }
+
+    return conversationMessages[conversationId] ?? [];
+  }
+
+  function updateConversationMessages(
+    conversationId: string,
+    updater: (messages: ChatMessage[]) => ChatMessage[],
+  ) {
+    setConversationMessages((current) => ({
+      ...current,
+      [conversationId]: updater(current[conversationId] ?? []),
+    }));
+  }
+
+  function handleResetConversation(conversationId: string | null) {
+    if (!conversationId) {
+      setInputValue("");
+      return;
+    }
+
+    setConversationMessages((current) => ({
+      ...current,
+      [conversationId]: [],
+    }));
     setInputValue("");
   }
 
@@ -29,13 +57,14 @@ export function useChatSession() {
     setInputValue(prompt);
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(activeConversationId: string | null) {
     const content = inputValue.trim();
 
-    if (!content || isSubmitting) {
+    if (!content || isSubmitting || !activeConversationId) {
       return;
     }
 
+    const messages = getMessages(activeConversationId);
     const userMessage = createChatMessage({
       role: "user",
       content,
@@ -53,7 +82,11 @@ export function useChatSession() {
       userMessage,
     ];
 
-    setMessages((current) => [...current, userMessage, assistantPlaceholder]);
+    updateConversationMessages(activeConversationId, (current) => [
+      ...current,
+      userMessage,
+      assistantPlaceholder,
+    ]);
     setInputValue("");
     setIsSubmitting(true);
 
@@ -76,13 +109,13 @@ export function useChatSession() {
 
       const parsed = chatResponseSchema.parse(payload);
 
-      setMessages((current) =>
+      updateConversationMessages(activeConversationId, (current) =>
         current.map((message) =>
           message.id === assistantPlaceholder.id ? parsed.message : message,
         ),
       );
     } catch (error) {
-      setMessages((current) =>
+      updateConversationMessages(activeConversationId, (current) =>
         current.map((message) =>
           message.id === assistantPlaceholder.id
             ? createChatMessage({
@@ -100,10 +133,11 @@ export function useChatSession() {
   }
 
   return {
-    messages,
+    conversationMessages,
     inputValue,
     isSubmitting,
     setInputValue,
+    getMessages,
     handlePromptSelect,
     handleResetConversation,
     handleSubmit,

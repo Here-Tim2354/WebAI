@@ -1,14 +1,14 @@
 # Current Todo
 
-更新时间：2026-03-25 23:35:00
+更新时间：2026-03-29 00:00:00
 
 ## 当前阶段
 
 - 当前项目处于 `Phase 3`
 - `Phase 1` 已完成并通过验收
 - `Phase 2` 的前端体验收口已基本完成
-- 当前判断：`Phase 3.1` 已完成主要口径收口，`Phase 3.2` 已完成核心表与 migration 落地
-- 当前主线：`继续推进 Supabase 接入层与会话级 CRUD，让聊天链路真正建立在数据库之上`
+- 当前判断：`Phase 3.1`、`Phase 3.2`、`Phase 3.3` 已完成，`Phase 3.4` 的会话 CRUD 已基本落地，但 `Auth` 仍存在待修复 bug
+- 当前主线：`先修复 Phase 3.4 的 Auth 问题，再进入 Phase 3.5 的消息持久化闭环`
 
 ## 当前状态概览
 
@@ -22,11 +22,10 @@
 - 已实现 Markdown 渲染、代码块高亮、代码复制
 - 已支持自定义 Gemini 服务端 URL：`GEMINI_BASE_URL`
 - 已修正服务端环境变量错误分类
-- 已收掉侧栏伪功能入口，使产品边界与 `Phase 1` 一致
 - 默认模型已调整为更稳妥的 `gemini-2.5-flash`
 - 已补充自动验收脚本：`npm run check:phase1`
 - 已完成本地 `Phase 1` 验收：`npm run check:phase1`
-- 已完成基础工程校验：`npm run lint`、`npm run typecheck`、`npm run build`
+- 已完成基础工程校验：`npm run lint`、`npm run typecheck`
 - 已更新 `plan/phase/phase_overview.md`，明确新的项目定位与 phase 顺序
 - 已确认课程作业主线将前置 `Supabase 持久化与会话 CRUD 系统`
 - 已完成 `Phase 2` 的前端视觉与交互收口
@@ -56,6 +55,28 @@
   - 已配置 `auth.users -> public.profiles` 的新用户触发器
   - 已为三张核心表开启基础 `RLS`
   - 已修复 `set_updated_at` 的 `search_path` 安全提示
+- 已完成 `Phase 3.3` 的 Supabase 接入层初始化：
+  - 已安装 `@supabase/supabase-js` 与 `@supabase/ssr`
+  - 已新增 Supabase 环境变量校验
+  - 已建立浏览器端 `Supabase client`
+  - 已建立服务端 `Supabase client`
+  - 已更新 `.env.example`，补充 Supabase 配置项
+- 已完成 `Phase 3.4` 的会话 CRUD 闭环：
+  - 已接入最小可用的 `Supabase Auth` 邮箱 magic link 登录链路
+  - 已实现 `auth confirm route` 与 `proxy.ts` 的 SSR session 刷新方案
+  - 已实现当前用户获取与工作区鉴权分层
+  - 已将首页切分为：未登录态 / 已登录工作区
+  - 已将左侧侧栏替换为真实会话列表
+  - 已实现会话列表查询
+  - 已实现点击 `New` 后立即创建空会话并自动选中
+  - 已实现会话重命名
+  - 已实现会话真删除
+  - 已完成会话级接口的基础错误处理修复
+  - 已完成本轮实现后的 `npm run lint` 与 `npm run typecheck`
+- 已确认当前 `Phase 3.4` 仍存在一个 `Auth` 相关 bug，尚待修复：
+  - 当前问题不应被误判为“认证链路已稳定可交付”
+  - 具体问题参考用户提供的排查线索与后续修复记录
+  - 在 Auth 修稳之前，不应直接把 `Phase 3.4` 视为完全收口
 
 ## 当前推进依据
 
@@ -70,30 +91,34 @@
 
 ## 下一阶段重点
 
-- 当前应进入 `Phase 3.3`
-- 下一步重点不是继续扩展表，而是先建立稳定的 `Supabase` 接入层
-- `Phase 3.3` 重点包括：
-  - 安装并接入 `@supabase/supabase-js` 与 `@supabase/ssr`
-  - 增加 Supabase 环境变量与配置说明
-  - 建立浏览器端 `Supabase client`
-  - 建立服务端 `Supabase client`
-  - 明确 `Next.js App Router` 下的身份获取方式
-  - 为后续会话 CRUD 和聊天持久化提供统一数据库访问入口
-- 在 `Phase 3.3` 完成后，应继续进入：
-  - `Phase 3.4`：会话级 CRUD
-  - `Phase 3.5`：聊天持久化闭环
+- 当前优先事项不是直接推进 `Phase 3.5`
+- 下一步重点应先修复 `Phase 3.4` 的 `Auth` 问题，并重新验证登录链路
+- Auth 修复完成后，再让当前聊天能力真正切到数据库主链路
+- `Phase 3.5` 重点包括：
+  - 当前未打开会话时，首次发送自动创建会话
+  - 用户消息写入 `public.messages`
+  - 服务端调用 Gemini 后写入 assistant 消息
+  - 打开历史会话时恢复完整消息记录
+  - 会话标题与消息流的边界整理，避免耦合失控
+- 在 `Phase 3.5` 完成后，再进入：
+  - `Phase 3.6`：RLS 验证、数据库说明补全与答辩支撑材料整理
 
 ## 当前限制与提醒
 
-- 当前虽然已在 Supabase 中落地核心表，但项目代码尚未接入 Supabase
-- 当前前端仍然是 `单页单会话、本地状态驱动、刷新丢失`
-- 当前还不能误判为已完成会话系统或数据库驱动聊天
+- 当前虽然已经完成真实用户下的会话 CRUD，但聊天消息仍未持久化
+- 当前 `messages` 表尚未接入实际聊天主链路
+- 当前打开历史会话时，还不能恢复数据库中的消息记录
+- 当前右侧聊天面板仍然是“会话内前端状态聊天”，不是“数据库驱动聊天”
 - 当前 Supabase 首批只落地了：
   - `profiles`
   - `conversations`
   - `messages`
 - `favorites` 与 `search_records` 仍然只保留在整体设计中，尚未进入首批 schema
 - `Supabase MCP` 当前可用，但不应假定其始终稳定；关键设计仍应和官方文档交叉确认
+- 当前邮箱登录链路是否可完整跑通，还依赖 Supabase 控制台中的以下配置是否正确：
+  - `Auth -> URL Configuration`
+  - `Auth -> Email Templates` 中的 magic link / confirm signup 模板
+- 当前 `Phase 3.4` 的 Auth 存在已知 bug，未修复前不应当作稳定能力对外说明
 - 若要接真实 Gemini，请优先确认以下环境变量：
   - `GEMINI_API_KEY`
   - `GEMINI_MODEL`
@@ -102,8 +127,10 @@
 ## 备注
 
 - 当前阶段判断基于现有文档、仓库实现、Supabase 实际项目状态和 MCP/官方资料交叉确认，不是静态猜测
-- `npm run build` 在沙盒内仍会遇到 `spawn EPERM`，但在沙盒外复跑可通过，这属于运行环境限制，不属于仓库缺陷
+- `npm run build` 在当前环境中仍会遇到 `spawn EPERM`，属于运行环境限制，当前不能直接作为仓库缺陷判断依据
 - 当前评估结论是：
-  - `Phase 3.1` 已基本完成
+  - `Phase 3.1` 已完成数据库口径收口
   - `Phase 3.2` 已完成核心数据库落地
-  - 项目可以把主线继续推进到 `Phase 3.3`
+  - `Phase 3.3` 已完成 Supabase 接入层初始化
+  - `Phase 3.4` 已完成真实用户下的会话 CRUD 主体，但 Auth 尚未收口
+  - 项目主线应先完成 `Phase 3.4` Auth 修复，再继续推进到 `Phase 3.5`
