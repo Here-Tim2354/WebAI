@@ -7,8 +7,8 @@
 - 当前项目处于 `Phase 3`
 - `Phase 1` 已完成并通过验收
 - `Phase 2` 的前端体验收口已基本完成
-- 当前判断：`Phase 3.1`、`Phase 3.2`、`Phase 3.3` 已完成，`Phase 3.4` 的会话 CRUD 已基本落地，但 `Auth` 仍存在待修复 bug
-- 当前主线：`先修复 Phase 3.4 的 Auth 问题，再进入 Phase 3.5 的消息持久化闭环`
+- 当前判断：`Phase 3.1`、`Phase 3.2`、`Phase 3.3` 已完成，`Phase 3.4` 的会话 CRUD 已基本落地
+- 当前主线：`进入 Phase 3.5 的消息持久化闭环`
 
 ## 当前状态概览
 
@@ -91,9 +91,6 @@
 
 ## 下一阶段重点
 
-- 当前优先事项不是直接推进 `Phase 3.5`
-- 下一步重点应先修复 `Phase 3.4` 的 `Auth` 问题，并重新验证登录链路
-- Auth 修复完成后，再让当前聊天能力真正切到数据库主链路
 - `Phase 3.5` 重点包括：
   - 当前未打开会话时，首次发送自动创建会话
   - 用户消息写入 `public.messages`
@@ -118,7 +115,6 @@
 - 当前邮箱登录链路是否可完整跑通，还依赖 Supabase 控制台中的以下配置是否正确：
   - `Auth -> URL Configuration`
   - `Auth -> Email Templates` 中的 magic link / confirm signup 模板
-- 当前 `Phase 3.4` 的 Auth 存在已知 bug，未修复前不应当作稳定能力对外说明
 - 若要接真实 Gemini，请优先确认以下环境变量：
   - `GEMINI_API_KEY`
   - `GEMINI_MODEL`
@@ -133,4 +129,4 @@
   - `Phase 3.2` 已完成核心数据库落地
   - `Phase 3.3` 已完成 Supabase 接入层初始化
   - `Phase 3.4` 已完成真实用户下的会话 CRUD 主体，但 Auth 尚未收口
-  - 项目主线应先完成 `Phase 3.4` Auth 修复，再继续推进到 `Phase 3.5`
+  - 推进到 `Phase 3.5`
