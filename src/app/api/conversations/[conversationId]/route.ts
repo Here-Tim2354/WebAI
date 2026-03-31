@@ -3,6 +3,7 @@ import {
   conversationResponseSchema,
   updateConversationRequestSchema,
 } from "@/lib/schemas/conversation";
+import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 import {
   ConversationAccessError,
@@ -10,6 +11,7 @@ import {
   getConversationById,
   updateConversationTitle,
 } from "@/lib/supabase/conversations";
+import { listConversationMessages } from "@/lib/supabase/messages";
 
 type RouteContext = {
   params: Promise<{
@@ -67,8 +69,11 @@ export async function GET(_request: Request, context: RouteContext) {
       user.id,
       conversationId,
     );
+    const messages = await listConversationMessages(supabase, conversationId);
 
-    return NextResponse.json(conversationResponseSchema.parse({ conversation }));
+    return NextResponse.json(
+      chatSessionResponseSchema.parse({ conversation, messages }),
+    );
   } catch (error) {
     return handleConversationError(error);
   }

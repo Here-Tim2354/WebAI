@@ -137,3 +137,29 @@ export async function deleteConversation(
     throw new ConversationAccessError("会话不存在，或你没有访问权限。");
   }
 }
+
+export async function touchConversation(
+  supabase: SupabaseClient,
+  userId: string,
+  conversationId: string,
+) {
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId)
+    .eq("user_id", userId)
+    .select("id, title, status, created_at, updated_at")
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new ConversationAccessError("会话不存在，或你没有访问权限。");
+    }
+
+    throw error;
+  }
+
+  return mapConversation(data as ConversationRow);
+}

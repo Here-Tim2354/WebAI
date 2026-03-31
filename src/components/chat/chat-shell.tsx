@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { AuthUser } from "@/lib/schemas/auth";
 import { Conversation, conversationResponseSchema } from "@/lib/schemas/conversation";
 import { AuthPanel } from "./auth-panel";
@@ -26,6 +27,12 @@ function getErrorMessage(error: unknown) {
   return "暂时无法完成操作，请稍后再试。";
 }
 
+function sortConversations(conversations: Conversation[]) {
+  return [...conversations].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  );
+}
+
 export function ChatShell({
   initialUser,
   initialConversations,
@@ -34,7 +41,9 @@ export function ChatShell({
 }: ChatShellProps) {
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
-  const [conversations, setConversations] = useState(initialConversations);
+  const [conversations, setConversations] = useState(
+    sortConversations(initialConversations),
+  );
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     initialConversations[0]?.id ?? null,
   );
@@ -43,6 +52,7 @@ export function ChatShell({
     string | null
   >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const {
     inputValue,
@@ -51,6 +61,8 @@ export function ChatShell({
     getMessages,
     handlePromptSelect,
     handleSubmit,
+    syncConversationMessages,
+    removeConversationMessages,
   } = useChatSession();
   const messages = getMessages(activeConversationId);
   const {
@@ -65,7 +77,17 @@ export function ChatShell({
     (conversation) => conversation.id === activeConversationId,
   );
 
-  async function handleCreateConversation() {
+  function upsertConversation(nextConversation: Conversation) {
+    setConversations((current) => {
+      const remaining = current.filter(
+        (conversation) => conversation.id !== nextConversation.id,
+      );
+
+      return sortConversations([nextConversation, ...remaining]);
+    });
+  }
+
+  async function createConversation(options?: { activate?: boolean }) {
     setIsCreatingConversation(true);
     setWorkspaceError(null);
 
@@ -84,12 +106,71 @@ export function ChatShell({
       }
 
       const parsed = conversationResponseSchema.parse(payload);
-      setConversations((current) => [parsed.conversation, ...current]);
-      setActiveConversationId(parsed.conversation.id);
-    } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      upsertConversation(parsed.conversation);
+      syncConversationMessages(parsed.conversation.id, []);
+
+      if (options?.activate ?? true) {
+        setActiveConversationId(parsed.conversation.id);
+      }
+
+      return parsed.conversation;
     } finally {
       setIsCreatingConversation(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      setIsLoadingConversation(false);
+      return;
+    }
+
+    const conversationId = activeConversationId;
+    let cancelled = false;
+
+    async function loadConversation() {
+      setIsLoadingConversation(true);
+
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error?.message ?? "读取会话失败。");
+        }
+
+        const parsed = chatSessionResponseSchema.parse(payload);
+
+        if (cancelled) {
+          return;
+        }
+
+        syncConversationMessages(conversationId, parsed.messages);
+        upsertConversation(parsed.conversation);
+        setWorkspaceError(null);
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceError(getErrorMessage(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingConversation(false);
+        }
+      }
+    }
+
+    void loadConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversationId, syncConversationMessages]);
+
+  async function handleCreateConversation() {
+    try {
+      await createConversation({ activate: true });
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
     }
   }
 
@@ -114,17 +195,7 @@ export function ChatShell({
       }
 
       const parsed = conversationResponseSchema.parse(payload);
-      setConversations((current) =>
-        current
-          .map((conversation) =>
-            conversation.id === conversationId
-              ? parsed.conversation
-              : conversation,
-          )
-          .sort((left, right) =>
-            right.updatedAt.localeCompare(left.updatedAt),
-          ),
-      );
+      upsertConversation(parsed.conversation);
     } catch (error) {
       const message = getErrorMessage(error);
       setWorkspaceError(message);
@@ -149,6 +220,7 @@ export function ChatShell({
         throw new Error(payload?.error?.message ?? "删除失败。");
       }
 
+      removeConversationMessages(conversationId);
       setConversations((current) => {
         const remaining = current.filter(
           (conversation) => conversation.id !== conversationId,
@@ -190,6 +262,32 @@ export function ChatShell({
     } finally {
       setIsSigningOut(false);
     }
+  }
+
+  async function ensureConversationId() {
+    if (activeConversationId) {
+      return activeConversationId;
+    }
+
+    try {
+      const conversation = await createConversation({ activate: true });
+      return conversation.id;
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
+      return null;
+    }
+  }
+
+  async function handleSendMessage() {
+    setWorkspaceError(null);
+
+    await handleSubmit({
+      activeConversationId,
+      ensureConversationId,
+      onConversationSynced(conversation) {
+        upsertConversation(conversation);
+      },
+    });
   }
 
   if (!user) {
@@ -242,46 +340,34 @@ export function ChatShell({
           </div>
         ) : null}
 
-        {activeConversation ? (
-          <section
-            className={`chat-body ${
-              hasMessages ? "chat-body--conversation" : "chat-body--empty"
-            }`}
-          >
-            <MessageList
-              messages={messages}
-              messageEndRef={messageEndRef}
-              scrollContainerRef={scrollContainerRef}
-              onPromptSelect={handlePromptSelect}
-              onScroll={handleScroll}
-              showJumpToLatest={showJumpToLatest}
-              onJumpToLatest={() => scrollToLatest()}
-            />
-            <ChatInput
-              value={inputValue}
-              onChange={setInputValue}
-              onSubmit={() => handleSubmit(activeConversation.id)}
-              isSubmitting={isSubmitting}
-              hasMessages={hasMessages}
-            />
-          </section>
-        ) : (
-          <section className="workspace-empty">
-            <div className="workspace-empty__inner">
-              <div className="chat-empty__eyebrow">WebAI</div>
-              <h2 className="workspace-empty__title">新建一个对话，继续你的思路</h2>
-              <p className="workspace-empty__description">你的对话会保存在侧边栏里，方便随时回来继续。</p>
-              <button
-                className="workspace-empty__button"
-                type="button"
-                onClick={() => void handleCreateConversation()}
-                disabled={isCreatingConversation}
-              >
-                {isCreatingConversation ? "创建中..." : "新建对话"}
-              </button>
-            </div>
-          </section>
-        )}
+        {isLoadingConversation ? (
+          <div className="workspace-banner" role="status">
+            正在恢复历史消息...
+          </div>
+        ) : null}
+
+        <section
+          className={`chat-body ${
+            hasMessages ? "chat-body--conversation" : "chat-body--empty"
+          }`}
+        >
+          <MessageList
+            messages={messages}
+            messageEndRef={messageEndRef}
+            scrollContainerRef={scrollContainerRef}
+            onPromptSelect={handlePromptSelect}
+            onScroll={handleScroll}
+            showJumpToLatest={showJumpToLatest}
+            onJumpToLatest={() => scrollToLatest()}
+          />
+          <ChatInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={handleSendMessage}
+            isSubmitting={isSubmitting}
+            hasMessages={hasMessages}
+          />
+        </section>
       </main>
     </div>
   );

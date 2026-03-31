@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { Conversation } from "@/lib/schemas/conversation";
 
 type ConversationSidebarProps = {
@@ -44,11 +44,16 @@ export function ConversationSidebar({
   );
   const [titleDraft, setTitleDraft] = useState("");
 
-  async function handleRenameSubmit(
-    event: FormEvent<HTMLFormElement>,
-    conversationId: string,
-  ) {
+  const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event,
+  ) => {
     event.preventDefault();
+
+    const conversationId = editingConversationId;
+
+    if (!conversationId) {
+      return;
+    }
 
     const nextTitle = titleDraft.trim();
 
@@ -63,7 +68,7 @@ export function ConversationSidebar({
     } catch {
       // 保留编辑态和输入内容，让用户直接修正后重试。
     }
-  }
+  };
 
   return (
     <aside className="sidebar">
@@ -106,9 +111,7 @@ export function ConversationSidebar({
                     {isEditing ? (
                       <form
                         className="conversation-item__rename"
-                        onSubmit={(event) =>
-                          void handleRenameSubmit(event, conversation.id)
-                        }
+                        onSubmit={handleRenameSubmit}
                       >
                         <input
                           autoFocus

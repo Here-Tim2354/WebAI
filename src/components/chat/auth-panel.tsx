@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type AuthPanelProps = {
   initialMessage?: string | null;
@@ -104,7 +104,9 @@ export function AuthPanel({
     }
   }, []);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
+    event,
+  ) => {
     event.preventDefault();
 
     if (!email.trim() || isSubmitting) {
@@ -141,7 +143,7 @@ export function AuthPanel({
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <main className="auth-shell">

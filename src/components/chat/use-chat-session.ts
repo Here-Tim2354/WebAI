@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ChatMessage,
-  chatResponseSchema,
+  chatSessionResponseSchema,
   createChatMessage,
 } from "@/lib/schemas/chat";
+import { Conversation } from "@/lib/schemas/conversation";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -15,6 +16,12 @@ function getErrorMessage(error: unknown) {
   return "消息发送失败，请稍后再试。";
 }
 
+type SubmitOptions = {
+  activeConversationId: string | null;
+  ensureConversationId: () => Promise<string | null>;
+  onConversationSynced: (conversation: Conversation) => void;
+};
+
 export function useChatSession() {
   const [conversationMessages, setConversationMessages] = useState<
     Record<string, ChatMessage[]>
@@ -22,13 +29,31 @@ export function useChatSession() {
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function getMessages(conversationId: string | null) {
+  const getMessages = useCallback((conversationId: string | null) => {
     if (!conversationId) {
       return [];
     }
 
     return conversationMessages[conversationId] ?? [];
-  }
+  }, [conversationMessages]);
+
+  const syncConversationMessages = useCallback((
+    conversationId: string,
+    messages: ChatMessage[],
+  ) => {
+    setConversationMessages((current) => ({
+      ...current,
+      [conversationId]: messages,
+    }));
+  }, []);
+
+  const removeConversationMessages = useCallback((conversationId: string) => {
+    setConversationMessages((current) => {
+      const next = { ...current };
+      delete next[conversationId];
+      return next;
+    });
+  }, []);
 
   function updateConversationMessages(
     conversationId: string,
@@ -40,50 +65,41 @@ export function useChatSession() {
     }));
   }
 
-  function handleResetConversation(conversationId: string | null) {
-    if (!conversationId) {
-      setInputValue("");
-      return;
-    }
-
-    setConversationMessages((current) => ({
-      ...current,
-      [conversationId]: [],
-    }));
-    setInputValue("");
-  }
-
-  function handlePromptSelect(prompt: string) {
+  const handlePromptSelect = useCallback((prompt: string) => {
     setInputValue(prompt);
-  }
+  }, []);
 
-  async function handleSubmit(activeConversationId: string | null) {
+  const handleSubmit = useCallback(async ({
+    activeConversationId,
+    ensureConversationId,
+    onConversationSynced,
+  }: SubmitOptions) => {
     const content = inputValue.trim();
 
-    if (!content || isSubmitting || !activeConversationId) {
+    if (!content || isSubmitting) {
       return;
     }
 
-    const messages = getMessages(activeConversationId);
+    const conversationId =
+      activeConversationId ?? (await ensureConversationId());
+
+    if (!conversationId) {
+      return;
+    }
+
     const userMessage = createChatMessage({
       role: "user",
       content,
       status: "complete",
     });
-
     const assistantPlaceholder = createChatMessage({
       role: "assistant",
       content: "",
       status: "pending",
     });
 
-    const nextConversation = [
-      ...messages.filter((message) => message.role !== "error"),
-      userMessage,
-    ];
-
-    updateConversationMessages(activeConversationId, (current) => [
-      ...current,
+    updateConversationMessages(conversationId, (current) => [
+      ...current.filter((message) => message.role !== "error"),
       userMessage,
       assistantPlaceholder,
     ]);
@@ -97,7 +113,8 @@ export function useChatSession() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: nextConversation,
+          conversationId,
+          content,
         }),
       });
 
@@ -107,15 +124,11 @@ export function useChatSession() {
         throw new Error(payload?.error?.message ?? "Gemini 暂时不可用。");
       }
 
-      const parsed = chatResponseSchema.parse(payload);
-
-      updateConversationMessages(activeConversationId, (current) =>
-        current.map((message) =>
-          message.id === assistantPlaceholder.id ? parsed.message : message,
-        ),
-      );
+      const parsed = chatSessionResponseSchema.parse(payload);
+      syncConversationMessages(conversationId, parsed.messages);
+      onConversationSynced(parsed.conversation);
     } catch (error) {
-      updateConversationMessages(activeConversationId, (current) =>
+      updateConversationMessages(conversationId, (current) =>
         current.map((message) =>
           message.id === assistantPlaceholder.id
             ? createChatMessage({
@@ -130,7 +143,7 @@ export function useChatSession() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  }, [inputValue, isSubmitting, syncConversationMessages]);
 
   return {
     conversationMessages,
@@ -139,7 +152,8 @@ export function useChatSession() {
     setInputValue,
     getMessages,
     handlePromptSelect,
-    handleResetConversation,
     handleSubmit,
+    syncConversationMessages,
+    removeConversationMessages,
   };
 }

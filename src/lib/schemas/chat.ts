@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conversationSchema } from "./conversation";
 
 export const chatMessageRoleSchema = z.enum([
   "user",
@@ -32,6 +33,16 @@ export const chatRequestSchema = z.object({
 
 export const chatResponseSchema = z.object({
   message: chatMessageSchema,
+});
+
+export const sendMessageRequestSchema = z.object({
+  conversationId: z.string().uuid("会话标识不正确。"),
+  content: z.string().trim().min(1, "消息不能为空。"),
+});
+
+export const chatSessionResponseSchema = z.object({
+  conversation: conversationSchema,
+  messages: z.array(chatMessageSchema),
 });
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;

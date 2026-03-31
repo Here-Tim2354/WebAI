@@ -50,7 +50,7 @@ export function MessageList({
         <div className="chat-empty">
           <div className="chat-empty__inner">
             <div className="chat-empty__eyebrow">WebAI</div>
-            <h1 className="chat-empty__title">想聊点什么？</h1>
+            <h1 className="chat-empty__title">想聊些什么？</h1>
             <div className="chat-empty__grid">
               {promptCards.map((card) => (
                 <button

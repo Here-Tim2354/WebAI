@@ -20,8 +20,8 @@ export async function createSupabaseServerClient() {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // Server Components 中写 cookie 会抛错。
-            // 当前阶段先不接完整 Auth 刷新链路，这里保持静默兼容。
+            // Server Components 中不能稳定写出响应 cookie。
+            // 这里保留兼容写入；真正的 session 刷新与持久化由 proxy.ts 负责。
           }
         },
       },
