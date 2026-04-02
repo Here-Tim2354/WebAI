@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircleIcon,
+  CheckIcon,
+  ChevronDownIcon,
   PanelLeftOpenIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -13,6 +15,16 @@ import { Button } from "@/components/ui/button";
 import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { AuthUser } from "@/lib/schemas/auth";
 import { Conversation, conversationResponseSchema } from "@/lib/schemas/conversation";
+import { AIModel, aiModelListResponseSchema } from "@/lib/schemas/model";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AuthPanel } from "./auth-panel";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ChatInput } from "./chat-input";
@@ -63,6 +75,8 @@ export function ChatShell({
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const {
     inputValue,
     isSubmitting,
@@ -83,6 +97,20 @@ export function ChatShell({
   const hasMessages = messages.length > 0;
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
+  );
+  const selectedModel = availableModels.find(
+    (model) => model.id === selectedModelId,
+  ) ?? null;
+  const groupedModels = availableModels.reduce<Record<string, AIModel[]>>(
+    (groups, model) => {
+      const key = model.provider === "gemini" ? "Gemini" : "OpenAI Compatible";
+
+      groups[key] ??= [];
+      groups[key].push(model);
+
+      return groups;
+    },
+    {},
   );
 
   function upsertConversation(nextConversation: Conversation) {
@@ -126,6 +154,50 @@ export function ChatShell({
       setIsCreatingConversation(false);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadModels() {
+      try {
+        const response = await fetch("/api/models");
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error?.message ?? "读取模型列表失败。");
+        }
+
+        const parsed = aiModelListResponseSchema.parse(payload);
+
+        if (cancelled) {
+          return;
+        }
+
+        setAvailableModels(parsed.models);
+        setSelectedModelId((current) => {
+          if (current && parsed.models.some((model) => model.id === current)) {
+            return current;
+          }
+
+          return (
+            parsed.models.find((model) => model.isDefault)?.id ??
+            parsed.models[0]?.id ??
+            null
+          );
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceError((current) => current ?? getErrorMessage(error));
+        }
+      }
+    }
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeConversationId) {
@@ -298,6 +370,7 @@ export function ChatShell({
     await handleSubmit({
       activeConversationId,
       ensureConversationId,
+      selectedModelId,
       onConversationSynced(conversation) {
         upsertConversation(conversation);
       },
@@ -354,13 +427,78 @@ export function ChatShell({
                 </div>
               </div>
               <div className="space-y-1">
-                <div className="truncate text-xl font-semibold tracking-[-0.05em] text-foreground sm:text-[1.5rem]">
-                  {hasMessages
-                    ? activeConversation?.title ?? "当前对话"
-                    : activeConversation
-                      ? activeConversation.title
-                      : "聊天工作区"}
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="inline-flex min-h-9 min-w-[12rem] items-center justify-between gap-3 rounded-full border border-slate-300/75 bg-transparent px-3.5 py-1.5 text-left text-[0.83rem] font-medium text-slate-600 transition-colors hover:border-slate-400/85 hover:bg-white/35 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+                        aria-label="选择模型"
+                      />
+                    }
+                  >
+                    <span className="truncate">
+                      {selectedModel?.label ?? "默认模型"}
+                    </span>
+                    <ChevronDownIcon className="size-4 shrink-0 text-slate-400" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={10}
+                    className="w-[22rem] rounded-2xl border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
+                  >
+                    {Object.entries(groupedModels).map(([groupName, models], index) => (
+                      <div key={groupName}>
+                        {index > 0 ? <DropdownMenuSeparator className="mx-2 my-1.5" /> : null}
+                        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
+                          {groupName}
+                        </DropdownMenuLabel>
+                        <DropdownMenuGroup>
+                          {models.map((model) => {
+                            const isActive = model.id === selectedModelId;
+                            const capabilitySummary = [
+                              model.capabilities.reasoning ? "推理" : null,
+                              model.capabilities.image ? "图像" : null,
+                              model.capabilities.audio ? "音频" : null,
+                              model.capabilities.video ? "视频" : null,
+                              model.capabilities.webSearch ? "联网" : null,
+                              model.capabilities.functionCalling ? "工具" : null,
+                            ].filter(Boolean);
+
+                            return (
+                              <DropdownMenuItem
+                                key={model.id}
+                                className="items-start rounded-xl px-3 py-2.5"
+                                onClick={() => setSelectedModelId(model.id)}
+                              >
+                                <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                                  <div className="min-w-0 space-y-1">
+                                    <div className="truncate text-sm font-medium text-foreground">
+                                      {model.label}
+                                    </div>
+                                    <div className="text-xs leading-5 text-muted-foreground">
+                                      {capabilitySummary.length > 0
+                                        ? capabilitySummary.join(" · ")
+                                        : model.provider === "gemini"
+                                          ? "Gemini 原生模型"
+                                          : "OpenAI 兼容模型"}
+                                    </div>
+                                  </div>
+                                  {isActive ? (
+                                    <span className="inline-flex size-5 items-center justify-center rounded-full bg-slate-900 text-white">
+                                      <CheckIcon className="size-3.5" />
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuGroup>
+                      </div>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
@@ -373,7 +511,7 @@ export function ChatShell({
                 : activeConversation
                   ? hasMessages
                     ? "进行中"
-                    : "已就绪"
+                    : selectedModel?.label ?? "已就绪"
                   : "未开始"}
             </Badge>
           </div>

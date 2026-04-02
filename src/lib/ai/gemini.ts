@@ -1,7 +1,12 @@
 import { Content, GoogleGenAI } from "@google/genai";
-import { getServerEnv } from "@/lib/env/server";
+import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
 import { ChatMessage } from "@/lib/schemas/chat";
 import { getSystemInstruction } from "./system-instruction";
+
+type GenerateWithGeminiOptions = {
+  conversationSystemPrompt?: string | null;
+  modelName?: string;
+};
 
 function toGeminiContents(messages: ChatMessage[]): Content[] {
   return messages
@@ -16,9 +21,18 @@ function toGeminiContents(messages: ChatMessage[]): Content[] {
     }));
 }
 
-export async function generateAssistantReply(messages: ChatMessage[]) {
+export async function generateWithGemini(
+  messages: ChatMessage[],
+  options?: GenerateWithGeminiOptions,
+) {
   const env = getServerEnv();
-  const systemInstruction = getSystemInstruction(messages);
+  const apiKey = requireServerEnvValue(
+    env.GEMINI_API_KEY,
+    "缺少 GEMINI_API_KEY。",
+  );
+  const systemInstruction = getSystemInstruction(messages, {
+    conversationSystemPrompt: options?.conversationSystemPrompt,
+  });
   const contents = toGeminiContents(messages);
 
   if (contents.length === 0) {
@@ -26,7 +40,7 @@ export async function generateAssistantReply(messages: ChatMessage[]) {
   }
 
   const client = new GoogleGenAI({
-    apiKey: env.GEMINI_API_KEY,
+    apiKey,
     httpOptions: env.GEMINI_BASE_URL
       ? {
           baseUrl: env.GEMINI_BASE_URL,
@@ -35,7 +49,7 @@ export async function generateAssistantReply(messages: ChatMessage[]) {
   });
 
   const response = await client.models.generateContent({
-    model: env.GEMINI_MODEL,
+    model: options?.modelName ?? env.GEMINI_MODEL,
     contents,
     config: systemInstruction
       ? {

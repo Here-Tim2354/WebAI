@@ -19,6 +19,7 @@ function getErrorMessage(error: unknown) {
 type SubmitOptions = {
   activeConversationId: string | null;
   ensureConversationId: () => Promise<string | null>;
+  selectedModelId?: string | null;
   onConversationSynced: (conversation: Conversation) => void;
 };
 
@@ -72,6 +73,7 @@ export function useChatSession() {
   const handleSubmit = useCallback(async ({
     activeConversationId,
     ensureConversationId,
+    selectedModelId,
     onConversationSynced,
   }: SubmitOptions) => {
     const content = inputValue.trim();
@@ -115,13 +117,14 @@ export function useChatSession() {
         body: JSON.stringify({
           conversationId,
           content,
+          modelId: selectedModelId ?? undefined,
         }),
       });
 
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "Gemini 暂时不可用。");
+        throw new Error(payload?.error?.message ?? "模型暂时不可用。");
       }
 
       const parsed = chatSessionResponseSchema.parse(payload);

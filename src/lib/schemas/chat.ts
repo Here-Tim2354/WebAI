@@ -38,6 +38,7 @@ export const chatResponseSchema = z.object({
 export const sendMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   content: z.string().trim().min(1, "消息不能为空。"),
+  modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
 });
 
 export const chatSessionResponseSchema = z.object({

@@ -9,7 +9,7 @@ import {
   ConversationAccessError,
   deleteConversation,
   getConversationById,
-  updateConversationTitle,
+  updateConversation,
 } from "@/lib/supabase/conversations";
 import { listConversationMessages } from "@/lib/supabase/messages";
 
@@ -108,7 +108,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(
         {
           error: {
-            message: parsed.error.issues[0]?.message ?? "标题格式不正确。",
+            message: parsed.error.issues[0]?.message ?? "会话更新参数不正确。",
           },
         },
         { status: 400 },
@@ -116,11 +116,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { conversationId } = await context.params;
-    const conversation = await updateConversationTitle(
+    const conversation = await updateConversation(
       supabase,
       user.id,
       conversationId,
-      parsed.data.title,
+      {
+        title: parsed.data.title,
+        systemPrompt: parsed.data.systemPrompt,
+      },
     );
 
     return NextResponse.json(conversationResponseSchema.parse({ conversation }));

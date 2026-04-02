@@ -4,6 +4,7 @@ import { Conversation } from "@/lib/schemas/conversation";
 type ConversationRow = {
   id: string;
   title: string;
+  system_prompt: string | null;
   status: "active" | "archived";
   created_at: string;
   updated_at: string;
@@ -13,11 +14,15 @@ function mapConversation(row: ConversationRow): Conversation {
   return {
     id: row.id,
     title: row.title,
+    systemPrompt: row.system_prompt,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+const conversationSelectFields =
+  "id, title, system_prompt, status, created_at, updated_at";
 
 export class ConversationAccessError extends Error {
   constructor(message: string) {
@@ -36,7 +41,7 @@ export async function listConversations(
 ) {
   const { data, error } = await supabase
     .from("conversations")
-    .select("id, title, status, created_at, updated_at")
+    .select(conversationSelectFields)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
@@ -51,14 +56,16 @@ export async function createConversation(
   supabase: SupabaseClient,
   userId: string,
   title = createDefaultConversationTitle(),
+  systemPrompt?: string,
 ) {
   const { data, error } = await supabase
     .from("conversations")
     .insert({
       user_id: userId,
       title,
+      system_prompt: systemPrompt?.trim() ? systemPrompt.trim() : null,
     })
-    .select("id, title, status, created_at, updated_at")
+    .select(conversationSelectFields)
     .single();
 
   if (error) {
@@ -75,7 +82,7 @@ export async function getConversationById(
 ) {
   const { data, error } = await supabase
     .from("conversations")
-    .select("id, title, status, created_at, updated_at")
+    .select(conversationSelectFields)
     .eq("id", conversationId)
     .eq("user_id", userId)
     .single();
@@ -91,18 +98,38 @@ export async function getConversationById(
   return mapConversation(data as ConversationRow);
 }
 
-export async function updateConversationTitle(
+type UpdateConversationInput = {
+  title?: string;
+  systemPrompt?: string;
+};
+
+export async function updateConversation(
   supabase: SupabaseClient,
   userId: string,
   conversationId: string,
-  title: string,
+  updates: UpdateConversationInput,
 ) {
+  const nextConversationUpdate: {
+    title?: string;
+    system_prompt?: string | null;
+  } = {};
+
+  if (updates.title !== undefined) {
+    nextConversationUpdate.title = updates.title;
+  }
+
+  if (updates.systemPrompt !== undefined) {
+    nextConversationUpdate.system_prompt = updates.systemPrompt.trim()
+      ? updates.systemPrompt.trim()
+      : null;
+  }
+
   const { data, error } = await supabase
     .from("conversations")
-    .update({ title })
+    .update(nextConversationUpdate)
     .eq("id", conversationId)
     .eq("user_id", userId)
-    .select("id, title, status, created_at, updated_at")
+    .select(conversationSelectFields)
     .single();
 
   if (error) {
@@ -150,7 +177,7 @@ export async function touchConversation(
     })
     .eq("id", conversationId)
     .eq("user_id", userId)
-    .select("id, title, status, created_at, updated_at")
+    .select(conversationSelectFields)
     .single();
 
   if (error) {

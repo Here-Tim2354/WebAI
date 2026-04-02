@@ -1,8 +1,15 @@
 import { z } from "zod";
 
-const requiredEnvStringSchema = z.preprocess(
-  (value) => (typeof value === "string" ? value.trim() : ""),
-  z.string().min(1, "缺少 GEMINI_API_KEY。"),
+const optionalEnvStringSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  },
+  z.string().min(1).optional(),
 );
 
 const optionalUrlSchema = z.preprocess((value) => {
@@ -15,9 +22,11 @@ const optionalUrlSchema = z.preprocess((value) => {
 }, z.string().url("GEMINI_BASE_URL 必须是合法 URL。").optional());
 
 const serverEnvSchema = z.object({
-  GEMINI_API_KEY: requiredEnvStringSchema,
+  GEMINI_API_KEY: optionalEnvStringSchema,
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   GEMINI_BASE_URL: optionalUrlSchema,
+  OPENAI_COMPATIBLE_API_KEY: optionalEnvStringSchema,
+  OPENAI_COMPATIBLE_BASE_URL: optionalUrlSchema,
 });
 
 export class ServerEnvError extends Error {
@@ -46,6 +55,8 @@ export function getServerEnv() {
       GEMINI_API_KEY: process.env.GEMINI_API_KEY,
       GEMINI_MODEL: process.env.GEMINI_MODEL,
       GEMINI_BASE_URL: process.env.GEMINI_BASE_URL,
+      OPENAI_COMPATIBLE_API_KEY: process.env.OPENAI_COMPATIBLE_API_KEY,
+      OPENAI_COMPATIBLE_BASE_URL: process.env.OPENAI_COMPATIBLE_BASE_URL,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -56,4 +67,15 @@ export function getServerEnv() {
   }
 
   return cachedEnv;
+}
+
+export function requireServerEnvValue(
+  value: string | undefined,
+  errorMessage: string,
+) {
+  if (!value) {
+    throw new ServerEnvError(errorMessage);
+  }
+
+  return value;
 }

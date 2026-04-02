@@ -66,6 +66,7 @@ export async function POST(request: Request) {
     supabase,
     user.id,
     parsed.data.title,
+    parsed.data.systemPrompt,
   );
 
   return NextResponse.json(conversationResponseSchema.parse({ conversation }));
