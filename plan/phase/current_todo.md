@@ -1,133 +1,76 @@
 # Current Todo
 
-更新时间：2026-03-29 00:00:00
+更新时间：2026-04-02 00:00:00
 
 ## 当前阶段
 
 - 当前项目处于 `Phase 3`
-- `Phase 1` 已完成并通过验收
-- `Phase 2` 的前端体验收口已基本完成
-- 当前判断：`Phase 3.1`、`Phase 3.2`、`Phase 3.3` 已完成，`Phase 3.4` 的会话 CRUD 已基本落地
-- 当前主线：`Phase 3.5 已完成，进入 Phase 3.6 的收口与支撑材料整理`
+- `Phase 1`、`Phase 2` 已完成
+- `Phase 3.1`、`Phase 3.2`、`Phase 3.3`、`Phase 3.4`、`Phase 3.5` 已完成
+- 当前主线：`Phase 3.6 验证与答辩材料准备`
 
-## 当前状态概览
+## 已完成的关键节点
 
-### 已完成
+- 数据库主线已闭环：
+  - `profiles`
+  - `conversations`
+  - `messages`
+- 已完成真实用户下的会话 CRUD：
+  - 新建
+  - 查询列表
+  - 打开历史会话
+  - 重命名
+  - 删除
+- 已完成消息持久化主链路：
+  - 首次发送自动创建会话
+  - 用户消息入库
+  - assistant 消息入库
+  - 历史消息恢复
+- 已完成前端迁移第一轮：
+  - `Tailwind CSS v4`
+  - `shadcn/ui`
+  - `Lucide React`
+  - `Motion`
+  - `Geist Sans / Geist Mono`
+  - 聊天核心组件已迁到新体系
+- 已完成前端迁移第二轮的已落地点：
+  - 移动端侧栏已改为 `Sheet`
+  - 删除确认已改为正式 `Dialog`
+  - 侧栏、空状态、输入区、消息区已做第二轮视觉收口
+  - assistant 消息已从厚卡片调整为更偏内容流的表现
+  - Markdown / 行内代码 / 代码块样式已继续统一
+- `Phase 3.5` 的 UI 迁移与微调工作已结束：
+  - 前端迁移第二轮已完成收口
+  - 整体美术风格已定型
+  - 当前页面视觉方向已可作为后续答辩展示基线
 
-- 已初始化 `Next.js App Router + TypeScript + Zod` 工程
-- 已接入 `@google/genai` 服务端调用
-- 已实现聊天 API route
-- 已实现单页单会话的多轮对话
-- 已实现输入框、发送按钮、assistant 占位气泡、错误气泡
-- 已实现 Markdown 渲染、代码块高亮、代码复制
-- 已支持自定义 Gemini 服务端 URL：`GEMINI_BASE_URL`
-- 已修正服务端环境变量错误分类
-- 默认模型已调整为更稳妥的 `gemini-2.5-flash`
-- 已补充自动验收脚本：`npm run check:phase1`
-- 已完成本地 `Phase 1` 验收：`npm run check:phase1`
-- 已完成基础工程校验：`npm run lint`、`npm run typecheck`
-- 已更新 `plan/phase/phase_overview.md`，明确新的项目定位与 phase 顺序
-- 已确认课程作业主线将前置 `Supabase 持久化与会话 CRUD 系统`
-- 已完成 `Phase 2` 的前端视觉与交互收口
-- 已新增并完善 `plan/phase/phase_3.md`，明确 `Phase 3` 的目标、顺序、边界与 MCP/官方文档前置确认要求
-- 已完成 `Phase 3.1` 的数据库口径收口：
-  - 已按课程设计要求复查 `plan/database/`
-  - 已明确当前阶段最小主线为：会话 CRUD + 消息持久化
-  - 已将 Supabase 身份口径收口为：`auth.users + profiles`
-  - 已将 `favorites / search_records` 明确为整体设计保留项，而非首批强制落地项
-- 已更新数据库相关文档：
-  - `plan/database/user_requirements.md`
-  - `plan/database/user_data_dictionary.md`
-  - `plan/database/entity_relationship_analysis.md`
-  - `plan/database/relation_schema_design.md`
-- 已将整体 E-R 图产物统一重命名为：
-  - `plan/database/overall_er_graph.dbml`
-  - `plan/database/overall_er_graph.sql`
-  - `plan/database/overall_er_graph.png`
-  - `plan/database/overall_er_graph.pdf`
-- 已完成 `Phase 3.2` 的核心 schema 落地：
-  - 已新增 migration：`supabase/migrations/20260325_phase3_core_schema.sql`
-  - 已在 Supabase 项目中成功应用 migration
-  - 已落地 `public.profiles`
-  - 已落地 `public.conversations`
-  - 已落地 `public.messages`
-  - 已配置枚举、主外键、索引、更新时间触发器
-  - 已配置 `auth.users -> public.profiles` 的新用户触发器
-  - 已为三张核心表开启基础 `RLS`
-  - 已修复 `set_updated_at` 的 `search_path` 安全提示
-- 已完成 `Phase 3.3` 的 Supabase 接入层初始化：
-  - 已安装 `@supabase/supabase-js` 与 `@supabase/ssr`
-  - 已新增 Supabase 环境变量校验
-  - 已建立浏览器端 `Supabase client`
-  - 已建立服务端 `Supabase client`
-  - 已更新 `.env.example`，补充 Supabase 配置项
-- 已完成 `Phase 3.4` 的会话 CRUD 闭环：
-  - 已接入最小可用的 `Supabase Auth` 邮箱 magic link 登录链路
-  - 已实现 `auth confirm route` 与 `proxy.ts` 的 SSR session 刷新方案
-  - 已实现当前用户获取与工作区鉴权分层
-  - 已将首页切分为：未登录态 / 已登录工作区
-  - 已将左侧侧栏替换为真实会话列表
-  - 已实现会话列表查询
-  - 已实现点击 `New` 后立即创建空会话并自动选中
-  - 已实现会话重命名
-  - 已实现会话真删除
-  - 已完成会话级接口的基础错误处理修复
-  - 已完成本轮实现后的 `npm run lint` 与 `npm run typecheck`
-- 已完成 `Phase 3.5` 的消息持久化闭环：
-  - 已实现未打开会话时首次发送自动创建会话
-  - 已实现用户消息写入 `public.messages`
-  - 已实现服务端调用 Gemini 后写入 assistant 消息
-  - 已实现打开历史会话时恢复完整消息记录
-  - 已完成会话标题与消息流边界整理
-  - 已完成消息持久化主链路与会话 CRUD 的衔接
+## 当前代码状态
 
-## 当前推进依据
+- 工作区已经形成统一的浅色 AI 工作台方向
+- 左侧栏、主聊天区、输入区、弹层已基本统一到同一套视觉语言
+- 空会话首页、消息区与输入区已完成本轮视觉收口
+- 当前前端迁移已完成，整体美术风格已进入稳定态
 
-- 阶段概要：`plan/phase/phase_3.md`
-- 课程要求：`requirements/scau_database_course_design_ai_readable.md`
-- Supabase 执行清单：`requirements/supabase_course_design_checklist.md`
-- 数据库文档目录：`plan/database/`
-- 当前阶段的推进应优先遵循：
-  - 课程要求与数据库主线闭环
-  - 项目内数据库文档
-  - `Supabase MCP` 与官方文档交叉确认后的实现判断
+## 下一步重点
 
-## 下一阶段重点
-
-- `Phase 3.6` 重点包括：
+- 补做 `Phase 3.6` 需要的：
   - RLS 验证
   - 数据库说明补全
   - migration 与表设计说明整理
   - 页面功能与数据库操作映射关系整理
   - 答辩支撑材料整理
 
-## 当前限制与提醒
+## 当前提醒
 
-- 当前虽然已经完成真实用户下的会话 CRUD，但仍需继续做 Phase 3.6 的收口与验证
-- 当前 `messages` 表已经接入实际聊天主链路
-- 当前打开历史会话时，已可以恢复数据库中的消息记录
-- 当前右侧聊天面板已经进入“数据库驱动聊天”的主路径
-- 当前 Supabase 首批只落地了：
+- 当前数据库首批只落地：
   - `profiles`
   - `conversations`
   - `messages`
-- `favorites` 与 `search_records` 仍然只保留在整体设计中，尚未进入首批 schema
-- `Supabase MCP` 当前可用，但不应假定其始终稳定；关键设计仍应和官方文档交叉确认
-- 当前邮箱登录链路是否可完整跑通，还依赖 Supabase 控制台中的以下配置是否正确：
-  - `Auth -> URL Configuration`
-  - `Auth -> Email Templates` 中的 magic link / confirm signup 模板
-- 若要接真实 Gemini，请优先确认以下环境变量：
-  - `GEMINI_API_KEY`
-  - `GEMINI_MODEL`
-  - `GEMINI_BASE_URL`（可选）
+- `favorites` 与 `search_records` 仍只保留在整体设计中
+- 深色模式还未正式进入实现
+- `npm run build` 在当前环境里仍可能遇到 `spawn EPERM`，暂不作为仓库缺陷判断依据
+- 当前邮箱登录链路是否完整跑通，仍依赖 Supabase 控制台配置
 
-## 备注
+## 一句话结论
 
-- 当前阶段判断基于现有文档、仓库实现、Supabase 实际项目状态和 MCP/官方资料交叉确认，不是静态猜测
-- `npm run build` 在当前环境中仍会遇到 `spawn EPERM`，属于运行环境限制，当前不能直接作为仓库缺陷判断依据
-- 当前评估结论是：
-  - `Phase 3.1` 已完成数据库口径收口
-  - `Phase 3.2` 已完成核心数据库落地
-  - `Phase 3.3` 已完成 Supabase 接入层初始化
-  - `Phase 3.4` 已完成真实用户下的会话 CRUD 主体，但 Auth 尚未收口
-- `Phase 3.5` 已完成，当前推进到 `Phase 3.6`
+- 当前项目已经完成数据库驱动聊天主链路，`Phase 3.5` 的 UI 迁移与微调已结束，整体美术风格已经定型，接下来进入 `Phase 3.6` 的验证与答辩材料整理。

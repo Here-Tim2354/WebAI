@@ -189,6 +189,40 @@
 - Motion for React 官方文档
 - https://motion.dev/docs/react
 
+### Playwright MCP
+
+定位：
+
+- 作为本轮前端迁移的页面验证与调试工具
+- 用于补充人工浏览器检查，而不是替代设计判断
+
+职责边界：
+
+- 用于检查页面是否真实渲染
+- 用于检查关键交互是否仍然可用
+- 用于查看控制台错误、页面结构和运行时异常
+- 用于辅助判断问题属于样式、动画、资源还是 hydration 层
+
+优先使用场景：
+
+- 每轮 UI 重构后检查首页、登录页、聊天页是否仍然可见
+- 检查 `Dialog`、`Sheet`、`DropdownMenu` 等交互型组件是否可正常打开
+- 检查输入框、按钮、侧栏、消息区是否因迁移而失效
+- 检查移动端或窄屏下结构是否仍然成立
+- 在浏览器中出现“空白页 / 元素消失 / 可见性异常”时，辅助判断 DOM 是否实际存在
+
+不做的事：
+
+- 不替代设计语言判断
+- 不作为视觉优劣的唯一标准
+- 不在当前环境中单独作为唯一事实来源，需要结合真实浏览器观察
+
+当前环境提醒：
+
+- 当前 `Playwright MCP` 可用于访问和调试本项目页面
+- 当前环境下可能出现权限提示、字体资源异常或 HMR websocket 噪音
+- 因此它更适合做“结构与交互验证”，不应单独承担最终视觉验收
+
 ## Untitled UI 参考策略
 
 ### 定位
@@ -409,6 +443,34 @@
 - 清理不再需要的样式类和重复结构
 - 为后续深色模式和扩展面板留出口径
 
+## Playwright 验证建议
+
+### 每轮重构后默认检查
+
+- 首页是否可见
+- 登录页文案、输入框、按钮是否正常显示
+- 聊天工作区骨架是否可见
+- 左侧栏是否可展开、收起、切换会话
+- 输入区是否可输入、可发送
+- 错误提示、加载提示是否能正常出现
+
+### 组件级检查建议
+
+- `Dialog`：打开、关闭、聚焦、遮罩行为
+- `Sheet`：移动端或窄屏下的展开关闭
+- `DropdownMenu`：触发器、菜单项、关闭行为
+- `Textarea`：输入、自动增高、回车发送
+- `MessageList`：滚动区、空态、跳转到最新按钮
+
+### 调试判断建议
+
+- 若页面一片空白，但 `Playwright` 仍能读取到 DOM，优先排查：
+  - 动画初始状态
+  - 可见性样式
+  - HMR 未刷新
+  - 字体或资源加载异常
+- 若 DOM 也不存在，再排查渲染逻辑、运行时错误和服务端响应
+
 ## 组件参考映射
 
 ### 登录页
@@ -542,6 +604,7 @@
 - Tailwind CSS v4：https://tailwindcss.com/blog/tailwindcss-v4
 - shadcn/ui Next.js：https://ui.shadcn.com/docs/installation/next
 - Motion for React：https://motion.dev/docs/react
+- Playwright MCP：用于本地页面验证、控制台检查与交互调试
 - Lucide：https://lucide.dev/
 - Untitled UI React Introduction：https://www.untitledui.com/react/docs/introduction
 - Untitled UI React Components：https://www.untitledui.com/react/components

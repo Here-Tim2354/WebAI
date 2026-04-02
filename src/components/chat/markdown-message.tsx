@@ -37,6 +37,13 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
           remarkCjkFriendlyGfmStrikethrough,
         ]}
         components={{
+          table({ children }) {
+            return (
+              <div className="markdown-table-wrap">
+                <table>{children}</table>
+              </div>
+            );
+          },
           pre({ children }) {
             const codeChild = Children.only(children);
 

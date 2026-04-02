@@ -1,6 +1,43 @@
 "use client";
 
 import { useState } from "react";
+import {
+  EllipsisIcon,
+  LogOutIcon,
+  MessageSquareTextIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PencilLineIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { Conversation } from "@/lib/schemas/conversation";
 
 type ConversationSidebarProps = {
@@ -10,6 +47,8 @@ type ConversationSidebarProps = {
   isDeletingConversationId: string | null;
   isSigningOut: boolean;
   currentUserEmail: string | null;
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
   onCreateConversation: () => Promise<void>;
   onSelectConversation: (conversationId: string) => void;
   onRenameConversation: (conversationId: string, title: string) => Promise<void>;
@@ -33,15 +72,22 @@ export function ConversationSidebar({
   isDeletingConversationId,
   isSigningOut,
   currentUserEmail,
+  mobileOpen,
+  onMobileOpenChange,
   onCreateConversation,
   onSelectConversation,
   onRenameConversation,
   onDeleteConversation,
   onSignOut,
 }: ConversationSidebarProps) {
+  const collapsedTrackClass =
+    "lg:flex lg:size-14 lg:items-center lg:justify-center lg:self-center";
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingConversationId, setEditingConversationId] = useState<string | null>(
     null,
   );
+  const [pendingDeleteConversation, setPendingDeleteConversation] =
+    useState<Conversation | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
 
   const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (
@@ -70,111 +116,384 @@ export function ConversationSidebar({
     }
   };
 
-  return (
-    <aside className="sidebar">
-      <div className="sidebar__top">
-        <div className="sidebar__brand">
-          <div className="sidebar__logo">W</div>
-          <div>
-            <strong>WebAI</strong>
-            <span>{currentUserEmail ?? "已登录"}</span>
+  async function handleCreateConversationClick() {
+    try {
+      await onCreateConversation();
+      onMobileOpenChange(false);
+    } catch {
+      // 创建失败时保留当前抽屉，方便继续操作。
+    }
+  }
+
+  function handleSelectConversation(conversationId: string) {
+    onSelectConversation(conversationId);
+    onMobileOpenChange(false);
+  }
+
+  async function handleConfirmDeleteConversation() {
+    if (!pendingDeleteConversation) {
+      return;
+    }
+
+    try {
+      await onDeleteConversation(pendingDeleteConversation.id);
+      setPendingDeleteConversation(null);
+    } catch {
+      // 删除失败时保留确认弹窗，避免用户误判操作已完成。
+    }
+  }
+
+  async function handleSignOutClick() {
+    try {
+      await onSignOut();
+      onMobileOpenChange(false);
+    } catch {
+      // 退出失败时保留当前上下文。
+    }
+  }
+
+  const sidebarContent = (
+    <div className="flex h-full flex-col gap-4 overflow-x-hidden px-3 py-4 sm:px-4">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3",
+          isCollapsed && "lg:grid lg:justify-center lg:justify-items-center lg:gap-4",
+        )}
+      >
+        <div
+          className={cn(
+            "flex min-w-0 items-center gap-3",
+            isCollapsed && "lg:hidden",
+          )}
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[16px] border border-border/70 bg-background/92 text-sm font-semibold shadow-none">
+            W
+          </div>
+          <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
+            <span className="block text-[0.68rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+              Workspace
+            </span>
+            <strong className="block truncate text-sm font-medium text-foreground">
+              WebAI
+            </strong>
+            <span className="block truncate text-xs text-muted-foreground">
+              {currentUserEmail ?? "已登录"}
+            </span>
           </div>
         </div>
 
-        <button
-          className="sidebar__new-chat"
+        <Button
+          variant="ghost"
+          className={cn(
+            "hidden lg:inline-flex",
+            isCollapsed &&
+              `${collapsedTrackClass} lg:rounded-[18px] lg:border lg:border-border/70 lg:bg-muted/55 lg:shadow-none`,
+          )}
           type="button"
-          onClick={() => void onCreateConversation()}
-          disabled={isCreating}
+          onClick={() => setIsCollapsed((current) => !current)}
+          aria-label={isCollapsed ? "展开侧栏" : "收起侧栏"}
         >
-          {isCreating ? "创建中..." : "新对话"}
-        </button>
+          {isCollapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+        </Button>
 
-        <section className="sidebar__overview" aria-label="会话列表">
-          <span className="sidebar__section-title">最近对话</span>
-          <div className="sidebar__conversation-list">
-            {conversations.length === 0 ? (
-              <div className="sidebar__empty">还没有对话。</div>
-            ) : (
-              conversations.map((conversation) => {
-                const isActive = conversation.id === activeConversationId;
-                const isEditing = conversation.id === editingConversationId;
-                const isDeleting = conversation.id === isDeletingConversationId;
-
-                return (
-                  <article
-                    key={conversation.id}
-                    className={`conversation-item ${
-                      isActive ? "conversation-item--active" : ""
-                    }`}
-                  >
-                    {isEditing ? (
-                      <form
-                        className="conversation-item__rename"
-                        onSubmit={handleRenameSubmit}
-                      >
-                        <input
-                          autoFocus
-                          value={titleDraft}
-                          onChange={(event) => setTitleDraft(event.target.value)}
-                          onBlur={() => {
-                            setEditingConversationId(null);
-                            setTitleDraft("");
-                          }}
-                        />
-                      </form>
-                    ) : (
-                      <button
-                        className="conversation-item__main"
-                        type="button"
-                        onClick={() => onSelectConversation(conversation.id)}
-                      >
-                        <strong>{conversation.title}</strong>
-                        <span>{formatUpdatedAt(conversation.updatedAt)}</span>
-                      </button>
-                    )}
-
-                    <div className="conversation-item__actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingConversationId(conversation.id);
-                          setTitleDraft(conversation.title);
-                        }}
-                      >
-                        重命名
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`确认删除“${conversation.title}”吗？`)) {
-                            void onDeleteConversation(conversation.id);
-                          }
-                        }}
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? "删除中..." : "删除"}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })
+        {isCollapsed ? (
+          <div
+            className={cn(
+              "hidden rounded-[18px] border border-border/70 bg-background/92 text-sm font-semibold",
+              collapsedTrackClass,
             )}
+          >
+            W
           </div>
-        </section>
+        ) : null}
       </div>
 
-      <div className="sidebar__footer">
-        <strong>{conversations.length > 0 ? `${conversations.length} 个对话` : "暂无对话"}</strong>
-        <button
-          className="sidebar__sign-out"
+      <Button
+        className={cn(
+          "h-10 rounded-2xl border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+          isCollapsed && "lg:hidden",
+        )}
+        variant="outline"
+        type="button"
+        onClick={() => void handleCreateConversationClick()}
+        disabled={isCreating}
+      >
+        <PlusIcon data-icon="inline-start" />
+        <span>{isCreating ? "创建中..." : "新对话"}</span>
+      </Button>
+
+      {isCollapsed ? (
+        <Button
+          variant="ghost"
+          className={cn(
+            "hidden rounded-[18px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+            collapsedTrackClass,
+          )}
           type="button"
-          onClick={() => void onSignOut()}
+          onClick={() => void handleCreateConversationClick()}
+          disabled={isCreating}
+          aria-label={isCreating ? "正在创建对话" : "新对话"}
+        >
+          <PlusIcon className="size-5" />
+        </Button>
+      ) : null}
+
+      <section className="flex min-h-0 flex-1 flex-col" aria-label="会话列表">
+        <div
+          className={cn(
+            "mb-2 flex items-center justify-between gap-2 px-1",
+            isCollapsed && "lg:justify-center lg:px-0",
+          )}
+        >
+          <span
+            className={cn(
+              "text-[0.72rem] font-medium tracking-[0.18em] text-muted-foreground uppercase",
+              isCollapsed && "lg:hidden",
+            )}
+          >
+            最近对话
+          </span>
+          <Badge
+            variant="secondary"
+            className={cn("rounded-full px-2 py-0.5", isCollapsed && "lg:hidden")}
+          >
+            {conversations.length}
+          </Badge>
+        </div>
+
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden pr-1",
+            isCollapsed && "lg:items-center lg:pr-0",
+          )}
+        >
+          {conversations.length === 0 ? (
+            <div
+              className={cn(
+                "rounded-[18px] border border-dashed border-border/75 bg-background/55 px-4 py-4 text-sm leading-6 text-muted-foreground",
+                isCollapsed && "lg:hidden",
+              )}
+            >
+              还没有对话。
+            </div>
+          ) : (
+            conversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId;
+              const isEditing = conversation.id === editingConversationId;
+              const isDeleting = conversation.id === isDeletingConversationId;
+
+              return (
+                <div
+                  key={conversation.id}
+                  className={cn(
+                    "rounded-[16px] border border-transparent bg-transparent transition-colors hover:bg-muted/40",
+                    isActive && !isCollapsed &&
+                      "border-border/70 bg-background/88",
+                    isCollapsed && "lg:w-14",
+                  )}
+                >
+                  {isEditing ? (
+                    <form className="p-3" onSubmit={handleRenameSubmit}>
+                      <Input
+                        autoFocus
+                        value={titleDraft}
+                        className="h-10 rounded-xl border-border/70 bg-background/92"
+                        onChange={(event) => setTitleDraft(event.target.value)}
+                        onBlur={() => {
+                          setEditingConversationId(null);
+                          setTitleDraft("");
+                        }}
+                      />
+                    </form>
+                  ) : (
+                    <div className={cn("flex items-start gap-2 p-1.5", isCollapsed && "lg:block lg:p-0")}>
+                      <button
+                        className={cn(
+                          "flex min-w-0 flex-1 items-start gap-3 rounded-[14px] px-3 py-2.5 text-left",
+                          isCollapsed &&
+                            "lg:size-14 lg:flex-none lg:items-center lg:justify-center lg:self-center lg:rounded-[18px] lg:px-0 lg:py-0",
+                          isCollapsed && isActive && "lg:bg-muted/55",
+                        )}
+                        type="button"
+                        title={conversation.title}
+                        onClick={() => handleSelectConversation(conversation.id)}
+                      >
+                        <div
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-2xl text-accent-foreground ring-1 ring-border/60",
+                            isActive ? "bg-blue-50/90 text-primary" : "bg-background/88 text-muted-foreground",
+                            isCollapsed && "lg:size-9 lg:rounded-2xl",
+                          )}
+                        >
+                          <MessageSquareTextIcon className="size-4" />
+                        </div>
+                        <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
+                          <strong className="block truncate text-sm font-medium text-foreground">
+                            {conversation.title}
+                          </strong>
+                          <span className="block text-xs text-muted-foreground">
+                            {formatUpdatedAt(conversation.updatedAt)}
+                          </span>
+                        </div>
+                      </button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className={cn(isCollapsed && "lg:hidden")}
+                            />
+                          }
+                        >
+                          <EllipsisIcon />
+                          <span className="sr-only">对话操作</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="bottom" align="end" className="w-40">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingConversationId(conversation.id);
+                                setTitleDraft(conversation.title);
+                              }}
+                            >
+                              <PencilLineIcon />
+                              重命名
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setPendingDeleteConversation(conversation)}
+                              disabled={isDeleting}
+                            >
+                              <Trash2Icon />
+                              {isDeleting ? "删除中..." : "删除"}
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 border-t border-border/60 pt-3 px-1",
+          isCollapsed && "lg:flex-col lg:px-0",
+        )}
+      >
+        <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
+          <span className="block text-[0.68rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+            Status
+          </span>
+          <strong className="block text-sm font-medium text-foreground">
+            {conversations.length > 0 ? `${conversations.length} 个对话` : "暂无对话"}
+          </strong>
+          <span className="block text-xs text-muted-foreground">
+            当前工作区已连接 Supabase
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          className={cn(
+            "rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            isCollapsed && "lg:mx-auto lg:size-10",
+          )}
+          type="button"
+          onClick={() => void handleSignOutClick()}
           disabled={isSigningOut}
         >
-          {isSigningOut ? "退出中..." : "退出登录"}
-        </button>
+          <LogOutIcon data-icon="inline-start" />
+          <span className={cn(isCollapsed && "lg:hidden")}>
+            {isSigningOut ? "退出中..." : "退出登录"}
+          </span>
+        </Button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      <aside
+        className={cn(
+          "hidden border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(245,249,255,0.9))] backdrop-blur-xl transition-[width] duration-200 lg:sticky lg:top-0 lg:flex lg:h-screen",
+          isCollapsed ? "lg:w-[5.75rem]" : "lg:w-[20rem]",
+        )}
+      >
+        {sidebarContent}
+      </aside>
+
+      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent
+          side="left"
+          className="w-[min(88vw,22rem)] border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(245,249,255,0.98))] p-0 backdrop-blur-xl"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>会话侧栏</SheetTitle>
+            <SheetDescription>查看、新建、切换和管理当前用户的历史会话。</SheetDescription>
+          </SheetHeader>
+          <div className="flex h-full flex-col overflow-hidden">{sidebarContent}</div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog
+        open={pendingDeleteConversation !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDeleteConversation(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[28rem] rounded-[18px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <div className="inline-flex size-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Trash2Icon className="size-5" />
+            </div>
+            <DialogTitle className="pt-1 text-[1.2rem] leading-none tracking-[-0.02em] text-foreground">
+              是否删除这个对话?
+            </DialogTitle>
+            <DialogDescription className="max-w-[60ch] text-sm leading-7 text-muted-foreground">
+              {pendingDeleteConversation
+                ? `“${pendingDeleteConversation.title}” 删除后将无法恢复，相关消息记录也会一起移除。`
+                : "删除后将无法恢复，相关消息记录也会一起移除。"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-3 border-t border-border/50 bg-slate-50/70 px-6 py-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-full px-5"
+              type="button"
+              onClick={() => setPendingDeleteConversation(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-10 rounded-full bg-red-600 px-5 text-white hover:bg-red-700"
+              type="button"
+              onClick={() => void handleConfirmDeleteConversation()}
+              disabled={
+                pendingDeleteConversation
+                  ? isDeletingConversationId === pendingDeleteConversation.id
+                  : false
+              }
+            >
+              {pendingDeleteConversation &&
+              isDeletingConversationId === pendingDeleteConversation.id
+                ? "删除中..."
+                : "确认删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { AlertCircleIcon, ArrowRightIcon, MailIcon, SparklesIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type AuthPanelProps = {
   initialMessage?: string | null;
@@ -146,42 +152,75 @@ export function AuthPanel({
   };
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <div className="auth-card__eyebrow">WebAI</div>
-        <h1 className="auth-card__title">继续使用你的对话</h1>
-        <p className="auth-card__description">输入邮箱，获取登录链接。</p>
-
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="auth-form__field">
-            <input
-              ref={inputRef}
-              type="email"
-              value={email}
-              placeholder="邮箱地址"
-              autoFocus
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-
-          <button className="auth-form__button" type="submit" disabled={isSubmitting}>
-            {isSubmitting
-              ? "发送中..."
-              : feedbackCode === "otp_expired"
-                ? "重新发送"
-                : "发送链接"}
-          </button>
-        </form>
-
-        {feedback ? (
-          <div
-            className={`auth-feedback auth-feedback--${feedbackType}`}
-            role="status"
-          >
-            {feedback}
+    <motion.main
+      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6"
+      initial={false}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(133,188,255,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(200,226,255,0.32),transparent_30%)]" />
+      <section className="relative w-full max-w-[31rem] rounded-[26px] border border-border/65 bg-white/86 p-6 shadow-[0_24px_72px_rgba(62,96,154,0.1)] backdrop-blur-xl sm:p-8">
+        <div className="mx-auto w-full max-w-[27rem]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[0.72rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+            <SparklesIcon className="size-3.5" />
+            WebAI
           </div>
-        ) : null}
+
+          <div className="mt-5 space-y-3">
+            <h1 className="max-w-[14ch] text-4xl font-semibold tracking-[0.01em] text-foreground sm:text-[3.0rem]">
+              登录
+            </h1>
+            <p className="max-w-[42ch] text-sm leading-6 text-muted-foreground sm:text-[0.95rem]">
+              输入你的邮箱
+            </p>
+          </div>
+
+          <form className="mt-8 space-y-3" onSubmit={handleSubmit}>
+            <label className="block space-y-2">
+              <div className="relative">
+                <MailIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={inputRef}
+                  type="email"
+                  value={email}
+                  placeholder="邮箱地址"
+                  autoFocus
+                  className="h-11 border-border/70 bg-background/88 pl-10 text-sm shadow-none"
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </div>
+            </label>
+
+            <Button
+              className="h-12 w-full rounded-2xl bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              <ArrowRightIcon data-icon="inline-end" />
+              {isSubmitting
+                ? "发送中..."
+                : feedbackCode === "otp_expired"
+                  ? "重新发送"
+                  : "发送链接"}
+            </Button>
+          </form>
+
+          {feedback ? (
+            <Alert
+              variant={feedbackType === "error" ? "destructive" : "default"}
+              className={cn(
+                "mt-5 rounded-2xl border bg-white/72 shadow-none",
+                feedbackType === "error"
+                  ? "border-red-200/80 bg-red-50/80 text-red-700"
+                  : "border-blue-100/80 bg-blue-50/72 text-foreground",
+              )}
+              role="status"
+            >
+              <AlertCircleIcon className="size-4" />
+              <AlertTitle>{feedbackType === "error" ? "登录提醒" : "邮件已发送"}</AlertTitle>
+              <AlertDescription>{feedback}</AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
       </section>
-    </main>
+    </motion.main>
   );
 }

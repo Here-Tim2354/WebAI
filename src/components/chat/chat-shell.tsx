@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  AlertCircleIcon,
+  PanelLeftOpenIcon,
+  SparklesIcon,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { AuthUser } from "@/lib/schemas/auth";
 import { Conversation, conversationResponseSchema } from "@/lib/schemas/conversation";
@@ -53,13 +61,13 @@ export function ChatShell({
   >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const {
     inputValue,
     isSubmitting,
     setInputValue,
     getMessages,
-    handlePromptSelect,
     handleSubmit,
     syncConversationMessages,
     removeConversationMessages,
@@ -170,7 +178,9 @@ export function ChatShell({
     try {
       await createConversation({ activate: true });
     } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
     }
   }
 
@@ -233,7 +243,9 @@ export function ChatShell({
         return remaining;
       });
     } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
     } finally {
       setIsDeletingConversationId(null);
     }
@@ -258,7 +270,9 @@ export function ChatShell({
       setActiveConversationId(null);
       router.refresh();
     } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
     } finally {
       setIsSigningOut(false);
     }
@@ -300,7 +314,7 @@ export function ChatShell({
   }
 
   return (
-    <div className="app-shell">
+    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
       <ConversationSidebar
         conversations={conversations}
         activeConversationId={activeConversationId}
@@ -308,6 +322,8 @@ export function ChatShell({
         isDeletingConversationId={isDeletingConversationId}
         isSigningOut={isSigningOut}
         currentUserEmail={user.email}
+        mobileOpen={isMobileSidebarOpen}
+        onMobileOpenChange={setIsMobileSidebarOpen}
         onCreateConversation={handleCreateConversation}
         onSelectConversation={setActiveConversationId}
         onRenameConversation={handleRenameConversation}
@@ -315,47 +331,78 @@ export function ChatShell({
         onSignOut={handleSignOut}
       />
 
-      <main className="main-panel">
-        <header className="chat-header">
-          <div>
-            <div className="chat-header__eyebrow">WebAI</div>
-            <div className="chat-header__brand">
-              {activeConversation?.title ?? "开始一个新对话"}
+      <main className="relative flex min-h-[60vh] min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(193,225,255,0.54),transparent_24%),radial-gradient(circle_at_top_center,rgba(158,204,255,0.2),transparent_28%),linear-gradient(180deg,rgba(238,247,255,0.96),rgba(244,249,255,0.98)_32%,rgba(244,249,255,0.98))]" />
+
+        <header className="relative z-10 px-4 pt-5 pb-4 sm:px-6 lg:px-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 space-y-2.5">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="shrink-0 rounded-full border-border/70 bg-background/88 shadow-none lg:hidden"
+                  type="button"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  aria-label="打开会话侧栏"
+                >
+                  <PanelLeftOpenIcon />
+                </Button>
+                <div className="inline-flex min-w-0 items-center gap-2 text-[0.7rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+                  <SparklesIcon className="size-3.5" />
+                  WebAI
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="truncate text-xl font-semibold tracking-[-0.05em] text-foreground sm:text-[1.5rem]">
+                  {hasMessages
+                    ? activeConversation?.title ?? "当前对话"
+                    : activeConversation
+                      ? activeConversation.title
+                      : "聊天工作区"}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="chat-header__pill">
-            {isSubmitting
-              ? "生成中"
-              : activeConversation
-                ? hasMessages
-                  ? "进行中"
-                  : "已就绪"
-                : "未开始"}
+
+            <Badge
+              variant="secondary"
+              className="rounded-full border border-border/65 bg-background/86 px-3 py-1 text-xs font-medium text-muted-foreground shadow-none"
+            >
+              {isSubmitting
+                ? "生成中"
+                : activeConversation
+                  ? hasMessages
+                    ? "进行中"
+                    : "已就绪"
+                  : "未开始"}
+            </Badge>
           </div>
         </header>
 
         {workspaceError ? (
-          <div className="workspace-banner workspace-banner--error" role="alert">
-            {workspaceError}
-          </div>
-        ) : null}
-
-        {isLoadingConversation ? (
-          <div className="workspace-banner" role="status">
-            正在恢复历史消息...
+          <div className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">
+            <Alert
+              variant="destructive"
+              className="rounded-[20px] border-red-200/80 bg-red-50/88 text-red-700 shadow-none"
+              role="alert"
+            >
+              <AlertCircleIcon className="size-4" />
+              <AlertTitle>工作区提醒</AlertTitle>
+              <AlertDescription>{workspaceError}</AlertDescription>
+            </Alert>
           </div>
         ) : null}
 
         <section
-          className={`chat-body ${
-            hasMessages ? "chat-body--conversation" : "chat-body--empty"
+          className={`relative z-10 flex min-h-0 flex-1 flex-col ${
+            hasMessages ? "px-3 pb-5 sm:px-5 lg:px-8" : "px-4 pb-8 sm:px-6 lg:px-8"
           }`}
         >
           <MessageList
             messages={messages}
             messageEndRef={messageEndRef}
             scrollContainerRef={scrollContainerRef}
-            onPromptSelect={handlePromptSelect}
+            loadingHint={isLoadingConversation ? "请稍等，我们正在从数据库同步当前会话。" : null}
             onScroll={handleScroll}
             showJumpToLatest={showJumpToLatest}
             onJumpToLatest={() => scrollToLatest()}
