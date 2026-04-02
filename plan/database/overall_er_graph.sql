@@ -1,8 +1,10 @@
--- Phase 3.1 note:
--- This file keeps a SQL-oriented schema draft for reference.
+-- WebAI overall schema draft:
+-- This file keeps a SQL-oriented schema reference.
 -- The dbdiagram-ready source of truth is `overall_er_graph.dbml`.
--- Current Phase 3 first-batch implementation should prioritize:
+-- Current actual implementation includes:
 -- auth.users / profiles / conversations / messages
+-- openai_compatible_models / gemini_models
+-- favorites and search_records remain in the overall design, but are not yet landed.
 
 CREATE TYPE "conversation_status" AS ENUM (
   'active',

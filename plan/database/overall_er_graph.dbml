@@ -1,11 +1,10 @@
-Project WebAI_Phase3 {
+Project WebAI {
   database_type: "PostgreSQL"
   Note: '''
-  WebAI database design for Phase 3.
-  First-batch implementation priority:
-  auth.users / profiles / conversations / messages
-  favorites and search_records stay in the overall design, but are not first-batch mandatory.
-  openai_compatible_models and gemini_models support Phase 4 model selection and AI provider dispatch.
+  WebAI database design.
+  Current landed tables:
+  auth.users / profiles / conversations / messages / openai_compatible_models / gemini_models
+  favorites and search_records stay in the overall design, but are not yet landed.
   '''
 }
 
@@ -95,7 +94,7 @@ Table favorites [headercolor: #F4F8FC] {
 
   Note: '''
   Extension entity for message favorites.
-  Not first-batch mandatory in Phase 3.
+  Kept in the overall design and reserved for a later implementation batch.
   '''
 }
 
@@ -112,7 +111,7 @@ Table search_records [headercolor: #F4F8FC] {
 
   Note: '''
   Extension entity for user search history.
-  Not first-batch mandatory in Phase 3.
+  Kept in the overall design and reserved for a later implementation batch.
   '''
 }
 

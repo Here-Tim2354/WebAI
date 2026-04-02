@@ -37,16 +37,18 @@
 - `favorites` 与 `search_records` 承接消息收藏与搜索行为
 - `openai_compatible_models` 与 `gemini_models` 承接 AI 模型目录与能力注册
 
-结合当前 `Phase 3` 的实施范围，第一批实际落地的最小关系模式应优先为：
+结合当前项目的实际落地情况，数据库主线已经稳定落地为：
 
 - `auth.users`
 - `profiles`
 - `conversations`
 - `messages`
+- `openai_compatible_models`
+- `gemini_models`
 
-`favorites` 与 `search_records` 保留在整体设计中，但不作为当前首批 migration 的强制范围。
+`favorites` 与 `search_records` 保留在整体设计中，但暂未进入当前实际数据库实现。
 
-`openai_compatible_models` 与 `gemini_models` 属于 `Phase 4` 相关的系统配置表。
+其中，`openai_compatible_models` 与 `gemini_models` 属于模型配置与能力注册表。
 它们不直接服务数据库课程设计主线中的“用户 CRUD”，但已经进入实际数据库实现，用于支撑：
 
 - 前端模型选择
@@ -54,13 +56,13 @@
 - 后端 AI provider 分发
 - OpenAI 兼容层与 Gemini 专属层的统一管理
 
-这是一项有意为之的阶段性取舍，而不是设计遗漏。
+这是一项有意为之的实现边界，而不是设计遗漏。
 
 原因包括：
 
-- 当前阶段的最高优先级是完成数据库课程设计主线
-- 当前最小可演示闭环聚焦于会话 CRUD 与消息持久化
-- 若在首批实现中同时落地 `favorites` 与 `search_records`，会扩大改动面并分散主线开发注意力
+- 数据库课程设计主线已经建立
+- 当前最小可演示闭环已经聚焦并完成在会话 CRUD 与消息持久化上
+- 若此时继续并行落地 `favorites` 与 `search_records`，会扩大改动面并分散后续扩展节奏
 
 因此当前应将这两张表理解为：
 
@@ -70,8 +72,8 @@
 
 也就是说：
 
-- 整体设计范围不等于首批实现范围
-- 当前 Supabase 中未落地 `favorites` 与 `search_records`，属于阶段性控制，不代表其被从系统设计中删除
+- 整体设计范围不等于当前实现范围
+- 当前 Supabase 中未落地 `favorites` 与 `search_records`，不代表其被从系统设计中删除
 
 ---
 
@@ -429,4 +431,4 @@
 
 ## 八、一句话总结
 
-当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录，以及 `Phase 4` 所需的多模型目录与能力注册；其中 `Phase 3` 首批实现应优先落地 `auth.users / profiles / conversations / messages`，后续通过模型注册表继续承接前端模型选择与后端 AI provider 分发。
+当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录，以及当前多模型目录与能力注册；其中实际已落地的是 `auth.users / profiles / conversations / messages / openai_compatible_models / gemini_models`，后续仍可继续通过收藏、搜索等扩展表补全更完整的产品能力。
