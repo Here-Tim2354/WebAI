@@ -26,6 +26,7 @@ export const aiModelSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   description: z.string().nullable(),
+  icon: z.string().nullable(),
   provider: aiModelProviderSchema,
   apiStyle: z.string().min(1),
   upstreamModelId: z.string().min(1),

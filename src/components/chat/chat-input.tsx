@@ -48,9 +48,7 @@ export function ChatInput({
     <motion.div
       className={cn(
         "mx-auto flex w-full flex-col gap-3 border border-border/90 bg-background/95 backdrop-blur-xl",
-        hasMessages
-          ? "sticky bottom-4 max-w-4xl rounded-[24px] px-4 py-4 shadow-[0_40px_48px_rgba(48,82,139,0.08)]"
-          : "max-w-[52rem] rounded-[30px] px-5 py-4 shadow-[0_16px_36px_rgba(48,82,139,0.06)]",
+        "max-w-4xl rounded-[24px] px-4 py-4 shadow-[0_40px_48px_rgba(48,82,139,0.12)]",
       )}
       initial={false}
     >
@@ -58,7 +56,7 @@ export function ChatInput({
         ref={textareaRef}
         className={cn(
           "max-h-60 resize-none border-0 bg-transparent px-1 py-0 text-[1rem] leading-8 shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-transparent",
-          hasMessages ? "min-h-24 rounded-none" : "min-h-14 rounded-none",
+          "min-h-8 rounded-none",
         )}
         placeholder="随便说些什么..."
         value={value}
@@ -75,14 +73,16 @@ export function ChatInput({
 
       <div className="flex items-center justify-end">
         <Button
-          className="h-10 rounded-full px-5 shadow-[0_12px_24px_rgba(72,115,195,0.14)]"
+          className="h-10 rounded-full px-1 shadow-[0_12px_24px_rgba(72,115,195,0.14)]"
           type="button"
           onClick={() => void onSubmit()}
           disabled={!canSend}
           aria-label="发送消息"
         >
-          <ArrowUpIcon data-icon="inline-end" />
-          发送
+          <span className="flex min-w-[5.5rem] items-center justify-center gap-2">
+            <ArrowUpIcon className="size-4" />
+            <span>发送</span>
+          </span>
         </Button>
       </div>
     </motion.div>

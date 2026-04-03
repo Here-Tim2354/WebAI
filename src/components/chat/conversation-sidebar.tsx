@@ -81,7 +81,7 @@ export function ConversationSidebar({
   onSignOut,
 }: ConversationSidebarProps) {
   const collapsedTrackClass =
-    "lg:flex lg:size-14 lg:items-center lg:justify-center lg:self-center";
+    "lg:flex lg:size-11 lg:items-center lg:justify-center lg:self-center";
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingConversationId, setEditingConversationId] = useState<string | null>(
     null,
@@ -187,7 +187,7 @@ export function ConversationSidebar({
           className={cn(
             "hidden lg:inline-flex",
             isCollapsed &&
-              `${collapsedTrackClass} lg:rounded-[18px] lg:border lg:border-border/70 lg:bg-muted/55 lg:shadow-none`,
+              `${collapsedTrackClass} lg:rounded-[10px] lg:border lg:border-border/70 lg:bg-muted/55 lg:shadow-none`,
           )}
           type="button"
           onClick={() => setIsCollapsed((current) => !current)}
@@ -199,7 +199,7 @@ export function ConversationSidebar({
         {isCollapsed ? (
           <div
             className={cn(
-              "hidden rounded-[18px] border border-border/70 bg-background/92 text-sm font-semibold",
+              "hidden rounded-[10px] border border-border/70 bg-background/92 text-sm font-semibold",
               collapsedTrackClass,
             )}
           >
@@ -226,7 +226,7 @@ export function ConversationSidebar({
         <Button
           variant="ghost"
           className={cn(
-            "hidden rounded-[18px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+            "hidden rounded-[10px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
             collapsedTrackClass,
           )}
           type="button"

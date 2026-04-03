@@ -1,6 +1,7 @@
 import { ChatShell } from "@/components/chat/chat-shell";
 import { mapAuthUser } from "@/lib/supabase/auth";
 import { listConversations } from "@/lib/supabase/conversations";
+import { listEnabledModels } from "@/lib/supabase/model-registry";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type HomePageProps = {
@@ -17,6 +18,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const conversations = user
     ? await listConversations(supabase, user.id)
     : [];
+  const models = user ? await listEnabledModels(supabase) : [];
   const resolvedSearchParams = await searchParams;
   const initialAuthMessage =
     resolvedSearchParams.auth === "error"
@@ -31,6 +33,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <ChatShell
       initialUser={user ? mapAuthUser(user) : null}
       initialConversations={conversations}
+      initialModels={models}
       initialAuthMessage={initialAuthMessage}
       initialAuthMessageType={initialAuthMessageType}
     />

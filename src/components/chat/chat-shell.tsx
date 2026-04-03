@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircleIcon,
+  BotIcon,
   CheckIcon,
   ChevronDownIcon,
+  NotebookPenIcon,
   PanelLeftOpenIcon,
   SparklesIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { AuthUser } from "@/lib/schemas/auth";
@@ -29,12 +30,14 @@ import { AuthPanel } from "./auth-panel";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
+import { ModelIcon } from "./model-icon";
 import { useChatSession } from "./use-chat-session";
 import { useMessageScroll } from "./use-message-scroll";
 
 type ChatShellProps = {
   initialUser: AuthUser | null;
   initialConversations: Conversation[];
+  initialModels: AIModel[];
   initialAuthMessage?: string | null;
   initialAuthMessageType?: "info" | "error";
 };
@@ -56,6 +59,7 @@ function sortConversations(conversations: Conversation[]) {
 export function ChatShell({
   initialUser,
   initialConversations,
+  initialModels,
   initialAuthMessage = null,
   initialAuthMessageType = "info",
 }: ChatShellProps) {
@@ -75,8 +79,10 @@ export function ChatShell({
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<AIModel[]>(initialModels);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(
+    initialModels.find((model) => model.isDefault)?.id ?? initialModels[0]?.id ?? null,
+  );
   const {
     inputValue,
     isSubmitting,
@@ -387,7 +393,7 @@ export function ChatShell({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
+    <div className="flex h-[100dvh] overflow-hidden bg-background lg:flex-row">
       <ConversationSidebar
         conversations={conversations}
         activeConversationId={activeConversationId}
@@ -404,7 +410,7 @@ export function ChatShell({
         onSignOut={handleSignOut}
       />
 
-      <main className="relative flex min-h-[60vh] min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(193,225,255,0.54),transparent_24%),radial-gradient(circle_at_top_center,rgba(158,204,255,0.2),transparent_28%),linear-gradient(180deg,rgba(238,247,255,0.96),rgba(244,249,255,0.98)_32%,rgba(244,249,255,0.98))]" />
 
         <header className="relative z-10 px-4 pt-5 pb-4 sm:px-6 lg:px-8">
@@ -423,7 +429,7 @@ export function ChatShell({
                 </Button>
                 <div className="inline-flex min-w-0 items-center gap-2 text-[0.7rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
                   <SparklesIcon className="size-3.5" />
-                  WebAI
+                  Tim2354-WebAI
                 </div>
               </div>
               <div className="space-y-1">
@@ -437,8 +443,18 @@ export function ChatShell({
                       />
                     }
                   >
-                    <span className="truncate">
-                      {selectedModel?.label ?? "默认模型"}
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      {selectedModel ? (
+                        <ModelIcon
+                          model={selectedModel}
+                          className="shrink-0 text-slate-500"
+                        />
+                      ) : (
+                        <BotIcon className="size-4 shrink-0 text-slate-400" />
+                      )}
+                      <span className="truncate text-[0.9rem]">
+                        {selectedModel?.label ?? "默认模型"}
+                      </span>
                     </span>
                     <ChevronDownIcon className="size-4 shrink-0 text-slate-400" />
                   </DropdownMenuTrigger>
@@ -451,10 +467,10 @@ export function ChatShell({
                     {Object.entries(groupedModels).map(([groupName, models], index) => (
                       <div key={groupName}>
                         {index > 0 ? <DropdownMenuSeparator className="mx-2 my-1.5" /> : null}
-                        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
-                          {groupName}
-                        </DropdownMenuLabel>
                         <DropdownMenuGroup>
+                          <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
+                            {groupName}
+                          </DropdownMenuLabel>
                           {models.map((model) => {
                             const isActive = model.id === selectedModelId;
                             const capabilitySummary = [
@@ -472,17 +488,23 @@ export function ChatShell({
                                 className="items-start rounded-xl px-3 py-2.5"
                                 onClick={() => setSelectedModelId(model.id)}
                               >
-                                <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-                                  <div className="min-w-0 space-y-1">
-                                    <div className="truncate text-sm font-medium text-foreground">
-                                      {model.label}
-                                    </div>
-                                    <div className="text-xs leading-5 text-muted-foreground">
-                                      {capabilitySummary.length > 0
-                                        ? capabilitySummary.join(" · ")
-                                        : model.provider === "gemini"
-                                          ? "Gemini 原生模型"
-                                          : "OpenAI 兼容模型"}
+                                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                                    <ModelIcon
+                                      model={model}
+                                      className="mt-0.5 size-5 shrink-0 text-slate-500"
+                                    />
+                                    <div className="min-w-0 space-y-1">
+                                      <div className="truncate text-sm font-medium text-foreground">
+                                        {model.label}
+                                      </div>
+                                      <div className="text-xs leading-5 text-muted-foreground">
+                                        {capabilitySummary.length > 0
+                                          ? capabilitySummary.join(" · ")
+                                          : model.provider === "gemini"
+                                            ? "Gemini 原生模型"
+                                            : "OpenAI 兼容模型"}
+                                      </div>
                                     </div>
                                   </div>
                                   {isActive ? (
@@ -502,18 +524,15 @@ export function ChatShell({
               </div>
             </div>
 
-            <Badge
-              variant="secondary"
-              className="rounded-full border border-border/65 bg-background/86 px-3 py-1 text-xs font-medium text-muted-foreground shadow-none"
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full bg-transparent text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
+              type="button"
+              aria-label="编辑会话级提示词"
             >
-              {isSubmitting
-                ? "生成中"
-                : activeConversation
-                  ? hasMessages
-                    ? "进行中"
-                    : selectedModel?.label ?? "已就绪"
-                  : "未开始"}
-            </Badge>
+              <NotebookPenIcon className="size-4.5" />
+            </Button>
           </div>
         </header>
 
@@ -532,7 +551,7 @@ export function ChatShell({
         ) : null}
 
         <section
-          className={`relative z-10 flex min-h-0 flex-1 flex-col ${
+          className={`relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden ${
             hasMessages ? "px-3 pb-5 sm:px-5 lg:px-8" : "px-4 pb-8 sm:px-6 lg:px-8"
           }`}
         >
@@ -545,13 +564,20 @@ export function ChatShell({
             showJumpToLatest={showJumpToLatest}
             onJumpToLatest={() => scrollToLatest()}
           />
-          <ChatInput
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSendMessage}
-            isSubmitting={isSubmitting}
-            hasMessages={hasMessages}
-          />
+          <div className="relative z-20 shrink-0 pt-4">
+            {hasMessages ? (
+              <div className="pointer-events-none absolute inset-x-0 -top-8 h-10 bg-gradient-to-t from-background/88 to-transparent" />
+            ) : null}
+            <div className="mx-auto w-full max-w-4xl">
+              <ChatInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={handleSendMessage}
+                isSubmitting={isSubmitting}
+                hasMessages={hasMessages}
+              />
+            </div>
+          </div>
         </section>
       </main>
     </div>

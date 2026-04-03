@@ -104,7 +104,7 @@ export function MessageList({
           </div>
         </motion.div>
       ) : (
-        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-7 px-1 py-8 sm:px-3 sm:py-10">
+        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-7 px-1 pt-8 pb-10 sm:px-3 sm:pt-10 sm:pb-12">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}

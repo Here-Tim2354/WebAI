@@ -5,6 +5,7 @@ type OpenAICompatibleModelRow = {
   model_id: string;
   label: string;
   description: string | null;
+  icon: string | null;
   api_style: string;
   base_url: string | null;
   is_default: boolean;
@@ -26,6 +27,7 @@ type GeminiModelRow = {
   name: string;
   display_name: string;
   description: string | null;
+  icon: string | null;
   api_style: string;
   is_default: boolean;
   sort_order: number;
@@ -38,6 +40,8 @@ type GeminiModelRow = {
   supports_code_execution: boolean;
   supports_function_calling: boolean;
   supports_tools: boolean;
+  supports_file_search: boolean;
+  supports_structured_outputs: boolean;
   supports_streaming: boolean;
   supports_reasoning: boolean;
 };
@@ -57,6 +61,7 @@ const openAIModelSelectFields = [
   "model_id",
   "label",
   "description",
+  "icon",
   "api_style",
   "base_url",
   "is_default",
@@ -78,6 +83,7 @@ const geminiModelSelectFields = [
   "name",
   "display_name",
   "description",
+  "icon",
   "api_style",
   "is_default",
   "sort_order",
@@ -90,6 +96,8 @@ const geminiModelSelectFields = [
   "supports_code_execution",
   "supports_function_calling",
   "supports_tools",
+  "supports_file_search",
+  "supports_structured_outputs",
   "supports_streaming",
   "supports_reasoning",
 ].join(", ");
@@ -101,6 +109,7 @@ function mapOpenAICompatibleModel(
     id: row.model_id,
     label: row.label,
     description: row.description,
+    icon: row.icon,
     provider: "openai_compatible",
     apiStyle: row.api_style,
     upstreamModelId: row.model_id,
@@ -131,6 +140,7 @@ function mapGeminiModel(row: GeminiModelRow): ResolvedAIModel {
     id: row.name,
     label: row.display_name,
     description: row.description,
+    icon: row.icon,
     provider: "gemini",
     apiStyle: row.api_style,
     upstreamModelId: row.name,
@@ -147,8 +157,8 @@ function mapGeminiModel(row: GeminiModelRow): ResolvedAIModel {
       tools: row.supports_tools,
       streaming: row.supports_streaming,
       reasoning: row.supports_reasoning,
-      fileSearch: false,
-      structuredOutputs: false,
+      fileSearch: row.supports_file_search,
+      structuredOutputs: row.supports_structured_outputs,
       googleSearch: row.supports_google_search,
       urlContext: row.supports_url_context,
       codeExecution: row.supports_code_execution,
