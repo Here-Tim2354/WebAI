@@ -1,0 +1,15 @@
+{
+  "createFileSetting": "default",
+  "showCreateFileNotification": true,
+  "defaultFolderPath": "",
+  "addAliasesToFrontmatter": true,
+  "useTemplates": false,
+  "defaultTemplatePath": "",
+  "templateFolder": "模版文件",
+  "templaterMethod": "execute",
+  "useRules": false,
+  "rules": [],
+  "autoTagging": false,
+  "autoTaggingMinConfidence": 0.7,
+  "debugMode": false
+}

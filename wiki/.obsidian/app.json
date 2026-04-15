@@ -1,0 +1,19 @@
+{
+  "trashOption": "local",
+  "newFileLocation": "current",
+  "attachmentFolderPath": "Attachment",
+  "autoPairMarkdown": false,
+  "spellcheck": false,
+  "alwaysUpdateLinks": true,
+  "pdfExportSettings": {
+    "includeName": true,
+    "pageSize": "A4",
+    "landscape": false,
+    "margin": "0",
+    "downscalePercent": 90
+  },
+  "showLineNumber": false,
+  "showIndentGuide": true,
+  "rightToLeft": false,
+  "promptDelete": false
+}

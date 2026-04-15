@@ -1,0 +1,12 @@
+{
+  "accentColor": "#e48b25",
+  "interfaceFontFamily": "HONOR Sans CN",
+  "textFontFamily": "Inter,MiSans",
+  "baseFontSize": 18,
+  "baseFontSizeAction": true,
+  "theme": "obsidian",
+  "cssTheme": "Border",
+  "monospaceFontFamily": "JetBrains Mono,HONOR Sans CN",
+  "nativeMenus": false,
+  "showViewHeader": true
+}

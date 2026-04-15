@@ -1,0 +1,42 @@
+{
+  "main": {
+    "id": "mobile-main",
+    "type": "split",
+    "children": [
+      {
+        "id": "mobile-tabs",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "mobile-leaf",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "新标签页"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "mobile-left",
+    "type": "mobile-drawer",
+    "children": [],
+    "currentTab": 0
+  },
+  "right": {
+    "id": "mobile-right",
+    "type": "mobile-drawer",
+    "children": [],
+    "currentTab": 0
+  },
+  "left-ribbon": {
+    "hiddenItems": {}
+  },
+  "active": "mobile-leaf",
+  "lastOpenFiles": []
+}
