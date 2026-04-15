@@ -30,3 +30,6 @@ next-env.d.ts
 
 # submissions
 submissions/WebAI需求分析文档.docx
+
+# wiki
+wiki/.obsidian/*
