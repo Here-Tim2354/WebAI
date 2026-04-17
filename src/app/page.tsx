@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { ChatShell } from "@/components/chat/chat-shell";
 import { mapAuthUser } from "@/lib/supabase/auth";
 import { listConversations } from "@/lib/supabase/conversations";
@@ -11,15 +12,28 @@ type HomePageProps = {
 };
 
 export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const isDevLoginModeEnabled =
+    process.env.NODE_ENV === "development" &&
+    (process.env.MODE === "DEV" || process.env.npm_config_mode === "DEV");
+
+  if (
+    !user &&
+    isDevLoginModeEnabled &&
+    resolvedSearchParams.auth !== "error" &&
+    resolvedSearchParams.auth !== "success"
+  ) {
+    redirect("/api/auth/dev-login");
+  }
+
   const conversations = user
     ? await listConversations(supabase, user.id)
     : [];
   const models = user ? await listEnabledModels(supabase) : [];
-  const resolvedSearchParams = await searchParams;
   const initialAuthMessage =
     resolvedSearchParams.auth === "error"
       ? "登录确认失败，请检查邮件链接或重新发送。"
