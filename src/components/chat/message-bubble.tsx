@@ -16,6 +16,10 @@ const roleLabelMap = {
   error: "Error",
 } as const;
 
+/**
+ * MessageBubble 只关心单条消息的视觉语义：
+ * 谁发的、是否报错、是否仍在生成，最终都映射成统一气泡样式。
+ */
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isAssistantLike =
     message.role === "assistant" || message.role === "system";
@@ -71,6 +75,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
       >
         {message.status === "pending" && message.content.length === 0 ? (
+          // assistant 占位气泡在真正文本返回前只展示加载态。
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             生成中

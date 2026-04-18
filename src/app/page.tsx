@@ -11,6 +11,10 @@ type HomePageProps = {
   }>;
 };
 
+/**
+ * 首页是一个 Server Component：
+ * 先在服务端恢复当前用户和初始工作区数据，再把“首屏可直接渲染”的状态交给 ChatShell。
+ */
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = await searchParams;
   const supabase = await createSupabaseServerClient();
@@ -21,6 +25,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     process.env.NODE_ENV === "development" &&
     (process.env.MODE === "DEV" || process.env.npm_config_mode === "DEV");
 
+  // DEV 模式下，如果用户还没有登录，就直接跳到开发登录捷径，
+  // 这样本地调试时刷新页面也能快速恢复工作区。
   if (
     !user &&
     isDevLoginModeEnabled &&
@@ -34,6 +40,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     ? await listConversations(supabase, user.id)
     : [];
   const models = user ? await listEnabledModels(supabase) : [];
+  // auth 查询参数由邮箱确认页回跳时带上，用来在首页给出一次性的登录结果提示。
   const initialAuthMessage =
     resolvedSearchParams.auth === "error"
       ? "登录确认失败，请检查邮件链接或重新发送。"

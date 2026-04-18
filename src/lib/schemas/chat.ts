@@ -55,6 +55,8 @@ type CreateChatMessageInput = {
   status: ChatMessage["status"];
 };
 
+// createChatMessage 是前端本地构造消息对象的统一入口。
+// 即使消息还没落库，也先保持与 schema 一致，避免 UI 处理“半结构化消息”。
 export function createChatMessage(input: CreateChatMessageInput): ChatMessage {
   return {
     id: input.id ?? crypto.randomUUID(),

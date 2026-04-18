@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+// dev-login 只在本地调试环境里使用，因此缺失配置时直接抛错更容易尽早发现问题。
 function getRequiredEnvValue(name: string) {
   const value = process.env[name]?.trim();
 
@@ -11,6 +12,10 @@ function getRequiredEnvValue(name: string) {
   return value;
 }
 
+/**
+ * 开发环境快捷登录：
+ * 服务端使用 service role 生成一次性 magic link，再立刻重定向到确认页，避免手动查邮箱。
+ */
 export async function GET(request: Request) {
   const isDevLoginModeEnabled =
     process.env.NODE_ENV === "development" &&
@@ -44,6 +49,8 @@ export async function GET(request: Request) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
+        // 这里只把 Supabase 当成“生成链接的管理端客户端”使用，
+        // 不需要 token 自动刷新，也不需要在服务端持久化 session。
         autoRefreshToken: false,
         persistSession: false,
       },
@@ -61,6 +68,8 @@ export async function GET(request: Request) {
       throw new Error(error.message);
     }
 
+    // admin.generateLink 返回的是用于后续确认的原始参数，
+    // 这里手动拼回 confirm URL，模拟用户点击了邮件中的登录链接。
     const tokenHash = data.properties.hashed_token;
     const verificationType = data.properties.verification_type;
 

@@ -8,6 +8,8 @@ type GenerateWithGeminiOptions = {
   modelName?: string;
 };
 
+// Gemini SDK 的历史消息结构不是 role/content，而是 Content.parts。
+// 这里把统一消息模型转换成 Gemini 期望的 contents 格式。
 function toGeminiContents(messages: ChatMessage[]): Content[] {
   return messages
     .filter(
@@ -21,6 +23,10 @@ function toGeminiContents(messages: ChatMessage[]): Content[] {
     }));
 }
 
+/**
+ * Gemini 调用走 @google/genai SDK。
+ * system instruction 和 contents 是分开的两个参数，这和 OpenAI compatible 的组装方式不同。
+ */
 export async function generateWithGemini(
   messages: ChatMessage[],
   options?: GenerateWithGeminiOptions,
@@ -43,6 +49,7 @@ export async function generateWithGemini(
     apiKey,
     httpOptions: env.GEMINI_BASE_URL
       ? {
+          // 预留给代理网关或兼容层的 baseUrl 覆写能力。
           baseUrl: env.GEMINI_BASE_URL,
         }
       : undefined,
@@ -53,6 +60,7 @@ export async function generateWithGemini(
     contents,
     config: systemInstruction
       ? {
+          // Gemini 把 system prompt 放在 config.systemInstruction，而不是消息列表里。
           systemInstruction,
         }
       : undefined,

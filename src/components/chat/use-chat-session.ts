@@ -23,6 +23,10 @@ type SubmitOptions = {
   onConversationSynced: (conversation: Conversation) => void;
 };
 
+/**
+ * useChatSession 管的是“消息交互状态”，不是整个页面状态：
+ * 输入框内容、发送中状态、各会话消息缓存都集中收在这里。
+ */
 export function useChatSession() {
   const [conversationMessages, setConversationMessages] = useState<
     Record<string, ChatMessage[]>
@@ -51,11 +55,13 @@ export function useChatSession() {
   const removeConversationMessages = useCallback((conversationId: string) => {
     setConversationMessages((current) => {
       const next = { ...current };
+      // 被删除的会话不应该继续在本地缓存中占一个键位。
       delete next[conversationId];
       return next;
     });
   }, []);
 
+  // updater 形式能保证在异步发送和多次状态更新交错时仍基于最新消息列表计算。
   function updateConversationMessages(
     conversationId: string,
     updater: (messages: ChatMessage[]) => ChatMessage[],
@@ -89,6 +95,8 @@ export function useChatSession() {
       return;
     }
 
+    // 发送采用“乐观更新”：
+    // 先把用户消息和 assistant 占位气泡放进列表，等后端返回后再用真实快照覆盖。
     const userMessage = createChatMessage({
       role: "user",
       content,
@@ -131,6 +139,7 @@ export function useChatSession() {
       syncConversationMessages(conversationId, parsed.messages);
       onConversationSynced(parsed.conversation);
     } catch (error) {
+      // 失败时不回滚用户消息，而是把 assistant 占位替换成 error 气泡。
       updateConversationMessages(conversationId, (current) =>
         current.map((message) =>
           message.id === assistantPlaceholder.id

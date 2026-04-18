@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+// 可选环境变量在进入业务逻辑前先做一次“去空格 + 空字符串转 undefined”的归一化。
 const optionalEnvStringSchema = z.preprocess(
   (value) => {
     if (typeof value !== "string") {
@@ -45,6 +46,10 @@ function formatEnvErrorMessage(error: z.ZodError) {
     .join(" ");
 }
 
+/**
+ * 运行时环境变量会被多个 provider 复用。
+ * 这里做一次 parse + cache，避免每次发消息都重复校验和拼装错误信息。
+ */
 export function getServerEnv() {
   if (cachedEnv) {
     return cachedEnv;
@@ -69,6 +74,8 @@ export function getServerEnv() {
   return cachedEnv;
 }
 
+// 某些变量在 schema 里允许 optional，是为了兼容多 provider 共存；
+// 真正进入具体 provider 时，再在使用点精确要求“这个值必须存在”。
 export function requireServerEnvValue(
   value: string | undefined,
   errorMessage: string,

@@ -21,6 +21,7 @@ type AuthFeedbackState = {
   code?: string | null;
 };
 
+// 登录相关报错可能来自 fetch、Supabase callback 或手动抛错，统一在这里做前端提示翻译。
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -29,6 +30,10 @@ function getErrorMessage(error: unknown) {
   return "发送登录链接失败，请稍后再试。";
 }
 
+/**
+ * Supabase 邮箱回调既可能把状态放在 query string，也可能放在 hash。
+ * 这里统一解析，避免前端只覆盖到其中一种回跳形态。
+ */
 function parseAuthFeedbackFromLocation(): AuthFeedbackState | null {
   const queryParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.slice(1));
@@ -76,6 +81,10 @@ function parseAuthFeedbackFromLocation(): AuthFeedbackState | null {
   return null;
 }
 
+/**
+ * AuthPanel 是未登录用户的入口面板：
+ * 负责邮箱输入、发送魔法链接，以及消费回跳后的登录反馈。
+ */
 export function AuthPanel({
   initialMessage = null,
   initialMessageType = "info",
@@ -87,6 +96,8 @@ export function AuthPanel({
   const [feedbackType, setFeedbackType] = useState<"info" | "error">(initialMessageType);
   const [feedbackCode, setFeedbackCode] = useState<string | null>(null);
 
+  // 管理登录页首次挂载时的本地恢复。
+  // 当前实现会读取上次输入过的邮箱，并解析 URL / hash 中的登录回跳结果来初始化提示状态。
   useEffect(() => {
     const savedEmail = window.localStorage.getItem(LAST_AUTH_EMAIL_KEY);
 
@@ -102,6 +113,7 @@ export function AuthPanel({
       setFeedbackCode(locationFeedback.code ?? null);
 
       if (locationFeedback.code === "otp_expired") {
+        // 链接过期时把焦点拉回邮箱框，减少用户重新发送的操作成本。
         window.setTimeout(() => {
           inputRef.current?.focus();
           inputRef.current?.select();

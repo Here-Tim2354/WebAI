@@ -26,10 +26,13 @@ type OpenAICompatibleResponse = {
   }>;
 };
 
+// 允许数据库里配置的 base_url 带尾部斜杠，真正拼接请求路径前统一清洗一次。
 function normalizeBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, "");
 }
 
+// OpenAI 兼容接口要求 messages 是 role/content 结构。
+// system prompt 不作为单独字段传，而是显式插入为第一条 system 消息。
 function toOpenAICompatibleMessages(
   messages: ChatMessage[],
   conversationSystemPrompt?: string | null,
@@ -61,6 +64,8 @@ function toOpenAICompatibleMessages(
   ];
 }
 
+// 有些 OpenAI 兼容服务会把 content 返回成字符串，
+// 也有些会返回 content parts 数组，这里统一抽成纯文本。
 function extractAssistantText(payload: OpenAICompatibleResponse) {
   const content = payload.choices?.[0]?.message?.content;
 
@@ -78,6 +83,10 @@ function extractAssistantText(payload: OpenAICompatibleResponse) {
   return "";
 }
 
+/**
+ * OpenAI compatible 调用走原始 HTTP，而不是官方 SDK。
+ * 这样更容易兼容多家“长得像 OpenAI”的上游服务。
+ */
 export async function generateWithOpenAICompatible(
   messages: ChatMessage[],
   options: GenerateWithOpenAICompatibleOptions,
@@ -104,6 +113,7 @@ export async function generateWithOpenAICompatible(
         messages,
         options.conversationSystemPrompt,
       ),
+      // 当前 phase 还没接流式输出，这里显式关闭 stream，保持返回结构简单稳定。
       stream: false,
     }),
   });

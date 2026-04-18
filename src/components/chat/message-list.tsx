@@ -17,6 +17,11 @@ type MessageListProps = {
   showJumpToLatest: boolean;
 };
 
+/**
+ * MessageList 负责两种界面态：
+ * 1. 空会话欢迎页
+ * 2. 已有消息时的滚动消息流
+ */
 export function MessageList({
   messages,
   messageEndRef,
@@ -43,11 +48,14 @@ export function MessageList({
   );
   const [typedTitle, setTypedTitle] = useState("");
 
+  // 管理空会话欢迎标题的逐字动画。
+  // 当前实现只在 messages 为空时启动定时器，逐步把 emptyTitle 切片写入 typedTitle。
   useEffect(() => {
     if (messages.length > 0) {
       return;
     }
 
+    // 欢迎标题通过逐字追加营造轻量输入感。
     const resetTimer = window.setTimeout(() => {
       setTypedTitle("");
     }, 0);

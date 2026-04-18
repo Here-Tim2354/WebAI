@@ -56,6 +56,7 @@ type ConversationSidebarProps = {
   onSignOut: () => Promise<void>;
 };
 
+// 会话列表展示时间不需要精确到秒，这里统一收口成适合中文界面的简洁格式。
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
@@ -65,6 +66,10 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
+/**
+ * 侧栏负责“会话导航”和“会话管理”两类交互：
+ * 切换、新建、重命名、删除、退出登录都从这里发起。
+ */
 export function ConversationSidebar({
   conversations,
   activeConversationId,
@@ -90,6 +95,8 @@ export function ConversationSidebar({
     useState<Conversation | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
 
+  // 重命名采用“局部编辑态 + 提交后调用父层 API”的模式，
+  // 这样侧栏只关心输入交互，不直接碰数据访问细节。
   const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (
     event,
   ) => {
@@ -152,6 +159,8 @@ export function ConversationSidebar({
     }
   }
 
+  // 为了同时复用桌面端 aside 和移动端 Sheet，
+  // 实际侧栏内容被抽成一个共享片段，避免维护两套会话列表 DOM。
   const sidebarContent = (
     <div className="flex h-full flex-col gap-4 overflow-x-hidden px-3 py-4 sm:px-4">
       <div
@@ -300,6 +309,7 @@ export function ConversationSidebar({
                         className="h-10 rounded-xl border-border/70 bg-background/92"
                         onChange={(event) => setTitleDraft(event.target.value)}
                         onBlur={() => {
+                          // 这里用 blur 直接收口编辑态，保证点击其它会话或空白区时不会残留半编辑状态。
                           setEditingConversationId(null);
                           setTitleDraft("");
                         }}

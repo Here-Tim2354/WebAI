@@ -9,6 +9,7 @@ type MessageRow = {
   created_at: string;
 };
 
+// messages 表里用 sender_type 表示消息来源，这里映射回前端统一的 role/status 结构。
 function mapMessageRow(row: MessageRow): ChatMessage {
   return createChatMessage({
     id: row.id,
@@ -18,6 +19,7 @@ function mapMessageRow(row: MessageRow): ChatMessage {
   });
 }
 
+// 历史消息必须按 created_at 正序取回，否则会破坏模型上下文顺序和前端展示顺序。
 export async function listConversationMessages(
   supabase: SupabaseClient,
   conversationId: string,

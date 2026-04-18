@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   description: "A modern Gemini-powered chat workspace.",
 };
 
+/**
+ * RootLayout 负责整个 App Router 共享的 HTML 壳层。
+ * 字体变量在这里挂到 body 上，下面所有页面和组件都能直接复用。
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

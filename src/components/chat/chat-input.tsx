@@ -27,6 +27,8 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
 
+  // 管理输入框高度自适应。
+  // 当前实现是在 value 变化后读取 scrollHeight，并把 textarea 高度限制在 240px 内。
   useEffect(() => {
     const textarea = textareaRef.current;
 
@@ -38,6 +40,8 @@ export function ChatInput({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
   }, [value]);
 
+  // 管理发送完成后的焦点回归。
+  // 当前实现是在 isSubmitting 重新变回 false 时，把光标焦点放回输入框。
   useEffect(() => {
     if (!isSubmitting) {
       textareaRef.current?.focus();

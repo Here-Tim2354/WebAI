@@ -57,6 +57,7 @@ export class ModelRegistryError extends Error {
   }
 }
 
+// Supabase select 字段统一抽成常量，避免列表查询和单条查询各写一份时字段漂移。
 const openAIModelSelectFields = [
   "model_id",
   "label",
@@ -102,6 +103,8 @@ const geminiModelSelectFields = [
   "supports_reasoning",
 ].join(", ");
 
+// 两张 provider 专属表最终都要映射成统一的前端模型结构，
+// 这样上层 UI 和聊天接口就不需要感知底层表结构差异。
 function mapOpenAICompatibleModel(
   row: OpenAICompatibleModelRow,
 ): ResolvedAIModel {
@@ -166,6 +169,10 @@ function mapGeminiModel(row: GeminiModelRow): ResolvedAIModel {
   };
 }
 
+/**
+ * 当前模型注册表是“分表存储、统一返回”：
+ * OpenAI Compatible 和 Gemini 各查各的，再在应用层合并排序。
+ */
 export async function listEnabledModels(
   supabase: SupabaseClient,
 ): Promise<ResolvedAIModel[]> {
@@ -201,6 +208,7 @@ export async function listEnabledModels(
       mapGeminiModel(row as unknown as GeminiModelRow),
     ),
   ].sort((left, right) => {
+    // sortOrder 优先表达产品侧排序意图，label 只是稳定兜底。
     if (left.sortOrder !== right.sortOrder) {
       return left.sortOrder - right.sortOrder;
     }
@@ -209,6 +217,10 @@ export async function listEnabledModels(
   });
 }
 
+/**
+ * 模型按 ID 查询时，需要依次尝试两张 provider 表。
+ * 上层只传一个 modelId，不关心它底层到底属于哪个 provider。
+ */
 export async function getEnabledModelById(
   supabase: SupabaseClient,
   modelId: string,

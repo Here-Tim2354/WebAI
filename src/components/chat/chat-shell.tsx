@@ -42,6 +42,7 @@ type ChatShellProps = {
   initialAuthMessageType?: "info" | "error";
 };
 
+// 前端链路里既可能抛 Error，也可能抛非 Error 值，统一在这里收口成人类可读消息。
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -50,12 +51,17 @@ function getErrorMessage(error: unknown) {
   return "暂时无法完成操作，请稍后再试。";
 }
 
+// 会话列表以最近更新时间倒序展示，保证刚对话过或刚编辑过的会话始终靠前。
 function sortConversations(conversations: Conversation[]) {
   return [...conversations].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt),
   );
 }
 
+/**
+ * ChatShell 是聊天工作区的前端状态中枢：
+ * 负责会话列表、当前会话、模型选择、消息发送和错误提示之间的协调。
+ */
 export function ChatShell({
   initialUser,
   initialConversations,
@@ -111,6 +117,7 @@ export function ChatShell({
     (groups, model) => {
       const key = model.provider === "gemini" ? "Gemini" : "OpenAI Compatible";
 
+      // ??= 是“若不存在则初始化”，这里把平铺的模型数组整理成按 provider 分组的结构。
       groups[key] ??= [];
       groups[key].push(model);
 
@@ -119,6 +126,7 @@ export function ChatShell({
     {},
   );
 
+  // upsert 的目标是“有则更新，无则插入”，这样重命名、拉取详情、发送消息后都能复用同一入口刷新列表。
   function upsertConversation(nextConversation: Conversation) {
     setConversations((current) => {
       const remaining = current.filter(
@@ -129,6 +137,10 @@ export function ChatShell({
     });
   }
 
+  /**
+   * 当前新建会话仍走“空参数快速创建”模式：
+   * 后端会自动补默认标题，前端这里只负责把新会话插入本地状态并决定是否立即激活。
+   */
   async function createConversation(options?: { activate?: boolean }) {
     setIsCreatingConversation(true);
     setWorkspaceError(null);
@@ -148,6 +160,8 @@ export function ChatShell({
       }
 
       const parsed = conversationResponseSchema.parse(payload);
+      // 新会话刚创建时数据库里还没有消息，这里提前同步空数组，
+      // 后续切换到它时就不会误读到旧会话残留状态。
       upsertConversation(parsed.conversation);
       syncConversationMessages(parsed.conversation.id, []);
 
@@ -161,9 +175,13 @@ export function ChatShell({
     }
   }
 
+  // 管理客户端挂载后的模型列表同步。
+  // 当前实现只在首次挂载时请求 /api/models，并在结果返回后校正可用模型和当前选中值。
   useEffect(() => {
     let cancelled = false;
 
+    // 模型列表即便服务端已经首屏注入过，也仍然在客户端再拉一遍，
+    // 这样进入工作区后能尽量同步到“当前数据库里最新启用”的模型集合。
     async function loadModels() {
       try {
         const response = await fetch("/api/models");
@@ -180,6 +198,8 @@ export function ChatShell({
         }
 
         setAvailableModels(parsed.models);
+        // 如果当前选中的模型仍然存在，就保留用户选择；
+        // 否则回退到默认模型，避免前端继续持有已被停用的 modelId。
         setSelectedModelId((current) => {
           if (current && parsed.models.some((model) => model.id === current)) {
             return current;
@@ -205,6 +225,8 @@ export function ChatShell({
     };
   }, []);
 
+  // 管理当前激活会话的详情加载。
+  // 当前实现会在 activeConversationId 变化时拉取会话快照，并在卸载或切换时通过 cancelled 防止过期回写。
   useEffect(() => {
     if (!activeConversationId) {
       setIsLoadingConversation(false);
@@ -214,6 +236,7 @@ export function ChatShell({
     const conversationId = activeConversationId;
     let cancelled = false;
 
+    // 切换会话时按需拉取详情，避免首页一次性把所有历史消息都塞进首屏 payload。
     async function loadConversation() {
       setIsLoadingConversation(true);
 
@@ -231,6 +254,8 @@ export function ChatShell({
           return;
         }
 
+        // 会话详情接口返回的是“会话 + 消息快照”，
+        // 因此前端可以一次同步标题、system prompt 和完整消息列表。
         syncConversationMessages(conversationId, parsed.messages);
         upsertConversation(parsed.conversation);
         setWorkspaceError(null);
@@ -314,6 +339,8 @@ export function ChatShell({
           (conversation) => conversation.id !== conversationId,
         );
 
+        // 如果删掉的是当前会话，就把焦点切到列表中的下一条，
+        // 避免主面板仍停留在一个已不存在的 conversationId 上。
         setActiveConversationId((activeId) =>
           activeId === conversationId ? remaining[0]?.id ?? null : activeId,
         );
@@ -361,6 +388,8 @@ export function ChatShell({
       return activeConversationId;
     }
 
+    // 首条消息发送时允许“先输入，后建会话”。
+    // 这样空白工作区不需要额外先点一次“新对话”。
     try {
       const conversation = await createConversation({ activate: true });
       return conversation.id;
@@ -377,6 +406,8 @@ export function ChatShell({
       activeConversationId,
       ensureConversationId,
       selectedModelId,
+      // handleSubmit 只知道聊天接口返回了最新会话，
+      // 具体怎么把它并回列表由 ChatShell 决定。
       onConversationSynced(conversation) {
         upsertConversation(conversation);
       },

@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getSupabaseEnv } from "@/lib/env/supabase";
 
+/**
+ * Server Component / Route Handler 共用的 Supabase SSR client。
+ * 关键点不是“新建一个 client”，而是把当前请求的 cookie 上下文接进去。
+ */
 export async function createSupabaseServerClient() {
   const env = getSupabaseEnv();
   const cookieStore = await cookies();
@@ -16,6 +20,7 @@ export async function createSupabaseServerClient() {
         },
         setAll(cookiesToSet) {
           try {
+            // 在能写 cookie 的服务端上下文里，把 Supabase 刷新的 session 同步回响应。
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
             });

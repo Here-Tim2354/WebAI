@@ -10,6 +10,7 @@ type ConversationRow = {
   updated_at: string;
 };
 
+// 数据库字段采用 snake_case，前端 schema 采用 camelCase，这里统一做一次映射转换。
 function mapConversation(row: ConversationRow): Conversation {
   return {
     id: row.id,
@@ -31,6 +32,7 @@ export class ConversationAccessError extends Error {
   }
 }
 
+// 当前产品默认的“空白新会话标题”集中定义，避免前后端到处散落字面量。
 export function createDefaultConversationTitle() {
   return "新会话";
 }
@@ -52,6 +54,10 @@ export async function listConversations(
   return (data ?? []).map((row) => mapConversation(row as ConversationRow));
 }
 
+/**
+ * createConversation 只负责数据库落库，不处理任何前端展示逻辑。
+ * system prompt 如果是空白字符串，会被归一化成 null，避免把“空值”和“空字符串”混在库里。
+ */
 export async function createConversation(
   supabase: SupabaseClient,
   userId: string,
@@ -103,6 +109,10 @@ type UpdateConversationInput = {
   systemPrompt?: string;
 };
 
+/**
+ * 更新时只写入显式提供的字段。
+ * 这样 PATCH 可以同时支持“只改标题”和“只改 system prompt”两种调用方式。
+ */
 export async function updateConversation(
   supabase: SupabaseClient,
   userId: string,
@@ -165,6 +175,8 @@ export async function deleteConversation(
   }
 }
 
+// touchConversation 不改业务字段，只更新 updated_at。
+// 它服务的是“最近会话排序”和“刚发生交互的会话自动置顶”。
 export async function touchConversation(
   supabase: SupabaseClient,
   userId: string,

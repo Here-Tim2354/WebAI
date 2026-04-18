@@ -19,6 +19,7 @@ type RouteContext = {
   }>;
 };
 
+// 单会话路由与集合路由一样，都依赖服务端从 cookie 里恢复当前用户。
 function unauthorizedResponse() {
   return NextResponse.json(
     {
@@ -30,6 +31,10 @@ function unauthorizedResponse() {
   );
 }
 
+/**
+ * 统一把会话访问类错误收口成 404，避免把“会话不存在”和“无权限访问”
+ * 暴露成不同响应，从而泄漏更多资源状态信息。
+ */
 function handleConversationError(error: unknown) {
   if (error instanceof ConversationAccessError) {
     return NextResponse.json(
@@ -55,6 +60,10 @@ function handleConversationError(error: unknown) {
   );
 }
 
+/**
+ * 读取某个会话的完整工作区状态。
+ * 除了会话本体，还会把消息列表一起返回，方便前端一次请求完成会话恢复。
+ */
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { supabase, user } = await getSupabaseAuthContext();
@@ -79,6 +88,11 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
+/**
+ * 当前 PATCH 同时承担两类会话级更新：
+ * 1. 标题重命名
+ * 2. 会话级 system prompt 更新
+ */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { supabase, user } = await getSupabaseAuthContext();
@@ -132,6 +146,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
+/**
+ * 删除成功后返回 204，无响应体。
+ * 前端应以状态码为准更新本地列表，而不是依赖额外 payload。
+ */
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { supabase, user } = await getSupabaseAuthContext();

@@ -8,6 +8,10 @@ type GenerateAssistantReplyOptions = {
   conversationSystemPrompt?: string | null;
 };
 
+/**
+ * AI 调用入口只做 provider 分发，不掺杂 provider 细节。
+ * 这样上层聊天接口只关心“给我回复”，而不是“该走哪个 SDK / HTTP 协议”。
+ */
 export async function generateAssistantReply(
   messages: ChatMessage[],
   options?: GenerateAssistantReplyOptions,
