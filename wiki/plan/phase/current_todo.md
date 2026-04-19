@@ -43,6 +43,7 @@
   - 会话 API 已支持读写 `systemPrompt`
   - AI 调用层已能接收会话级提示词
 - 已完成模型注册表首轮落地：
+  - `ai_models`
   - `openai_compatible_models`
   - `gemini_models`
   - Supabase migration 已落地
@@ -56,6 +57,7 @@
   - `/api/models` 已可用
   - 空会话首页头部已接入模型选择条
   - 当前发送消息时已可带上所选模型
+  - 当前 `modelId` 已切换为注册表主键语义
 
 ## 当前代码状态
 
@@ -73,6 +75,7 @@
   - 评估是否需要在会话级或本地持久化当前模型选择
 - 完成模型注册表首轮数据整理：
   - 补充首批常用模型 seed 数据
+  - 校对父表与 provider 子表的字段分层
   - 校对 `OpenAI compatible` 与 `Gemini` 的能力标记
   - 明确默认模型策略
 - 继续推进 `Phase 4` 的基础扩展位：

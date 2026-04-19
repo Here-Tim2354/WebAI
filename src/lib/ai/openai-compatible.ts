@@ -1,10 +1,10 @@
 import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
 import { ChatMessage } from "@/lib/schemas/chat";
-import { ResolvedAIModel } from "@/lib/supabase/model-registry";
+import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { getSystemInstruction } from "./system-instruction";
 
 type GenerateWithOpenAICompatibleOptions = {
-  model: ResolvedAIModel;
+  model: RuntimeAIModel;
   conversationSystemPrompt?: string | null;
 };
 

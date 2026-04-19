@@ -1,11 +1,24 @@
+---
+aliases:
+  - ChatShell 状态流
+  - ChatShell State Flow
+---
+
 # ChatShell 前端状态流说明
 
 本文档用于理解 `ChatShell` 的前端运行机制，而不是页面展示结构。
 
-对应代码文件：
+代码入口：
 - `src/components/chat/chat-shell.tsx`
 - `src/components/chat/use-chat-session.ts`
 - `src/components/chat/use-message-scroll.ts`
+
+关联笔记：
+- [[chatshell]]
+- [[conversation-sidebar-stateflow]]
+- [[message-list-stateflow]]
+- [[chat-input-stateflow]]
+- [[auth-panel-stateflow]]
 
 ---
 
@@ -19,9 +32,7 @@
 - 哪些 `useEffect` 在做副作用管理
 - 前端请求是如何串到页面更新上的
 
-如果你想看“页面长什么样、由哪些区块组成”，应该看：
-
-- [chatshell.md](E:\Learning\Programming\WebAI\wiki\doc\frontend\chatshell.md)
+如果你想看页面结构本身，直接看 [[chatshell]]。
 
 ---
 
@@ -205,6 +216,7 @@ const [selectedModelId, setSelectedModelId] = useState<string | null>(...);
 - 客户端挂载后还会再请求一次 `/api/models`
 - 如果当前选中的模型仍然存在，就保留
 - 如果模型失效，就回退到默认模型或列表第一项
+- 当前 `selectedModelId` 保存的是注册表主键，不再直接等于上游模型名
 
 ---
 

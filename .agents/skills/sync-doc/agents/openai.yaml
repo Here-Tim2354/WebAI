@@ -1,0 +1,7 @@
+interface:
+  display_name: "文档同步"
+  short_description: "同步项目文档与阶段进度"
+  default_prompt: "使用 $sync-doc 同步 wiki/doc 和 wiki/plan/phase/current_todo.md，更新 GUIDE.md 索引与旧双链，并汇报具体改动和仍需手动删除的文件。"
+
+policy:
+  allow_implicit_invocation: true

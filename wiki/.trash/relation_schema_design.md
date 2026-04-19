@@ -1,4 +1,12 @@
-# 关系模式设计
+# 已迁移
+
+当前文档已迁移到：
+
+- [10_verified/relation_schema_design.md](/E:/Learning/Programming/WebAI/wiki/plan/database/10_verified/relation_schema_design.md)
+
+数据库需求基线请优先参考：
+
+- [phase_overview.md](/E:/Learning/Programming/WebAI/wiki/plan/phase/phase_overview.md)
 
 ## 文档定位
 
@@ -172,36 +180,36 @@
 - 英文表名：`openai_compatible_models`
 - 作用：保存采用 OpenAI 兼容接口的模型目录、展示信息与能力位配置
 
-| 字段名 | 类型 | 可空 | 主键 | 外键 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `id` | `uuid` | 否 | 是 | 否 | `gen_random_uuid()` | 记录唯一标识 |
-| `model_id` | `varchar(120)` | 否 | 否 | 否 | 无 | 上游兼容接口使用的模型标识 |
-| `upstream_object` | `varchar(50)` | 是 | 否 | 否 | 无 | 对应上游模型对象类型 |
-| `owned_by` | `varchar(120)` | 是 | 否 | 否 | 无 | 上游模型归属信息 |
-| `upstream_created_at` | `timestamptz` | 是 | 否 | 否 | 无 | 上游模型创建时间 |
-| `label` | `varchar(120)` | 否 | 否 | 否 | 无 | 前端展示名称 |
-| `description` | `text` | 是 | 否 | 否 | 无 | 模型说明 |
-| `provider_name` | `varchar(120)` | 否 | 否 | 否 | `openai` | 实际兼容供应商名称 |
-| `base_url` | `text` | 是 | 否 | 否 | 无 | 兼容接口基地址 |
-| `api_style` | `varchar(50)` | 否 | 否 | 否 | `openai_compatible` | 接口风格标识 |
-| `supports_text` | `boolean` | 否 | 否 | 否 | `true` | 是否支持文本能力 |
-| `supports_image` | `boolean` | 否 | 否 | 否 | `false` | 是否支持图片能力 |
-| `supports_audio` | `boolean` | 否 | 否 | 否 | `false` | 是否支持音频能力 |
-| `supports_video` | `boolean` | 否 | 否 | 否 | `false` | 是否支持视频能力 |
-| `supports_web_search` | `boolean` | 否 | 否 | 否 | `false` | 是否支持联网搜索 |
-| `supports_function_calling` | `boolean` | 否 | 否 | 否 | `false` | 是否支持函数调用 |
-| `supports_tools` | `boolean` | 否 | 否 | 否 | `false` | 是否支持工具能力聚合开关 |
-| `supports_file_search` | `boolean` | 否 | 否 | 否 | `false` | 是否支持文件检索 |
-| `supports_structured_outputs` | `boolean` | 否 | 否 | 否 | `false` | 是否支持结构化输出 |
-| `supports_streaming` | `boolean` | 否 | 否 | 否 | `true` | 是否支持流式输出 |
-| `supports_reasoning` | `boolean` | 否 | 否 | 否 | `false` | 是否支持推理型能力 |
-| `context_window` | `integer` | 是 | 否 | 否 | 无 | 上下文窗口规模 |
-| `max_output_tokens` | `integer` | 是 | 否 | 否 | 无 | 最大输出 token |
-| `is_enabled` | `boolean` | 否 | 否 | 否 | `true` | 是否启用 |
-| `is_default` | `boolean` | 否 | 否 | 否 | `false` | 是否为该表默认模型 |
-| `sort_order` | `integer` | 否 | 否 | 否 | `0` | 前端排序权重 |
-| `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 记录创建时间 |
-| `updated_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 记录更新时间 |
+| 字段名                           | 类型             | 可空  | 主键  | 外键  | 默认值                 | 说明            |
+| ----------------------------- | -------------- | --- | --- | --- | ------------------- | ------------- |
+| `id`                          | `uuid`         | 否   | 是   | 否   | `gen_random_uuid()` | 记录唯一标识        |
+| `model_id`                    | `varchar(120)` | 否   | 否   | 否   | 无                   | 上游兼容接口使用的模型标识 |
+| `upstream_object`             | `varchar(50)`  | 是   | 否   | 否   | 无                   | 对应上游模型对象类型    |
+| `owned_by`                    | `varchar(120)` | 是   | 否   | 否   | 无                   | 上游模型归属信息      |
+| `upstream_created_at`         | `timestamptz`  | 是   | 否   | 否   | 无                   | 上游模型创建时间      |
+| `label`                       | `varchar(120)` | 否   | 否   | 否   | 无                   | 前端展示名称        |
+| `description`                 | `text`         | 是   | 否   | 否   | 无                   | 模型说明          |
+| `provider_name`               | `varchar(120)` | 否   | 否   | 否   | `openai`            | 实际兼容供应商名称     |
+| `base_url`                    | `text`         | 是   | 否   | 否   | 无                   | 兼容接口基地址       |
+| `api_style`                   | `varchar(50)`  | 否   | 否   | 否   | `openai_compatible` | 接口风格标识        |
+| `supports_text`               | `boolean`      | 否   | 否   | 否   | `true`              | 是否支持文本能力      |
+| `supports_image`              | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持图片能力      |
+| `supports_audio`              | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持音频能力      |
+| `supports_video`              | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持视频能力      |
+| `supports_web_search`         | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持联网搜索      |
+| `supports_function_calling`   | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持函数调用      |
+| `supports_tools`              | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持工具能力聚合开关  |
+| `supports_file_search`        | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持文件检索      |
+| `supports_structured_outputs` | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持结构化输出     |
+| `supports_streaming`          | `boolean`      | 否   | 否   | 否   | `true`              | 是否支持流式输出      |
+| `supports_reasoning`          | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持推理型能力     |
+| `context_window`              | `integer`      | 是   | 否   | 否   | 无                   | 上下文窗口规模       |
+| `max_output_tokens`           | `integer`      | 是   | 否   | 否   | 无                   | 最大输出 token    |
+| `is_enabled`                  | `boolean`      | 否   | 否   | 否   | `true`              | 是否启用          |
+| `is_default`                  | `boolean`      | 否   | 否   | 否   | `false`             | 是否为该表默认模型     |
+| `sort_order`                  | `integer`      | 否   | 否   | 否   | `0`                 | 前端排序权重        |
+| `created_at`                  | `timestamptz`  | 否   | 否   | 否   | `now()`             | 记录创建时间        |
+| `updated_at`                  | `timestamptz`  | 否   | 否   | 否   | `now()`             | 记录更新时间        |
 
 ### 8. Gemini 模型表
 
@@ -209,39 +217,39 @@
 - 英文表名：`gemini_models`
 - 作用：保存 Gemini 模型目录、官方模型元数据与 Gemini 专属能力位配置
 
-| 字段名 | 类型 | 可空 | 主键 | 外键 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `id` | `uuid` | 否 | 是 | 否 | `gen_random_uuid()` | 记录唯一标识 |
-| `name` | `varchar(160)` | 否 | 否 | 否 | 无 | Gemini 官方模型名 |
-| `base_model_id` | `varchar(120)` | 是 | 否 | 否 | 无 | Gemini 官方基础模型标识 |
-| `version` | `varchar(120)` | 是 | 否 | 否 | 无 | 模型版本 |
-| `display_name` | `varchar(160)` | 否 | 否 | 否 | 无 | 前端展示名称 |
-| `description` | `text` | 是 | 否 | 否 | 无 | 模型说明 |
-| `input_token_limit` | `integer` | 是 | 否 | 否 | 无 | 输入 token 上限 |
-| `output_token_limit` | `integer` | 是 | 否 | 否 | 无 | 输出 token 上限 |
-| `supported_generation_methods` | `text[]` | 否 | 否 | 否 | `{}` | 官方支持的生成方法集合 |
-| `thinking` | `boolean` | 是 | 否 | 否 | 无 | 是否具备 thinking 能力标识 |
-| `temperature` | `numeric(4,3)` | 是 | 否 | 否 | 无 | 默认温度参数 |
-| `max_temperature` | `numeric(4,3)` | 是 | 否 | 否 | 无 | 最大温度 |
-| `top_p` | `numeric(5,4)` | 是 | 否 | 否 | 无 | top-p 参数 |
-| `top_k` | `integer` | 是 | 否 | 否 | 无 | top-k 参数 |
-| `api_style` | `varchar(50)` | 否 | 否 | 否 | `gemini_native` | 接口风格标识 |
-| `supports_text` | `boolean` | 否 | 否 | 否 | `true` | 是否支持文本能力 |
-| `supports_image` | `boolean` | 否 | 否 | 否 | `false` | 是否支持图片能力 |
-| `supports_audio` | `boolean` | 否 | 否 | 否 | `false` | 是否支持音频能力 |
-| `supports_video` | `boolean` | 否 | 否 | 否 | `false` | 是否支持视频能力 |
-| `supports_google_search` | `boolean` | 否 | 否 | 否 | `false` | 是否支持 Google Search grounding |
-| `supports_url_context` | `boolean` | 否 | 否 | 否 | `false` | 是否支持 URL Context |
-| `supports_code_execution` | `boolean` | 否 | 否 | 否 | `false` | 是否支持 Code Execution |
-| `supports_function_calling` | `boolean` | 否 | 否 | 否 | `false` | 是否支持函数调用 |
-| `supports_tools` | `boolean` | 否 | 否 | 否 | `false` | 是否支持工具能力聚合开关 |
-| `supports_streaming` | `boolean` | 否 | 否 | 否 | `true` | 是否支持流式输出 |
-| `supports_reasoning` | `boolean` | 否 | 否 | 否 | `false` | 是否支持推理型能力 |
-| `is_enabled` | `boolean` | 否 | 否 | 否 | `true` | 是否启用 |
-| `is_default` | `boolean` | 否 | 否 | 否 | `false` | 是否为该表默认模型 |
-| `sort_order` | `integer` | 否 | 否 | 否 | `0` | 前端排序权重 |
-| `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 记录创建时间 |
-| `updated_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 记录更新时间 |
+| 字段名                            | 类型             | 可空  | 主键  | 外键  | 默认值                 | 说明                           |
+| ------------------------------ | -------------- | --- | --- | --- | ------------------- | ---------------------------- |
+| `id`                           | `uuid`         | 否   | 是   | 否   | `gen_random_uuid()` | 记录唯一标识                       |
+| `name`                         | `varchar(160)` | 否   | 否   | 否   | 无                   | Gemini 官方模型名                 |
+| `base_model_id`                | `varchar(120)` | 是   | 否   | 否   | 无                   | Gemini 官方基础模型标识              |
+| `version`                      | `varchar(120)` | 是   | 否   | 否   | 无                   | 模型版本                         |
+| `display_name`                 | `varchar(160)` | 否   | 否   | 否   | 无                   | 前端展示名称                       |
+| `description`                  | `text`         | 是   | 否   | 否   | 无                   | 模型说明                         |
+| `input_token_limit`            | `integer`      | 是   | 否   | 否   | 无                   | 输入 token 上限                  |
+| `output_token_limit`           | `integer`      | 是   | 否   | 否   | 无                   | 输出 token 上限                  |
+| `supported_generation_methods` | `text[]`       | 否   | 否   | 否   | `{}`                | 官方支持的生成方法集合                  |
+| `thinking`                     | `boolean`      | 是   | 否   | 否   | 无                   | 是否具备 thinking 能力标识           |
+| `temperature`                  | `numeric(4,3)` | 是   | 否   | 否   | 无                   | 默认温度参数                       |
+| `max_temperature`              | `numeric(4,3)` | 是   | 否   | 否   | 无                   | 最大温度                         |
+| `top_p`                        | `numeric(5,4)` | 是   | 否   | 否   | 无                   | top-p 参数                     |
+| `top_k`                        | `integer`      | 是   | 否   | 否   | 无                   | top-k 参数                     |
+| `api_style`                    | `varchar(50)`  | 否   | 否   | 否   | `gemini_native`     | 接口风格标识                       |
+| `supports_text`                | `boolean`      | 否   | 否   | 否   | `true`              | 是否支持文本能力                     |
+| `supports_image`               | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持图片能力                     |
+| `supports_audio`               | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持音频能力                     |
+| `supports_video`               | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持视频能力                     |
+| `supports_google_search`       | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持 Google Search grounding |
+| `supports_url_context`         | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持 URL Context             |
+| `supports_code_execution`      | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持 Code Execution          |
+| `supports_function_calling`    | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持函数调用                     |
+| `supports_tools`               | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持工具能力聚合开关                 |
+| `supports_streaming`           | `boolean`      | 否   | 否   | 否   | `true`              | 是否支持流式输出                     |
+| `supports_reasoning`           | `boolean`      | 否   | 否   | 否   | `false`             | 是否支持推理型能力                    |
+| `is_enabled`                   | `boolean`      | 否   | 否   | 否   | `true`              | 是否启用                         |
+| `is_default`                   | `boolean`      | 否   | 否   | 否   | `false`             | 是否为该表默认模型                    |
+| `sort_order`                   | `integer`      | 否   | 否   | 否   | `0`                 | 前端排序权重                       |
+| `created_at`                   | `timestamptz`  | 否   | 否   | 否   | `now()`             | 记录创建时间                       |
+| `updated_at`                   | `timestamptz`  | 否   | 否   | 否   | `now()`             | 记录更新时间                       |
 
 ---
 

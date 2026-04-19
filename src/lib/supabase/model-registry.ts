@@ -1,15 +1,23 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { AIModel } from "@/lib/schemas/model";
 
-type OpenAICompatibleModelRow = {
-  model_id: string;
+type AIModelRow = {
+  id: string;
+  provider: "openai_compatible" | "gemini";
+  api_style: string;
+  upstream_model_id: string;
   label: string;
   description: string | null;
   icon: string | null;
-  api_style: string;
-  base_url: string | null;
+  is_enabled: boolean;
   is_default: boolean;
   sort_order: number;
+};
+
+type OpenAICompatibleModelRow = {
+  ai_model_id: string;
+  model_id: string;
+  base_url: string | null;
   supports_text: boolean;
   supports_image: boolean;
   supports_audio: boolean;
@@ -24,13 +32,8 @@ type OpenAICompatibleModelRow = {
 };
 
 type GeminiModelRow = {
+  ai_model_id: string;
   name: string;
-  display_name: string;
-  description: string | null;
-  icon: string | null;
-  api_style: string;
-  is_default: boolean;
-  sort_order: number;
   supports_text: boolean;
   supports_image: boolean;
   supports_audio: boolean;
@@ -46,7 +49,7 @@ type GeminiModelRow = {
   supports_reasoning: boolean;
 };
 
-export type ResolvedAIModel = AIModel & {
+export type RuntimeAIModel = AIModel & {
   baseUrl: string | null;
 };
 
@@ -57,16 +60,24 @@ export class ModelRegistryError extends Error {
   }
 }
 
-// Supabase select 字段统一抽成常量，避免列表查询和单条查询各写一份时字段漂移。
-const openAIModelSelectFields = [
-  "model_id",
+const aiModelSelectFields = [
+  "id",
+  "provider",
+  "api_style",
+  "upstream_model_id",
   "label",
   "description",
   "icon",
-  "api_style",
-  "base_url",
+  "is_enabled",
   "is_default",
   "sort_order",
+].join(", ");
+
+// Supabase select 字段统一抽成常量，避免列表查询和单条查询各写一份时字段漂移。
+const openAIModelSelectFields = [
+  "ai_model_id",
+  "model_id",
+  "base_url",
   "supports_text",
   "supports_image",
   "supports_audio",
@@ -81,13 +92,8 @@ const openAIModelSelectFields = [
 ].join(", ");
 
 const geminiModelSelectFields = [
+  "ai_model_id",
   "name",
-  "display_name",
-  "description",
-  "icon",
-  "api_style",
-  "is_default",
-  "sort_order",
   "supports_text",
   "supports_image",
   "supports_audio",
@@ -103,22 +109,21 @@ const geminiModelSelectFields = [
   "supports_reasoning",
 ].join(", ");
 
-// 两张 provider 专属表最终都要映射成统一的前端模型结构，
-// 这样上层 UI 和聊天接口就不需要感知底层表结构差异。
 function mapOpenAICompatibleModel(
+  model: AIModelRow,
   row: OpenAICompatibleModelRow,
-): ResolvedAIModel {
+): RuntimeAIModel {
   return {
-    id: row.model_id,
-    label: row.label,
-    description: row.description,
-    icon: row.icon,
+    id: model.id,
+    label: model.label,
+    description: model.description,
+    icon: model.icon,
     provider: "openai_compatible",
-    apiStyle: row.api_style,
-    upstreamModelId: row.model_id,
+    apiStyle: model.api_style,
+    upstreamModelId: model.upstream_model_id,
     baseUrl: row.base_url,
-    isDefault: row.is_default,
-    sortOrder: row.sort_order,
+    isDefault: model.is_default,
+    sortOrder: model.sort_order,
     capabilities: {
       text: row.supports_text,
       image: row.supports_image,
@@ -138,18 +143,18 @@ function mapOpenAICompatibleModel(
   };
 }
 
-function mapGeminiModel(row: GeminiModelRow): ResolvedAIModel {
+function mapGeminiModel(model: AIModelRow, row: GeminiModelRow): RuntimeAIModel {
   return {
-    id: row.name,
-    label: row.display_name,
-    description: row.description,
-    icon: row.icon,
+    id: model.id,
+    label: model.label,
+    description: model.description,
+    icon: model.icon,
     provider: "gemini",
-    apiStyle: row.api_style,
-    upstreamModelId: row.name,
+    apiStyle: model.api_style,
+    upstreamModelId: model.upstream_model_id,
     baseUrl: null,
-    isDefault: row.is_default,
-    sortOrder: row.sort_order,
+    isDefault: model.is_default,
+    sortOrder: model.sort_order,
     capabilities: {
       text: row.supports_text,
       image: row.supports_image,
@@ -169,27 +174,50 @@ function mapGeminiModel(row: GeminiModelRow): ResolvedAIModel {
   };
 }
 
+function indexById<T extends { ai_model_id: string }>(rows: T[] | null) {
+  return new Map((rows ?? []).map((row) => [row.ai_model_id, row]));
+}
+
 /**
- * 当前模型注册表是“分表存储、统一返回”：
- * OpenAI Compatible 和 Gemini 各查各的，再在应用层合并排序。
+ * 当前模型注册表是“父表驱动、子表补全”：
+ * ai_models 负责通用元数据，provider 子表负责各自实现细节。
  */
 export async function listEnabledModels(
   supabase: SupabaseClient,
-): Promise<ResolvedAIModel[]> {
+): Promise<RuntimeAIModel[]> {
+  const { data: models, error: modelsError } = await supabase
+    .from("ai_models")
+    .select(aiModelSelectFields)
+    .eq("is_enabled", true)
+    .order("sort_order", { ascending: true })
+    .order("label", { ascending: true });
+
+  if (modelsError) {
+    throw modelsError;
+  }
+
+  const normalizedModels = (models ?? []) as unknown as AIModelRow[];
+  const openAIIds = normalizedModels
+    .filter((model) => model.provider === "openai_compatible")
+    .map((model) => model.id);
+  const geminiIds = normalizedModels
+    .filter((model) => model.provider === "gemini")
+    .map((model) => model.id);
+
   const [{ data: openAIModels, error: openAIError }, { data: geminiModels, error: geminiError }] =
     await Promise.all([
-      supabase
-        .from("openai_compatible_models")
-        .select(openAIModelSelectFields)
-        .eq("is_enabled", true)
-        .order("sort_order", { ascending: true })
-        .order("label", { ascending: true }),
-      supabase
-        .from("gemini_models")
-        .select(geminiModelSelectFields)
-        .eq("is_enabled", true)
-        .order("sort_order", { ascending: true })
-        .order("display_name", { ascending: true }),
+      openAIIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : supabase
+            .from("openai_compatible_models")
+            .select(openAIModelSelectFields)
+            .in("ai_model_id", openAIIds),
+      geminiIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : supabase
+            .from("gemini_models")
+            .select(geminiModelSelectFields)
+            .in("ai_model_id", geminiIds),
     ]);
 
   if (openAIError) {
@@ -200,44 +228,75 @@ export async function listEnabledModels(
     throw geminiError;
   }
 
-  return [
-    ...(openAIModels ?? []).map((row) =>
-      mapOpenAICompatibleModel(row as unknown as OpenAICompatibleModelRow),
-    ),
-    ...(geminiModels ?? []).map((row) =>
-      mapGeminiModel(row as unknown as GeminiModelRow),
-    ),
-  ].sort((left, right) => {
-    // sortOrder 优先表达产品侧排序意图，label 只是稳定兜底。
-    if (left.sortOrder !== right.sortOrder) {
-      return left.sortOrder - right.sortOrder;
+  const openAIMap = indexById(
+    (openAIModels ?? []) as unknown as OpenAICompatibleModelRow[],
+  );
+  const geminiMap = indexById(
+    (geminiModels ?? []) as unknown as GeminiModelRow[],
+  );
+
+  return normalizedModels.map((model) => {
+    if (model.provider === "openai_compatible") {
+      const child = openAIMap.get(model.id);
+
+      if (!child) {
+        throw new ModelRegistryError("OpenAI compatible 模型缺少 provider 子表记录。");
+      }
+
+      return mapOpenAICompatibleModel(model, child);
     }
 
-    return left.label.localeCompare(right.label, "zh-CN");
+    const child = geminiMap.get(model.id);
+
+    if (!child) {
+      throw new ModelRegistryError("Gemini 模型缺少 provider 子表记录。");
+    }
+
+    return mapGeminiModel(model, child);
   });
 }
 
 /**
- * 模型按 ID 查询时，需要依次尝试两张 provider 表。
- * 上层只传一个 modelId，不关心它底层到底属于哪个 provider。
+ * 模型按注册表 ID 查询时，先读 ai_models，再按 provider 补全子表细节。
  */
 export async function getEnabledModelById(
   supabase: SupabaseClient,
   modelId: string,
-): Promise<ResolvedAIModel> {
-  const { data: openAIModel, error: openAIError } = await supabase
-    .from("openai_compatible_models")
-    .select(openAIModelSelectFields)
-    .eq("model_id", modelId)
+): Promise<RuntimeAIModel> {
+  const { data: model, error: modelError } = await supabase
+    .from("ai_models")
+    .select(aiModelSelectFields)
+    .eq("id", modelId)
     .eq("is_enabled", true)
     .maybeSingle();
 
-  if (openAIError) {
-    throw openAIError;
+  if (modelError) {
+    throw modelError;
   }
 
-  if (openAIModel) {
+  if (!model) {
+    throw new ModelRegistryError("模型不存在，或当前未启用。");
+  }
+
+  const normalizedModel = model as unknown as AIModelRow;
+
+  if (normalizedModel.provider === "openai_compatible") {
+    const { data: openAIModel, error: openAIError } = await supabase
+      .from("openai_compatible_models")
+      .select(openAIModelSelectFields)
+      .eq("ai_model_id", normalizedModel.id)
+      .maybeSingle();
+
+    if (openAIError) {
+      throw openAIError;
+    }
+
+    if (!openAIModel) {
+      throw new ModelRegistryError("OpenAI compatible 模型缺少 provider 子表记录。");
+    }
+
     return mapOpenAICompatibleModel(
+      normalizedModel,
       openAIModel as unknown as OpenAICompatibleModelRow,
     );
   }
@@ -245,8 +304,7 @@ export async function getEnabledModelById(
   const { data: geminiModel, error: geminiError } = await supabase
     .from("gemini_models")
     .select(geminiModelSelectFields)
-    .eq("name", modelId)
-    .eq("is_enabled", true)
+    .eq("ai_model_id", normalizedModel.id)
     .maybeSingle();
 
   if (geminiError) {
@@ -254,8 +312,11 @@ export async function getEnabledModelById(
   }
 
   if (geminiModel) {
-    return mapGeminiModel(geminiModel as unknown as GeminiModelRow);
+    return mapGeminiModel(
+      normalizedModel,
+      geminiModel as unknown as GeminiModelRow,
+    );
   }
 
-  throw new ModelRegistryError("模型不存在，或当前未启用。");
+  throw new ModelRegistryError("Gemini 模型缺少 provider 子表记录。");
 }

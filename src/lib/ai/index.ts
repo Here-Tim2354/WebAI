@@ -1,10 +1,10 @@
 import { ChatMessage } from "@/lib/schemas/chat";
-import { ResolvedAIModel } from "@/lib/supabase/model-registry";
+import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { generateWithGemini } from "./gemini";
 import { generateWithOpenAICompatible } from "./openai-compatible";
 
 type GenerateAssistantReplyOptions = {
-  model?: ResolvedAIModel | null;
+  model?: RuntimeAIModel | null;
   conversationSystemPrompt?: string | null;
 };
 

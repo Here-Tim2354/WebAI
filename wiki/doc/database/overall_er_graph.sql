@@ -3,7 +3,7 @@
 -- The dbdiagram-ready source of truth is `overall_er_graph.dbml`.
 -- Current actual implementation includes:
 -- auth.users / profiles / conversations / messages
--- openai_compatible_models / gemini_models
+-- ai_models / openai_compatible_models / gemini_models
 -- favorites and search_records remain in the overall design, but are not yet landed.
 
 CREATE TYPE "conversation_status" AS ENUM (
@@ -62,8 +62,24 @@ CREATE TABLE "search_records" (
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
+CREATE TABLE "ai_models" (
+  "id" uuid PRIMARY KEY NOT NULL,
+  "provider" varchar(50) NOT NULL,
+  "api_style" varchar(50) NOT NULL,
+  "upstream_model_id" varchar(160) NOT NULL,
+  "label" varchar(160) NOT NULL,
+  "description" text,
+  "icon" text,
+  "is_enabled" boolean NOT NULL DEFAULT true,
+  "is_default" boolean NOT NULL DEFAULT false,
+  "sort_order" integer NOT NULL DEFAULT 0,
+  "created_at" timestamptz NOT NULL DEFAULT (now()),
+  "updated_at" timestamptz NOT NULL DEFAULT (now())
+);
+
 CREATE TABLE "openai_compatible_models" (
   "id" uuid PRIMARY KEY NOT NULL,
+  "ai_model_id" uuid,
   "model_id" varchar(120) UNIQUE NOT NULL,
   "upstream_object" varchar(50),
   "owned_by" varchar(120),
@@ -95,6 +111,7 @@ CREATE TABLE "openai_compatible_models" (
 
 CREATE TABLE "gemini_models" (
   "id" uuid PRIMARY KEY NOT NULL,
+  "ai_model_id" uuid,
   "name" varchar(160) UNIQUE NOT NULL,
   "base_model_id" varchar(120),
   "version" varchar(120),
@@ -118,6 +135,8 @@ CREATE TABLE "gemini_models" (
   "supports_code_execution" boolean NOT NULL DEFAULT false,
   "supports_function_calling" boolean NOT NULL DEFAULT false,
   "supports_tools" boolean NOT NULL DEFAULT false,
+  "supports_file_search" boolean NOT NULL DEFAULT false,
+  "supports_structured_outputs" boolean NOT NULL DEFAULT false,
   "supports_streaming" boolean NOT NULL DEFAULT true,
   "supports_reasoning" boolean NOT NULL DEFAULT false,
   "is_enabled" boolean NOT NULL DEFAULT true,
@@ -142,13 +161,22 @@ CREATE UNIQUE INDEX ON "favorites" ("user_id", "message_id");
 CREATE INDEX ON "search_records" ("user_id");
 CREATE INDEX ON "search_records" ("created_at");
 
+CREATE INDEX ON "ai_models" ("is_enabled");
+CREATE INDEX ON "ai_models" ("sort_order", "label");
+CREATE UNIQUE INDEX ON "ai_models" ("provider", "upstream_model_id");
+CREATE UNIQUE INDEX ON "ai_models" ("provider") WHERE "is_default" = true;
+
 CREATE INDEX ON "openai_compatible_models" ("is_enabled");
 CREATE INDEX ON "openai_compatible_models" ("sort_order", "label");
 CREATE UNIQUE INDEX ON "openai_compatible_models" ("is_default") WHERE "is_default" = true;
+CREATE INDEX ON "openai_compatible_models" ("ai_model_id");
+CREATE UNIQUE INDEX ON "openai_compatible_models" ("ai_model_id") WHERE "ai_model_id" IS NOT NULL;
 
 CREATE INDEX ON "gemini_models" ("is_enabled");
 CREATE INDEX ON "gemini_models" ("sort_order", "display_name");
 CREATE UNIQUE INDEX ON "gemini_models" ("is_default") WHERE "is_default" = true;
+CREATE INDEX ON "gemini_models" ("ai_model_id");
+CREATE UNIQUE INDEX ON "gemini_models" ("ai_model_id") WHERE "ai_model_id" IS NOT NULL;
 
 COMMENT ON COLUMN "conversations"."system_prompt" IS 'Conversation-level markdown prompt';
 
@@ -169,3 +197,9 @@ ALTER TABLE "favorites"
 
 ALTER TABLE "search_records"
   ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "openai_compatible_models"
+  ADD FOREIGN KEY ("ai_model_id") REFERENCES "ai_models" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "gemini_models"
+  ADD FOREIGN KEY ("ai_model_id") REFERENCES "ai_models" ("id") DEFERRABLE INITIALLY IMMEDIATE;

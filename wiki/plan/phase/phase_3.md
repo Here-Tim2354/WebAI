@@ -62,10 +62,16 @@
 ## 文档前置工作
 - 在 `Phase 3` 中，所有数据库实现都应先回到课程与项目文档确认口径
 - 默认需要优先阅读并对齐：
-  - `wiki/requirements/scau_database_course_design_ai_readable.md`
-  - `wiki/requirements/supabase_course_design_checklist.md`
-  - `wiki/plan/phase/current_todo.md`
-  - `wiki/plan/database/` 下的需求分析、数据字典、实体关系、关系模式等文档
+  - [[requirements/scau_database_course_design_ai_readable|scau_database_course_design_ai_readable]]
+  - Supabase 官方文档
+  - [[plan/phase/current_todo|current_todo]]
+  - [[doc/database/GUIDE|GUIDE]]
+  - [[doc/database/00_contract/user_requirements|user_requirements]]
+  - [[doc/database/00_contract/user_data_dictionary|user_data_dictionary]]
+  - [[doc/database/00_contract/entity_relationship_analysis|entity_relationship_analysis]]
+  - [[doc/database/10_verified/relation_schema_design|relation_schema_design]]
+  - [[doc/database/30_mapping/feature_to_table_mapping|feature_to_table_mapping]]
+  - [[doc/database/40_verification/migration_checklist|migration_checklist]]
 - 前置确认重点包括：
   - 当前实现是否仍然服务课程的数据库主线
   - 数据字典是否仍然从用户视角出发，而不是退化成字段表
@@ -114,7 +120,7 @@
   - 后续答辩展示
 
 ## 推荐实现顺序
-1. 先阅读课程要求、执行清单和 `wiki/plan/database/` 文档，统一数据库表达口径
+1. 先阅读课程要求、执行清单和 [[doc/database/GUIDE|GUIDE]]，统一数据库表达口径
 2. 先确认 `Supabase MCP` 当前状态，并通过官方资料核实本轮实现依赖的关键能力
 3. 完成 `Supabase` 核心关系模式的 migration 设计与落地
 4. 接入浏览器端与服务端 `Supabase client`，明确身份获取与数据库访问边界

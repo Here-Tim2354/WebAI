@@ -1,4 +1,12 @@
-# 实体与联系分析
+# 已迁移
+
+当前文档已迁移到：
+
+- [00_contract/entity_relationship_analysis.md](/E:/Learning/Programming/WebAI/wiki/plan/database/00_contract/entity_relationship_analysis.md)
+
+数据库需求基线请优先参考：
+
+- [phase_overview.md](/E:/Learning/Programming/WebAI/wiki/plan/phase/phase_overview.md)
 
 ## 文档定位
 

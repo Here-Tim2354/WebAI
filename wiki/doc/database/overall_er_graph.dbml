@@ -3,7 +3,7 @@ Project WebAI {
   Note: '''
   WebAI database design.
   Current landed tables:
-  auth.users / profiles / conversations / messages / openai_compatible_models / gemini_models
+  auth.users / profiles / conversations / messages / ai_models / openai_compatible_models / gemini_models
   favorites and search_records stay in the overall design, but are not yet landed.
   '''
 }
@@ -115,8 +115,36 @@ Table search_records [headercolor: #F4F8FC] {
   '''
 }
 
+Table ai_models [headercolor: #F3F7FF] {
+  id uuid [pk, not null]
+  provider varchar(50) [not null]
+  api_style varchar(50) [not null]
+  upstream_model_id varchar(160) [not null]
+  label varchar(160) [not null]
+  description text
+  icon text
+  is_enabled boolean [not null, default: true]
+  is_default boolean [not null, default: false]
+  sort_order integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    is_enabled
+    (sort_order, label)
+    (provider, upstream_model_id) [unique]
+    (provider) [unique]
+  }
+
+  Note: '''
+  Shared parent table for the model registry.
+  Common metadata and the unified runtime model id live here.
+  '''
+}
+
 Table openai_compatible_models [headercolor: #F3F7FF] {
   id uuid [pk, not null]
+  ai_model_id uuid [note: 'References ai_models.id']
   model_id varchar(120) [not null, unique]
   upstream_object varchar(50)
   owned_by varchar(120)
@@ -149,16 +177,19 @@ Table openai_compatible_models [headercolor: #F3F7FF] {
     is_enabled
     (sort_order, label)
     (is_default) [unique]
+    ai_model_id
+    (ai_model_id) [unique]
   }
 
   Note: '''
-  Registry table for OpenAI-compatible models.
-  Used by the backend dispatch layer and future frontend model selector.
+  Provider child table for OpenAI-compatible models.
+  Stores provider-specific fields such as base_url and capability flags.
   '''
 }
 
 Table gemini_models [headercolor: #F3F7FF] {
   id uuid [pk, not null]
+  ai_model_id uuid [note: 'References ai_models.id']
   name varchar(160) [not null, unique]
   base_model_id varchar(120)
   version varchar(120)
@@ -182,6 +213,8 @@ Table gemini_models [headercolor: #F3F7FF] {
   supports_code_execution boolean [not null, default: false]
   supports_function_calling boolean [not null, default: false]
   supports_tools boolean [not null, default: false]
+  supports_file_search boolean [not null, default: false]
+  supports_structured_outputs boolean [not null, default: false]
   supports_streaming boolean [not null, default: true]
   supports_reasoning boolean [not null, default: false]
   is_enabled boolean [not null, default: true]
@@ -194,11 +227,12 @@ Table gemini_models [headercolor: #F3F7FF] {
     is_enabled
     (sort_order, display_name)
     (is_default) [unique]
+    ai_model_id
+    (ai_model_id) [unique]
   }
 
   Note: '''
-  Registry table for Gemini models and Gemini-specific capabilities.
-  Used by the backend dispatch layer and future frontend model selector.
+  Provider child table for Gemini models and Gemini-specific capabilities.
   '''
 }
 
@@ -208,3 +242,5 @@ Ref: messages.conversation_id > conversations.id
 Ref: favorites.user_id > auth.users.id
 Ref: favorites.message_id > messages.id
 Ref: search_records.user_id > auth.users.id
+Ref: openai_compatible_models.ai_model_id - ai_models.id
+Ref: gemini_models.ai_model_id - ai_models.id

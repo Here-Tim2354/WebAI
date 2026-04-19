@@ -1,45 +1,42 @@
+---
+aliases:
+  - ChatShell
+  - ChatShell 页面结构
+---
+
 # ChatShell 页面结构说明
 
 本文档用于快速理解 `ChatShell` 组件在页面中的职责，以及它实际拼出的网页结构。
 
-对应代码文件：
+代码入口：
 - `src/components/chat/chat-shell.tsx`
+
+关联笔记：
+- [[chatshell-stateflow]]
+- [[conversation-sidebar]]
+- [[message-list]]
+- [[chat-input]]
+- [[auth-panel]]
 
 ## 本组件所用到的子组件
 
-### AuthPanel
+### [[auth-panel|AuthPanel]]
 
-对应文件：
-- `src/components/chat/auth-panel.tsx`
-
-简短介绍：
 - 未登录时展示的登录面板
 - 负责邮箱输入、发送魔法链接和登录回跳提示
 
-### ConversationSidebar
+### [[conversation-sidebar|ConversationSidebar]]
 
-对应文件：
-- `src/components/chat/conversation-sidebar.tsx`
-
-简短介绍：
 - 左侧会话管理区
 - 负责展示历史会话、新建、切换、重命名、删除和退出登录
 
-### MessageList
+### [[message-list|MessageList]]
 
-对应文件：
-- `src/components/chat/message-list.tsx`
-
-简短介绍：
 - 聊天主区域中的消息展示容器
 - 负责空状态欢迎页、消息列表和回到底部按钮
 
-### ChatInput
+### [[chat-input|ChatInput]]
 
-对应文件：
-- `src/components/chat/chat-input.tsx`
-
-简短介绍：
 - 页面底部输入区
 - 负责文本输入、回车发送、按钮发送和输入框高度自适应
 
@@ -207,6 +204,11 @@ if (!user) {
 - 显示模型图标
 - 按 provider 分组展示模型
 - 点击后切换 `selectedModelId`
+
+补充说明：
+
+- `selectedModelId` 当前对应的是模型注册表父表 `ai_models.id`
+- 真正的上游模型名会在服务端通过注册表映射到 `upstreamModelId`
 
 也就是说，页面头部最重要的业务交互之一，就是模型选择。
 

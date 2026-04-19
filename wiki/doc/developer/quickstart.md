@@ -4,8 +4,8 @@
 
 ## 推荐阅读顺序
 
-1. [phase_overview.md](</E:/Programming/WebAI/wiki/plan/phase/phase_overview.md>)
-2. [current_todo.md](</E:/Programming/WebAI/wiki/plan/phase/current_todo.md>)
+1. [[plan/phase/phase_overview|phase_overview]]
+2. [[plan/phase/current_todo|current_todo]]
 3. [page.tsx](</E:/Programming/WebAI/src/app/page.tsx>)
 4. [chat-shell.tsx](</E:/Programming/WebAI/src/components/chat/chat-shell.tsx>)
 5. [use-chat-session.ts](</E:/Programming/WebAI/src/components/chat/use-chat-session.ts>)
@@ -22,8 +22,8 @@
 16. [schemas/*.ts](</E:/Programming/WebAI/src/lib/schemas>)
 17. [chat components](</E:/Programming/WebAI/src/components/chat>)
 18. [ui components](</E:/Programming/WebAI/src/components/ui>)
-19. [database docs](</E:/Programming/WebAI/wiki/plan/database>)
-20. [requirements docs](</E:/Programming/WebAI/wiki/requirements>)
+19. [[doc/database/GUIDE|database docs]]
+20. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
 
 ## 先看什么
 
@@ -43,6 +43,7 @@
 - `proxy.ts`：负责请求级 session 刷新和 cookie 同步。
 - `AuthUser`：项目内部使用的轻量用户对象，不等同于 Supabase 原生 `User`。
 - `AIModel`：前端选择器和聊天 API 之间的统一模型描述。
+- `modelId`：当前传递的是模型注册表主键，不直接等于上游模型名。
 
 ## 主链路
 
@@ -77,11 +78,13 @@
 
 数据库相关阅读建议按下面的顺序：
 
-1. [user_requirements.md](</E:/Programming/WebAI/wiki/plan/database/user_requirements.md>)
-2. [user_data_dictionary.md](</E:/Programming/WebAI/wiki/plan/database/user_data_dictionary.md>)
-3. [relation_schema_design.md](</E:/Programming/WebAI/wiki/plan/database/relation_schema_design.md>)
-4. [entity_relationship_analysis.md](</E:/Programming/WebAI/wiki/plan/database/entity_relationship_analysis.md>)
-5. [supabase/migrations](</E:/Programming/WebAI/supabase/migrations>)
+1. [[doc/database/GUIDE|database/GUIDE]]
+2. [[doc/database/00_contract/user_requirements|00_contract/user_requirements]]
+3. [[doc/database/00_contract/user_data_dictionary|00_contract/user_data_dictionary]]
+4. [[doc/database/10_verified/relation_schema_design|10_verified/relation_schema_design]]
+5. [[doc/database/00_contract/entity_relationship_analysis|00_contract/entity_relationship_analysis]]
+6. [[doc/database/40_verification/migration_checklist|40_verification/migration_checklist]]
+7. [supabase/migrations](</E:/Programming/WebAI/supabase/migrations>)
 
 这条顺序的目的，是先理解“为什么要这些表”，再看“怎么设计字段”，最后再看“代码怎么落到数据库”。
 
