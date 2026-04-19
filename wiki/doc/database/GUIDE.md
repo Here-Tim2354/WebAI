@@ -46,3 +46,10 @@
 5. [[doc/database/10_verified/relation_schema_design|relation_schema_design]]
 6. [[doc/database/30_mapping/feature_to_table_mapping|feature_to_table_mapping]]
 7. [[doc/database/40_verification/migration_checklist|migration_checklist]]
+
+## 当前状态
+
+- 远端 Supabase 已执行模型注册表父子表最终态迁移
+- `ai_models` 已成为统一模型入口
+- `openai_compatible_models` 与 `gemini_models` 已重建为 provider 专属子表
+- 当前远端仅保留首个 `Gemini 3 Flash Preview` seed，`OpenAI compatible` 首批 seed 仍待补齐

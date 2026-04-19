@@ -133,7 +133,7 @@ Table ai_models [headercolor: #F3F7FF] {
     is_enabled
     (sort_order, label)
     (provider, upstream_model_id) [unique]
-    (provider) [unique]
+    (provider) [unique, note: 'Partial unique in actual migration when is_default = true']
   }
 
   Note: '''
@@ -144,16 +144,9 @@ Table ai_models [headercolor: #F3F7FF] {
 
 Table openai_compatible_models [headercolor: #F3F7FF] {
   id uuid [pk, not null]
-  ai_model_id uuid [note: 'References ai_models.id']
-  model_id varchar(120) [not null, unique]
-  upstream_object varchar(50)
-  owned_by varchar(120)
-  upstream_created_at timestamptz
-  label varchar(120) [not null]
-  description text
-  provider_name varchar(120) [not null, default: 'openai']
+  ai_model_id uuid [not null, unique, note: 'References ai_models.id']
+  model_id varchar(160) [not null, unique]
   base_url text
-  api_style varchar(50) [not null, default: 'openai_compatible']
   supports_text boolean [not null, default: true]
   supports_image boolean [not null, default: false]
   supports_audio boolean [not null, default: false]
@@ -165,18 +158,10 @@ Table openai_compatible_models [headercolor: #F3F7FF] {
   supports_structured_outputs boolean [not null, default: false]
   supports_streaming boolean [not null, default: true]
   supports_reasoning boolean [not null, default: false]
-  context_window integer
-  max_output_tokens integer
-  is_enabled boolean [not null, default: true]
-  is_default boolean [not null, default: false]
-  sort_order integer [not null, default: 0]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    is_enabled
-    (sort_order, label)
-    (is_default) [unique]
     ai_model_id
     (ai_model_id) [unique]
   }
@@ -189,21 +174,8 @@ Table openai_compatible_models [headercolor: #F3F7FF] {
 
 Table gemini_models [headercolor: #F3F7FF] {
   id uuid [pk, not null]
-  ai_model_id uuid [note: 'References ai_models.id']
+  ai_model_id uuid [not null, unique, note: 'References ai_models.id']
   name varchar(160) [not null, unique]
-  base_model_id varchar(120)
-  version varchar(120)
-  display_name varchar(160) [not null]
-  description text
-  input_token_limit integer
-  output_token_limit integer
-  supported_generation_methods text[] [not null, default: '{}']
-  thinking boolean
-  temperature numeric(4,3)
-  max_temperature numeric(4,3)
-  top_p numeric(5,4)
-  top_k integer
-  api_style varchar(50) [not null, default: 'gemini_native']
   supports_text boolean [not null, default: true]
   supports_image boolean [not null, default: false]
   supports_audio boolean [not null, default: false]
@@ -217,16 +189,10 @@ Table gemini_models [headercolor: #F3F7FF] {
   supports_structured_outputs boolean [not null, default: false]
   supports_streaming boolean [not null, default: true]
   supports_reasoning boolean [not null, default: false]
-  is_enabled boolean [not null, default: true]
-  is_default boolean [not null, default: false]
-  sort_order integer [not null, default: 0]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    is_enabled
-    (sort_order, display_name)
-    (is_default) [unique]
     ai_model_id
     (ai_model_id) [unique]
   }

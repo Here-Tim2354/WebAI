@@ -11,6 +11,8 @@
 - `openai_compatible_models` / `gemini_models` 作为 provider 子表
 - 前端模型选择读取已启用模型列表
 - 服务端按 `modelId` 分发到对应 provider
+- 远端 Supabase 已完成模型注册表父子表最终态重建
+- 当前远端首个已验证 seed 为 `Gemini 3 Flash Preview`
 
 ## 当前未纳入已验证
 

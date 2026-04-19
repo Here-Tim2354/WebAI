@@ -2,21 +2,29 @@
 
 ## 当前主线表
 
-- [ ] `profiles`
-- [ ] `conversations`
-- [ ] `messages`
-- [ ] `ai_models`
-- [ ] `openai_compatible_models`
-- [ ] `gemini_models`
+- [x] `profiles`
+- [x] `conversations`
+- [x] `messages`
+- [x] `ai_models`
+- [x] `openai_compatible_models`
+- [x] `gemini_models`
 
 ## 验证项
 
-- [ ] migration 文件是否与当前代码查询路径一致
-- [ ] 表名、字段名和代码 `select` 字段一致
-- [ ] 默认值和非空约束与当前业务一致
-- [ ] 删除策略与当前业务一致
-- [ ] 模型注册表父表与子表外键关系已明确
-- [ ] 模型注册表默认模型约束已明确
+- [x] migration 文件是否与当前代码查询路径一致
+- [x] 表名、字段名和代码 `select` 字段一致
+- [x] 默认值和非空约束与当前业务一致
+- [x] 删除策略与当前业务一致
+- [x] 模型注册表父表与子表外键关系已明确
+- [x] 模型注册表默认模型约束已明确
+- [x] 若采用破坏式重建，已确认 `openai_compatible_models` 与 `gemini_models` 可直接删除重建
+- [x] 父表 `ai_models` 已成为唯一统一入口，子表仅保留 provider 专属字段
+
+## 当前缺口
+
+- [ ] `OpenAI compatible` 首批 seed 仍未补齐
+- [ ] 更多 `Gemini` 常用模型 seed 仍未补齐
+- [ ] RLS advisor 与性能 advisor 的遗留项仍需单独收口
 
 ## 当前原则
 

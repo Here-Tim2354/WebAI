@@ -79,16 +79,9 @@ CREATE TABLE "ai_models" (
 
 CREATE TABLE "openai_compatible_models" (
   "id" uuid PRIMARY KEY NOT NULL,
-  "ai_model_id" uuid,
-  "model_id" varchar(120) UNIQUE NOT NULL,
-  "upstream_object" varchar(50),
-  "owned_by" varchar(120),
-  "upstream_created_at" timestamptz,
-  "label" varchar(120) NOT NULL,
-  "description" text,
-  "provider_name" varchar(120) NOT NULL DEFAULT 'openai',
+  "ai_model_id" uuid NOT NULL,
+  "model_id" varchar(160) UNIQUE NOT NULL,
   "base_url" text,
-  "api_style" varchar(50) NOT NULL DEFAULT 'openai_compatible',
   "supports_text" boolean NOT NULL DEFAULT true,
   "supports_image" boolean NOT NULL DEFAULT false,
   "supports_audio" boolean NOT NULL DEFAULT false,
@@ -100,32 +93,14 @@ CREATE TABLE "openai_compatible_models" (
   "supports_structured_outputs" boolean NOT NULL DEFAULT false,
   "supports_streaming" boolean NOT NULL DEFAULT true,
   "supports_reasoning" boolean NOT NULL DEFAULT false,
-  "context_window" integer,
-  "max_output_tokens" integer,
-  "is_enabled" boolean NOT NULL DEFAULT true,
-  "is_default" boolean NOT NULL DEFAULT false,
-  "sort_order" integer NOT NULL DEFAULT 0,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE TABLE "gemini_models" (
   "id" uuid PRIMARY KEY NOT NULL,
-  "ai_model_id" uuid,
+  "ai_model_id" uuid NOT NULL,
   "name" varchar(160) UNIQUE NOT NULL,
-  "base_model_id" varchar(120),
-  "version" varchar(120),
-  "display_name" varchar(160) NOT NULL,
-  "description" text,
-  "input_token_limit" integer,
-  "output_token_limit" integer,
-  "supported_generation_methods" text[] NOT NULL DEFAULT '{}',
-  "thinking" boolean,
-  "temperature" numeric(4,3),
-  "max_temperature" numeric(4,3),
-  "top_p" numeric(5,4),
-  "top_k" integer,
-  "api_style" varchar(50) NOT NULL DEFAULT 'gemini_native',
   "supports_text" boolean NOT NULL DEFAULT true,
   "supports_image" boolean NOT NULL DEFAULT false,
   "supports_audio" boolean NOT NULL DEFAULT false,
@@ -139,9 +114,6 @@ CREATE TABLE "gemini_models" (
   "supports_structured_outputs" boolean NOT NULL DEFAULT false,
   "supports_streaming" boolean NOT NULL DEFAULT true,
   "supports_reasoning" boolean NOT NULL DEFAULT false,
-  "is_enabled" boolean NOT NULL DEFAULT true,
-  "is_default" boolean NOT NULL DEFAULT false,
-  "sort_order" integer NOT NULL DEFAULT 0,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -166,17 +138,11 @@ CREATE INDEX ON "ai_models" ("sort_order", "label");
 CREATE UNIQUE INDEX ON "ai_models" ("provider", "upstream_model_id");
 CREATE UNIQUE INDEX ON "ai_models" ("provider") WHERE "is_default" = true;
 
-CREATE INDEX ON "openai_compatible_models" ("is_enabled");
-CREATE INDEX ON "openai_compatible_models" ("sort_order", "label");
-CREATE UNIQUE INDEX ON "openai_compatible_models" ("is_default") WHERE "is_default" = true;
 CREATE INDEX ON "openai_compatible_models" ("ai_model_id");
-CREATE UNIQUE INDEX ON "openai_compatible_models" ("ai_model_id") WHERE "ai_model_id" IS NOT NULL;
+CREATE UNIQUE INDEX ON "openai_compatible_models" ("ai_model_id");
 
-CREATE INDEX ON "gemini_models" ("is_enabled");
-CREATE INDEX ON "gemini_models" ("sort_order", "display_name");
-CREATE UNIQUE INDEX ON "gemini_models" ("is_default") WHERE "is_default" = true;
 CREATE INDEX ON "gemini_models" ("ai_model_id");
-CREATE UNIQUE INDEX ON "gemini_models" ("ai_model_id") WHERE "ai_model_id" IS NOT NULL;
+CREATE UNIQUE INDEX ON "gemini_models" ("ai_model_id");
 
 COMMENT ON COLUMN "conversations"."system_prompt" IS 'Conversation-level markdown prompt';
 
