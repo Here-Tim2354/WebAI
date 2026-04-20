@@ -16,8 +16,6 @@
 - [[doc/database/10_verified/verified_notes|verified_notes]]
 - [[doc/database/overall_er_graph.dbml|overall_er_graph.dbml]]
 - [[doc/database/overall_er_graph.sql|overall_er_graph.sql]]
-- [[doc/database/overall_er_graph.png|overall_er_graph.png]]
-- [[doc/database/overall_er_graph.pdf|overall_er_graph.pdf]]
 
 ## 扩展设想
 

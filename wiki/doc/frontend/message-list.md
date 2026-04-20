@@ -21,6 +21,7 @@ aliases:
 
 - 负责渲染单条消息气泡
 - 根据消息角色和状态决定外观
+- 内部继续把正文交给 `MarkdownMessage`
 
 ### motion 组件
 
@@ -118,9 +119,44 @@ messages.length === 0
 
 - 单条消息长什么样
 
+当前展示链路已经细化成：
+
+```tsx
+MessageList
+  -> MessageBubble
+     -> MarkdownMessage
+        -> CodeBlock
+```
+
+也就是说，`MessageList` 只决定“消息区怎么排”，真正的单条消息样式、Markdown 富文本、代码块高亮和复制按钮，都不在这里实现。
+
 ---
 
-## 6. loadingHint 的位置
+## 6. MessageBubble / MarkdownMessage / CodeBlock 当前语义
+
+虽然这三个组件不定义在 `MessageList` 文件里，但它们已经构成消息区的实际展示链路。
+
+### MessageBubble
+
+- 根据 `user / assistant / system / error` 决定消息外观
+- 根据 `pending / streaming / cancelled / error / complete` 决定状态标签或占位态
+- assistant 流式输出时会切到本地 reveal 动画链路
+
+### MarkdownMessage
+
+- 负责消息正文的 Markdown 渲染
+- 负责表格包装、行内代码和块级代码替换
+- 当前已支持给 user 消息注入更紧凑的 `markdown--compact` 约束
+
+### CodeBlock
+
+- 负责高亮后的代码块容器
+- 右上角复制按钮当前已改为图标按钮
+- 复制链路当前支持 `Clipboard API + execCommand("copy")` 双通道兜底
+
+---
+
+## 7. loadingHint 的位置
 
 空状态下如果传入了：
 
@@ -135,7 +171,7 @@ messages.length === 0
 
 ---
 
-## 7. 回到底部按钮
+## 8. 回到底部按钮
 
 在消息流模式下，如果：
 
@@ -150,7 +186,7 @@ messages.length === 0
 
 ---
 
-## 8. 页面结构树
+## 9. 页面结构树
 
 可以压缩成：
 
@@ -163,12 +199,14 @@ MessageList
 │  │  └─ loadingHint
 │  └─ 消息流
 │     ├─ MessageBubble 列表
+│     │  └─ MarkdownMessage
+│     │     └─ CodeBlock
 │     ├─ messageEndRef 锚点
 │     └─ “最新”按钮
 ```
 
 ---
 
-## 9. 一句话理解
+## 10. 一句话理解
 
-`MessageList` 本质上是聊天主区域的内容切换容器：它负责在“欢迎页”和“消息流”之间切换，并承担滚动区域本身。
+`MessageList` 本质上是聊天主区域的内容切换容器：它负责在“欢迎页”和“消息流”之间切换，并承担滚动区域本身；真正的消息外观、Markdown 和代码块体验都已经继续下沉到 `MessageBubble -> MarkdownMessage -> CodeBlock`。

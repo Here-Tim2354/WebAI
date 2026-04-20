@@ -12,6 +12,8 @@ aliases:
 
 - [[chatshell]]
 - [[chatshell-stateflow]]
+- [[use-chat-workspace]]
+- [[use-chat-workspace-stateflow]]
 
 ## 侧栏
 
@@ -22,6 +24,12 @@ aliases:
 
 - [[message-list]]
 - [[message-list-stateflow]]
+- [[message-bubble]]
+- [[message-bubble-stateflow]]
+- [[markdown-message]]
+- [[markdown-message-stateflow]]
+- [[code-block]]
+- [[code-block-stateflow]]
 
 ## 输入区
 
@@ -41,5 +49,7 @@ aliases:
 
 - 想看“页面长什么样”，优先看不带 `-stateflow` 的结构文档。
 - 想看“状态怎么流动、请求怎么触发、effect 在做什么”，看对应的 `-stateflow` 文档。
+- 想看“工作区编排层为什么不再堆在 `ChatShell` 里”，优先看 [[use-chat-workspace]]。
+- 想看“单条消息、Markdown 和代码块体验到底在哪层实现”，按 [[message-bubble]] -> [[markdown-message]] -> [[code-block]] 的顺序看。
 - 想看“外部库是怎么落到当前代码里的”，看 `library` 库里的 `footprint` 系列文档。
 - 在 Obsidian 里打开任意一篇后，可以直接结合 `Backlinks` 和 `Outgoing links` 面板继续跳转。

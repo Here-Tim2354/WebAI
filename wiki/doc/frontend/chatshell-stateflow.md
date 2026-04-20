@@ -10,6 +10,7 @@ aliases:
 
 代码入口：
 - `src/components/chat/chat-shell.tsx`
+- `src/components/chat/use-chat-workspace.ts`
 - `src/components/chat/use-chat-session.ts`
 - `src/components/chat/use-message-scroll.ts`
 
@@ -38,26 +39,16 @@ aliases:
 
 ## 2. ChatShell 在状态流中的角色
 
-`ChatShell` 是聊天工作区的前端状态中枢。
+当前版本里，`ChatShell` 已不再独自承担整个工作区状态中枢。
 
-它不只是一个页面组件，还负责协调下面几类状态：
+现在更准确的理解应该是：
 
-- 用户状态
-- 会话列表状态
-- 当前激活会话状态
-- 当前工作区错误状态
-- 模型列表与当前选中模型状态
-- 当前会话的消息发送入口
-- 会话详情加载状态
-- 移动端侧栏开关状态
+- `ChatShell` 负责页面壳级状态与页面装配
+- `useChatWorkspace` 负责工作区编排状态
+- `useChatSession` 负责消息交互状态
+- `useMessageScroll` 负责滚动状态
 
-其中：
-
-- 页面级状态主要集中在 `ChatShell`
-- 消息交互状态被拆到 `useChatSession`
-- 滚动与吸底状态被拆到 `useMessageScroll`
-
-所以它的职责更像“总控层”，不是单纯渲染 JSX。
+所以它们四者共同构成聊天工作区的前端状态机，而不是再由 `ChatShell` 一处包办。
 
 ---
 
@@ -91,7 +82,7 @@ aliases:
 
 ## 4. ChatShell 自身维护的状态
 
-以下状态定义在 `ChatShell` 本体中。
+以下状态现在只保留在 `ChatShell` 本体中。
 
 ### 4.1 用户状态
 
@@ -109,118 +100,74 @@ const [user, setUser] = useState(initialUser);
 
 ---
 
-### 4.2 会话列表状态
-
-```tsx
-const [conversations, setConversations] = useState(
-  sortConversations(initialConversations),
-);
-```
-
-作用：
-- 保存当前工作区左侧会话列表
-
-当前实现：
-- 初始值来自服务端首屏会话列表
-- 创建、重命名、加载会话详情、发送消息后，都会通过 `upsertConversation()` 刷新
-- 删除会话时会直接从列表里移除
-
----
-
-### 4.3 当前激活会话
-
-```tsx
-const [activeConversationId, setActiveConversationId] = useState<string | null>(
-  initialConversations[0]?.id ?? null,
-);
-```
-
-作用：
-- 表示当前主面板正在查看和交互的是哪一个会话
-
-当前实现：
-- 默认取首屏会话列表的第一项
-- 点击侧栏会话时更新
-- 新建会话时可自动切换到新会话
-- 删除当前会话时会自动切到剩余列表中的第一项
-
----
-
-### 4.4 会话创建、删除、退出、详情加载状态
+### 4.2 退出登录状态
 
 这几类状态都属于“操作中的 UI 标志位”。
 
 ```tsx
-const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-const [isDeletingConversationId, setIsDeletingConversationId] = useState<string | null>(null);
 const [isSigningOut, setIsSigningOut] = useState(false);
-const [isLoadingConversation, setIsLoadingConversation] = useState(false);
 ```
 
-分别表示：
-
-- `isCreatingConversation`
-  - 当前是否正在创建新会话
-- `isDeletingConversationId`
-  - 当前正在删除的是哪一个会话
 - `isSigningOut`
   - 当前是否正在退出登录
-- `isLoadingConversation`
-  - 当前是否正在拉取激活会话的完整消息快照
-
-这里的设计重点是：
-
-- 创建和退出只需要布尔值
-- 删除需要精确到某条会话，所以用 `string | null`
 
 ---
 
-### 4.5 页面局部 UI 状态
+### 4.3 页面局部 UI 状态
 
 ```tsx
 const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
+const [promptEditorValue, setPromptEditorValue] = useState("");
+const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 ```
 
 分别表示：
 
 - `isMobileSidebarOpen`
   - 移动端抽屉侧栏是否打开
+- `isPromptDialogOpen`
+  - 会话级提示词弹窗是否打开
+- `promptEditorValue`
+  - 弹窗里的当前编辑值
+- `isSavingPrompt`
+  - 当前是否正在保存提示词
+
+---
+
+## 5. useChatWorkspace 管理的状态
+
+`useChatWorkspace` 是当前聊天工作区的编排层。
+
+它主要维护这些状态：
+
+- `conversations`
+- `activeConversationId`
 - `workspaceError`
-  - 工作区级别错误提示内容
-
-`workspaceError` 的特点是：
-
-- 多个异步动作都会往这里写错误
-- 页面顶部会统一通过 `Alert` 展示出来
-
----
-
-### 4.6 模型状态
-
-```tsx
-const [availableModels, setAvailableModels] = useState<AIModel[]>(initialModels);
-const [selectedModelId, setSelectedModelId] = useState<string | null>(...);
-```
-
-作用：
-
 - `availableModels`
-  - 当前可选模型列表
-- `selectedModelId`
-  - 当前聊天时使用的模型
+- `draftModelId`
+- `draftSystemPrompt`
+- `isCreatingConversation`
+- `isDeletingConversationId`
+- `isLoadingConversation`
 
-当前实现：
+它负责的行为包括：
 
-- 初始值来自服务端首屏数据
-- 客户端挂载后还会再请求一次 `/api/models`
-- 如果当前选中的模型仍然存在，就保留
-- 如果模型失效，就回退到默认模型或列表第一项
-- 当前 `selectedModelId` 保存的是注册表主键，不再直接等于上游模型名
+- 创建、重命名、删除会话
+- 切换当前会话
+- 首屏后同步模型列表
+- 切换会话时拉取会话详情
+- 协调当前会话模型与提示词设置
+- 在首条消息发送前，把草稿控制项一并落入新会话
+
+因此现在的边界是：
+
+- `ChatShell` 不再直接保存整套会话/模型/工作区错误状态
+- 这些状态统一通过 `useChatWorkspace` 暴露给页面壳消费
 
 ---
 
-## 5. useChatSession 管理的状态
+## 6. useChatSession 管理的状态
 
 `ChatShell` 自己没有直接保存消息数组，而是把消息相关状态委托给：
 
@@ -273,7 +220,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-## 6. useMessageScroll 管理的状态
+## 7. useMessageScroll 管理的状态
 
 滚动逻辑没有放在 `ChatShell` 本体，而是委托给：
 
@@ -297,11 +244,11 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-## 7. ChatShell 的两个 useEffect
+## 8. useChatWorkspace 的两个关键 useEffect
 
-`ChatShell` 自身目前有两个关键副作用。
+当前与工作区编排最相关的两个副作用已经放进 `useChatWorkspace`。
 
-### 7.1 挂载后同步模型列表
+### 8.1 挂载后同步模型列表
 
 触发时机：
 
@@ -332,7 +279,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 7.2 当前会话切换时加载详情
+### 8.2 当前会话切换时加载详情
 
 触发时机：
 
@@ -364,11 +311,11 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-## 8. 其它组件中的 useEffect
+## 9. 其它组件中的 useEffect
 
 虽然它们不在 `ChatShell` 本体里，但都参与了 `ChatShell` 页面运行。
 
-### 8.1 ChatInput 的两个 effect
+### 9.1 ChatInput 的两个 effect
 
 对应文件：
 - `src/components/chat/chat-input.tsx`
@@ -394,7 +341,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 8.2 MessageList 的 effect
+### 9.2 MessageList 的 effect
 
 对应文件：
 - `src/components/chat/message-list.tsx`
@@ -409,7 +356,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 8.3 AuthPanel 的 effect
+### 9.3 AuthPanel 的 effect
 
 对应文件：
 - `src/components/chat/auth-panel.tsx`
@@ -426,7 +373,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 8.4 useMessageScroll 的 effect
+### 9.4 useMessageScroll 的 effect
 
 对应文件：
 - `src/components/chat/use-message-scroll.ts`
@@ -443,7 +390,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-## 9. 关键行为链路
+## 10. 关键行为链路
 
 下面是几个重要的前端行为链路。
 
@@ -541,7 +488,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-## 10. 状态之间的关系
+## 11. 状态之间的关系
 
 可以把 `ChatShell` 的前端状态流压缩成下面这张关系图：
 
@@ -553,7 +500,11 @@ const [isSubmitting, setIsSubmitting] = useState(false);
   -> ChatShell useState 初始化
 
 ChatShell
-  -> 管页面级状态
+  -> 管页面壳级状态
+  -> 触发消息发送与退出登录
+
+useChatWorkspace
+  -> 管会话与模型编排状态
   -> 触发会话与模型请求
   -> 把消息状态委托给 useChatSession
   -> 把滚动状态委托给 useMessageScroll
@@ -575,6 +526,6 @@ useMessageScroll
 
 ---
 
-## 11. 一句话总结
+## 12. 一句话总结
 
-`ChatShell` 的本质不是“把几个组件摆出来”，而是把用户、会话、模型、消息、副作用和请求链路协调成一个能持续运行的聊天工作区前端状态机。
+当前聊天工作区前端状态机已经拆成四层：`ChatShell` 管页面壳，`useChatWorkspace` 管工作区编排，`useChatSession` 管消息交互，`useMessageScroll` 管滚动吸底；它们一起把用户、会话、模型、消息、副作用和请求链路协调成一个可持续运行的聊天页面。

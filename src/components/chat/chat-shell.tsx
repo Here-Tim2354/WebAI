@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircleIcon,
@@ -22,13 +22,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { chatSessionResponseSchema } from "@/lib/schemas/chat";
 import { AuthUser } from "@/lib/schemas/auth";
-import {
-  Conversation,
-  conversationResponseSchema,
-} from "@/lib/schemas/conversation";
-import { AIModel, aiModelListResponseSchema } from "@/lib/schemas/model";
+import { Conversation } from "@/lib/schemas/conversation";
+import { AIModel } from "@/lib/schemas/model";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +40,7 @@ import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 import { ModelIcon } from "./model-icon";
 import { useChatSession } from "./use-chat-session";
+import { useChatWorkspace } from "./use-chat-workspace";
 import { useMessageScroll } from "./use-message-scroll";
 
 type ChatShellProps = {
@@ -63,20 +60,9 @@ function getErrorMessage(error: unknown) {
   return "暂时无法完成操作，请稍后再试。";
 }
 
-function getDefaultModelId(models: AIModel[]) {
-  return models.find((model) => model.isDefault)?.id ?? models[0]?.id ?? null;
-}
-
-// 会话列表以最近更新时间倒序展示，保证刚对话过或刚编辑过的会话始终靠前。
-function sortConversations(conversations: Conversation[]) {
-  return [...conversations].sort((left, right) =>
-    right.updatedAt.localeCompare(left.updatedAt),
-  );
-}
-
 /**
- * ChatShell 是聊天工作区的前端状态中枢：
- * 负责会话列表、当前会话、模型选择、消息发送和错误提示之间的协调。
+ * ChatShell 现在只保留“页面壳组件”的职责：
+ * 它负责把工作区编排逻辑、消息交互逻辑和具体 UI 结构拼到一起。
  */
 export function ChatShell({
   initialUser,
@@ -87,25 +73,8 @@ export function ChatShell({
 }: ChatShellProps) {
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
-  const [conversations, setConversations] = useState(
-    sortConversations(initialConversations),
-  );
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(
-    initialConversations[0]?.id ?? null,
-  );
-  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  const [isDeletingConversationId, setIsDeletingConversationId] = useState<
-    string | null
-  >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<AIModel[]>(initialModels);
-  const [draftModelId, setDraftModelId] = useState<string | null>(
-    getDefaultModelId(initialModels),
-  );
-  const [draftSystemPrompt, setDraftSystemPrompt] = useState<string | null>(null);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptEditorValue, setPromptEditorValue] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
@@ -119,6 +88,33 @@ export function ChatShell({
     syncConversationMessages,
     removeConversationMessages,
   } = useChatSession();
+  const {
+    conversations,
+    activeConversationId,
+    selectedModelId,
+    selectedModel,
+    currentSystemPrompt,
+    groupedModels,
+    workspaceError,
+    isCreatingConversation,
+    isDeletingConversationId,
+    isLoadingConversation,
+    setActiveConversationId,
+    setWorkspaceError,
+    handleCreateConversation,
+    handleRenameConversation,
+    handleDeleteConversation,
+    handleSelectModel,
+    saveSystemPrompt,
+    ensureConversationId,
+    upsertConversation,
+    resetAfterSignOut,
+  } = useChatWorkspace({
+    initialConversations,
+    initialModels,
+    syncConversationMessages,
+    removeConversationMessages,
+  });
   const messages = getMessages(activeConversationId);
   const {
     messageEndRef,
@@ -128,277 +124,6 @@ export function ChatShell({
     scrollToLatest,
   } = useMessageScroll({ messages });
   const hasMessages = messages.length > 0;
-  const activeConversation = conversations.find(
-    (conversation) => conversation.id === activeConversationId,
-  );
-  const selectedModelId = activeConversation?.modelId ?? draftModelId;
-  const currentSystemPrompt = activeConversation?.systemPrompt ?? draftSystemPrompt;
-  const selectedModel = availableModels.find(
-    (model) => model.id === selectedModelId,
-  ) ?? (
-    availableModels.find((model) => model.isDefault) ?? availableModels[0] ?? null
-  );
-  const groupedModels = availableModels.reduce<Record<string, AIModel[]>>(
-    (groups, model) => {
-      const key = model.provider === "gemini" ? "Gemini" : "OpenAI Compatible";
-
-      // ??= 是“若不存在则初始化”，这里把平铺的模型数组整理成按 provider 分组的结构。
-      groups[key] ??= [];
-      groups[key].push(model);
-
-      return groups;
-    },
-    {},
-  );
-
-  function resetDraftConversationControls(models = availableModels) {
-    setDraftModelId(getDefaultModelId(models));
-    setDraftSystemPrompt(null);
-  }
-
-  // upsert 的目标是“有则更新，无则插入”，这样重命名、拉取详情、发送消息后都能复用同一入口刷新列表。
-  function upsertConversation(nextConversation: Conversation) {
-    setConversations((current) => {
-      const remaining = current.filter(
-        (conversation) => conversation.id !== nextConversation.id,
-      );
-
-      return sortConversations([nextConversation, ...remaining]);
-    });
-  }
-
-  /**
-   * 当前新建会话仍走“空参数快速创建”模式：
-   * 但首条消息发送前如果已有草稿控制项，会在这里把 model / system prompt 一并落进去。
-   */
-  async function createConversation(options?: {
-    activate?: boolean;
-    modelId?: string | null;
-    systemPrompt?: string | null;
-    consumeDraftControls?: boolean;
-  }) {
-    setIsCreatingConversation(true);
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch("/api/conversations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          modelId: options?.modelId ?? undefined,
-          systemPrompt: options?.systemPrompt ?? undefined,
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "新建会话失败。");
-      }
-
-      const parsed = conversationResponseSchema.parse(payload);
-      // 新会话刚创建时数据库里还没有消息，这里提前同步空数组，
-      // 后续切换到它时就不会误读到旧会话残留状态。
-      upsertConversation(parsed.conversation);
-      syncConversationMessages(parsed.conversation.id, []);
-
-      if (options?.activate ?? true) {
-        setActiveConversationId(parsed.conversation.id);
-      }
-
-      if (options?.consumeDraftControls) {
-        resetDraftConversationControls();
-      }
-
-      return parsed.conversation;
-    } finally {
-      setIsCreatingConversation(false);
-    }
-  }
-
-  // 管理客户端挂载后的模型列表同步。
-  // 当前实现只在首次挂载时请求 /api/models，并在结果返回后校正可用模型和草稿默认值。
-  useEffect(() => {
-    let cancelled = false;
-
-    // 模型列表即便服务端已经首屏注入过，也仍然在客户端再拉一遍，
-    // 这样进入工作区后能尽量同步到“当前数据库里最新启用”的模型集合。
-    async function loadModels() {
-      try {
-        const response = await fetch("/api/models");
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload?.error?.message ?? "读取模型列表失败。");
-        }
-
-        const parsed = aiModelListResponseSchema.parse(payload);
-
-        if (cancelled) {
-          return;
-        }
-
-        setAvailableModels(parsed.models);
-        setDraftModelId((current) => {
-          if (current && parsed.models.some((model) => model.id === current)) {
-            return current;
-          }
-
-          return getDefaultModelId(parsed.models);
-        });
-      } catch (error) {
-        if (!cancelled) {
-          setWorkspaceError((current) => current ?? getErrorMessage(error));
-        }
-      }
-    }
-
-    void loadModels();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // 管理当前激活会话的详情加载。
-  // 当前实现会在 activeConversationId 变化时拉取会话快照，并在卸载或切换时通过 cancelled 防止过期回写。
-  useEffect(() => {
-    if (!activeConversationId) {
-      setIsLoadingConversation(false);
-      return;
-    }
-
-    const conversationId = activeConversationId;
-    let cancelled = false;
-
-    // 切换会话时按需拉取详情，避免首页一次性把所有历史消息都塞进首屏 payload。
-    async function loadConversation() {
-      setIsLoadingConversation(true);
-
-      try {
-        const response = await fetch(`/api/conversations/${conversationId}`);
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload?.error?.message ?? "读取会话失败。");
-        }
-
-        const parsed = chatSessionResponseSchema.parse(payload);
-
-        if (cancelled) {
-          return;
-        }
-
-        // 会话详情接口返回的是“会话 + 消息快照”，
-        // 因此前端可以一次同步标题、system prompt、modelId 和完整消息列表。
-        syncConversationMessages(conversationId, parsed.messages);
-        upsertConversation(parsed.conversation);
-        setWorkspaceError(null);
-      } catch (error) {
-        if (!cancelled) {
-          setWorkspaceError(getErrorMessage(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingConversation(false);
-        }
-      }
-    }
-
-    void loadConversation();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeConversationId, syncConversationMessages]);
-
-  async function handleCreateConversation() {
-    try {
-      await createConversation({ activate: true });
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    }
-  }
-
-  async function handleRenameConversation(
-    conversationId: string,
-    title: string,
-  ) {
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "重命名失败。");
-      }
-
-      const parsed = conversationResponseSchema.parse(payload);
-      upsertConversation(parsed.conversation);
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    }
-  }
-
-  async function patchConversationControls(
-    conversationId: string,
-    updates: { modelId?: string; systemPrompt?: string },
-  ) {
-    const response = await fetch(`/api/conversations/${conversationId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updates),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload?.error?.message ?? "更新会话设置失败。");
-    }
-
-    return conversationResponseSchema.parse(payload).conversation;
-  }
-
-  async function handleSelectModel(modelId: string) {
-    setWorkspaceError(null);
-
-    if (!activeConversationId || !activeConversation) {
-      setDraftModelId(modelId);
-      return;
-    }
-
-    const previousConversation = activeConversation;
-    upsertConversation({
-      ...activeConversation,
-      modelId,
-    });
-
-    try {
-      const nextConversation = await patchConversationControls(
-        activeConversationId,
-        {
-          modelId,
-        },
-      );
-      upsertConversation(nextConversation);
-    } catch (error) {
-      upsertConversation(previousConversation);
-      setWorkspaceError(getErrorMessage(error));
-    }
-  }
 
   function handlePromptDialogOpenChange(nextOpen: boolean) {
     setIsPromptDialogOpen(nextOpen);
@@ -420,74 +145,13 @@ export function ChatShell({
     setWorkspaceError(null);
 
     try {
-      if (!activeConversationId || !activeConversation) {
-        setDraftSystemPrompt(nextSystemPrompt);
-      } else {
-        const nextConversation = await patchConversationControls(
-          activeConversationId,
-          {
-            systemPrompt: nextSystemPrompt ?? "",
-          },
-        );
-        upsertConversation(nextConversation);
-      }
-
+      await saveSystemPrompt(nextSystemPrompt);
       setIsPromptDialogOpen(false);
       setPromptEditorValue("");
     } catch (error) {
       setWorkspaceError(getErrorMessage(error));
     } finally {
       setIsSavingPrompt(false);
-    }
-  }
-
-  async function handleDeleteConversation(conversationId: string) {
-    setIsDeletingConversationId(conversationId);
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const payload =
-          response.status === 204
-            ? null
-            : await response.json().catch(() => null);
-        throw new Error(payload?.error?.message ?? "删除失败。");
-      }
-
-      removeConversationMessages(conversationId);
-      setConversations((current) => {
-        const remaining = current.filter(
-          (conversation) => conversation.id !== conversationId,
-        );
-
-        // 如果删掉的是当前会话，就把焦点切到列表中的下一条，
-        // 避免主面板仍停留在一个已不存在的 conversationId 上。
-        setActiveConversationId((activeId) => {
-          if (activeId !== conversationId) {
-            return activeId;
-          }
-
-          const nextActiveConversationId = remaining[0]?.id ?? null;
-
-          if (!nextActiveConversationId) {
-            resetDraftConversationControls();
-          }
-
-          return nextActiveConversationId;
-        });
-
-        return remaining;
-      });
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    } finally {
-      setIsDeletingConversationId(null);
     }
   }
 
@@ -506,9 +170,7 @@ export function ChatShell({
       }
 
       setUser(null);
-      setConversations([]);
-      setActiveConversationId(null);
-      resetDraftConversationControls(initialModels);
+      resetAfterSignOut();
       router.refresh();
     } catch (error) {
       const message = getErrorMessage(error);
@@ -516,27 +178,6 @@ export function ChatShell({
       throw new Error(message);
     } finally {
       setIsSigningOut(false);
-    }
-  }
-
-  async function ensureConversationId() {
-    if (activeConversationId) {
-      return activeConversationId;
-    }
-
-    // 首条消息发送时允许“先配置控制项，后建会话”。
-    // 这样空白工作区不会因为试选模型或编辑提示词而污染数据库。
-    try {
-      const conversation = await createConversation({
-        activate: true,
-        modelId: draftModelId ?? undefined,
-        systemPrompt: draftSystemPrompt ?? undefined,
-        consumeDraftControls: true,
-      });
-      return conversation.id;
-    } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
-      return null;
     }
   }
 

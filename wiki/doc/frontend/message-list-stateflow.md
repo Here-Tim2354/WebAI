@@ -43,6 +43,7 @@ aliases:
 - 消息本身由父层控制
 - 滚动策略也由父层 hook 协调
 - `MessageList` 主要负责按这些输入做展示
+- 单条消息的细节状态并不在这里继续展开
 
 ---
 
@@ -143,9 +144,39 @@ const [typedTitle, setTypedTitle] = useState("");
 
 因此它只是消息数组的消费方，不是消息数组的生产方。
 
+补充说明：
+
+- `MessageBubble` 内部会继续根据消息角色与状态决定外观
+- assistant 流式回复时，局部 reveal 状态发生在 `MessageBubble` 内部
+- `MarkdownMessage` 与 `CodeBlock` 的渲染和复制行为，也不归 `MessageList` 自身管理
+
 ---
 
-## 7. 回到底部按钮的状态流
+## 7. 为什么消息细节状态不放在这里
+
+当前设计里，`MessageList` 只处理“列表级问题”，不处理“单条消息级问题”。
+
+因此下面这些状态都不应该继续回流到 `MessageList`：
+
+- 某条 assistant 消息是否正在做流式 reveal
+- user 消息是否使用紧凑 Markdown 样式
+- 代码块复制按钮当前是否处于“已复制”态
+
+这些都已经分别落在：
+
+- `MessageBubble`
+- `MarkdownMessage`
+- `CodeBlock`
+
+这样拆分的好处是：
+
+- `MessageList` 仍然是轻量容器
+- 单条消息体验可以独立细修
+- 复制按钮、代码块和 Markdown 约束不会反向污染消息列表容器
+
+---
+
+## 8. 回到底部按钮的状态流
 
 按钮出现与否完全由父层控制：
 
@@ -160,6 +191,6 @@ const [typedTitle, setTypedTitle] = useState("");
 
 ---
 
-## 8. 一句话总结
+## 9. 一句话总结
 
-`MessageList` 的状态流很轻：它自己只管理空状态标题动画，消息与滚动的主控制权都留在父层和专门的滚动 hook 中。
+`MessageList` 的状态流仍然很轻：它自己只管理空状态标题动画，消息与滚动的主控制权留在父层和专门的滚动 hook 中，而单条消息的 reveal、Markdown 和代码块复制体验则继续下沉到消息子组件链路。

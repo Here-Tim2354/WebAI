@@ -6,34 +6,35 @@
 
 1. [[plan/phase/phase_overview|phase_overview]]
 2. [[plan/phase/current_todo|current_todo]]
-3. [page.tsx](</E:/Programming/WebAI/src/app/page.tsx>)
-4. [chat-shell.tsx](</E:/Programming/WebAI/src/components/chat/chat-shell.tsx>)
-5. [use-chat-session.ts](</E:/Programming/WebAI/src/components/chat/use-chat-session.ts>)
-6. [chat route](</E:/Programming/WebAI/src/app/api/chat/route.ts>)
-7. [supabase/server.ts](</E:/Programming/WebAI/src/lib/supabase/server.ts>)
-8. [supabase/proxy.ts](</E:/Programming/WebAI/src/lib/supabase/proxy.ts>)
-9. [supabase/auth.ts](</E:/Programming/WebAI/src/lib/supabase/auth.ts>)
-10. [conversations.ts](</E:/Programming/WebAI/src/lib/supabase/conversations.ts>)
-11. [messages.ts](</E:/Programming/WebAI/src/lib/supabase/messages.ts>)
-12. [model-registry.ts](</E:/Programming/WebAI/src/lib/supabase/model-registry.ts>)
-13. [ai/index.ts](</E:/Programming/WebAI/src/lib/ai/index.ts>)
-14. [ai/gemini.ts](</E:/Programming/WebAI/src/lib/ai/gemini.ts>)
-15. [ai/openai-compatible.ts](</E:/Programming/WebAI/src/lib/ai/openai-compatible.ts>)
-16. [schemas/*.ts](</E:/Programming/WebAI/src/lib/schemas>)
-17. [chat components](</E:/Programming/WebAI/src/components/chat>)
-18. [ui components](</E:/Programming/WebAI/src/components/ui>)
-19. [[doc/database/GUIDE|database docs]]
-20. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
+3. `src/app/page.tsx`
+4. `src/components/chat/chat-shell.tsx`
+5. `src/components/chat/use-chat-workspace.ts`
+6. `src/components/chat/use-chat-session.ts`
+7. `src/app/api/chat/route.ts`
+8. `src/lib/supabase/server.ts`
+9. `src/lib/supabase/proxy.ts`
+10. `src/lib/supabase/auth.ts`
+11. `src/lib/supabase/conversations.ts`
+12. `src/lib/supabase/messages.ts`
+13. `src/lib/supabase/model-registry.ts`
+14. `src/lib/ai/index.ts`
+15. `src/lib/ai/gemini.ts`
+16. `src/lib/ai/openai-compatible.ts`
+17. `src/lib/schemas/*.ts`
+18. `src/components/chat`
+19. `src/components/ui`
+20. [[doc/database/GUIDE|database docs]]
+21. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
 
 ## 先看什么
 
 如果你只想先恢复主线，不需要整仓库重读，建议按下面的优先级：
 
 1. 先看项目当前阶段和待办，确认现在处于 `Phase 4`，并了解当前主线。
-2. 再看 `page.tsx` 和 `chat-shell.tsx`，因为它们决定了页面入口、登录态、会话列表和聊天主工作区。
+2. 再看 `page.tsx`、`chat-shell.tsx` 和 `use-chat-workspace.ts`，因为它们共同决定页面入口、登录态、会话列表、模型控制项和聊天主工作区。
 3. 接着看 `use-chat-session.ts` 和 `/api/chat`，把“发送消息到 AI 回复”这条链路串起来。
 4. 然后看 Supabase 相关封装，理解“用户、会话、消息、模型列表”怎么从数据库读写。
-5. 最后再看 UI 组件和 schema，补齐细节实现方式。
+5. 最后再看消息展示链路：`message-list.tsx -> message-bubble.tsx -> markdown-message.tsx -> code-block.tsx`，补齐细节实现方式。
 
 ## 这几个核心概念
 
@@ -84,20 +85,7 @@
 4. [[doc/database/10_verified/relation_schema_design|10_verified/relation_schema_design]]
 5. [[doc/database/00_contract/entity_relationship_analysis|00_contract/entity_relationship_analysis]]
 6. [[doc/database/40_verification/migration_checklist|40_verification/migration_checklist]]
-7. [supabase/migrations](</E:/Programming/WebAI/supabase/migrations>)
+7. `supabase/migrations`
 
 这条顺序的目的，是先理解“为什么要这些表”，再看“怎么设计字段”，最后再看“代码怎么落到数据库”。
 
-## 你可以继续问我的内容
-
-- 某个文件的作用是什么
-- 某个 React / Next / Supabase 语法怎么理解
-- 某条请求链路是怎么走的
-- 某个数据库表为什么这样设计
-- 某个 AI 调用层为什么要拆开
-
-## 维护原则
-
-- 这份文档面向快速回到项目，不追求详尽。
-- 如果后续主线切到 `Phase 4` 的新能力，可以继续在这里补“入口文件”和“关键链路”。
-- 如果你想让这份文档更像真正的导航页，可以继续加一节“常用文件地图”。

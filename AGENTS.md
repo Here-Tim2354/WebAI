@@ -70,8 +70,9 @@
 在同步文档时应参考：
 - 阅读`syncDoc`以获取同步文档的指令
 
-开发命令：
-- `npm run dev --mode=DEV`
+开发环境：
+- 运行网页命令：`npm run dev --mode=DEV`
+- `npm run lint` 应该无视wiki/.obsidian/*
 
 提交信息规范：
 - 提交信息统一为 `<category>(phase <x>):brief message`，其中`<category>`为类别，`<x>`为当前的phase阶段

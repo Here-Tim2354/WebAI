@@ -9,6 +9,7 @@ import { CodeBlock } from "./code-block";
 
 type MarkdownMessageProps = {
   content: string;
+  className?: string;
 };
 
 // ReactMarkdown 的 code/pre 回调拿到的是 ReactNode。
@@ -33,9 +34,12 @@ function extractTextContent(node: ReactNode): string {
  * MarkdownMessage 是消息内容的统一渲染入口。
  * 这里集中处理 GFM、中文排版兼容，以及代码块替换逻辑。
  */
-export function MarkdownMessage({ content }: MarkdownMessageProps) {
+export function MarkdownMessage({
+  content,
+  className,
+}: MarkdownMessageProps) {
   return (
-    <div className="markdown">
+    <div className={["markdown", className].filter(Boolean).join(" ")}>
       <ReactMarkdown
         remarkPlugins={[
           remarkGfm,
