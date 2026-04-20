@@ -6,6 +6,7 @@ import { getSystemInstruction } from "./system-instruction";
 type GenerateWithGeminiOptions = {
   conversationSystemPrompt?: string | null;
   modelName?: string;
+  abortSignal?: AbortSignal;
 };
 
 // Gemini SDK 的历史消息结构不是 role/content，而是 Content.parts。
@@ -24,10 +25,11 @@ function toGeminiContents(messages: ChatMessage[]): Content[] {
 }
 
 /**
- * Gemini 调用走 @google/genai SDK。
- * system instruction 和 contents 是分开的两个参数，这和 OpenAI compatible 的组装方式不同。
+ * Gemini 流式调用走 @google/genai SDK。
+ * SDK 的 chunk.text 在不同模型上既可能是增量，也可能是已累计文本，
+ * 这里统一折算成“只向上层产出新增片段”。
  */
-export async function generateWithGemini(
+export async function* streamWithGemini(
   messages: ChatMessage[],
   options?: GenerateWithGeminiOptions,
 ) {
@@ -55,22 +57,41 @@ export async function generateWithGemini(
       : undefined,
   });
 
-  const response = await client.models.generateContent({
+  const response = await client.models.generateContentStream({
     model: options?.modelName ?? env.GEMINI_MODEL,
     contents,
     config: systemInstruction
       ? {
           // Gemini 把 system prompt 放在 config.systemInstruction，而不是消息列表里。
           systemInstruction,
+          abortSignal: options?.abortSignal,
         }
-      : undefined,
+      : {
+          abortSignal: options?.abortSignal,
+        },
   });
+  let aggregatedText = "";
 
-  const text = response.text?.trim();
+  for await (const chunk of response) {
+    const chunkText = chunk.text ?? "";
 
-  if (!text) {
-    throw new Error("Gemini 返回了空内容，请稍后重试。");
+    if (!chunkText) {
+      continue;
+    }
+
+    const delta = chunkText.startsWith(aggregatedText)
+      ? chunkText.slice(aggregatedText.length)
+      : chunkText;
+
+    if (!delta) {
+      continue;
+    }
+
+    aggregatedText += delta;
+    yield delta;
   }
 
-  return text;
+  if (!aggregatedText.trim()) {
+    throw new Error("Gemini 返回了空内容，请稍后重试。");
+  }
 }

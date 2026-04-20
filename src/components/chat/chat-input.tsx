@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
-import { ArrowUpIcon } from "lucide-react";
+import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -11,8 +11,8 @@ type ChatInputProps = {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => Promise<void>;
+  onStop: () => void;
   isSubmitting: boolean;
-  hasMessages: boolean;
   disabled?: boolean;
 };
 
@@ -20,12 +20,13 @@ export function ChatInput({
   value,
   onChange,
   onSubmit,
+  onStop,
   isSubmitting,
-  hasMessages,
   disabled = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
+  const canStop = isSubmitting && !disabled;
 
   // 管理输入框高度自适应。
   // 当前实现是在 value 变化后读取 scrollHeight，并把 textarea 高度限制在 240px 内。
@@ -68,7 +69,7 @@ export function ChatInput({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
+          if (event.key === "Enter" && !event.shiftKey && !isSubmitting) {
             event.preventDefault();
             void onSubmit();
           }
@@ -79,13 +80,24 @@ export function ChatInput({
         <Button
           className="h-10 rounded-full px-1 shadow-[0_12px_24px_rgba(72,115,195,0.14)]"
           type="button"
-          onClick={() => void onSubmit()}
-          disabled={!canSend}
-          aria-label="发送消息"
+          onClick={() => {
+            if (isSubmitting) {
+              onStop();
+              return;
+            }
+
+            void onSubmit();
+          }}
+          disabled={!canSend && !canStop}
+          aria-label={isSubmitting ? "停止生成" : "发送消息"}
         >
           <span className="flex min-w-[5.5rem] items-center justify-center gap-2">
-            <ArrowUpIcon className="size-4" />
-            <span>发送</span>
+            {isSubmitting ? (
+              <SquareIcon className="size-4 fill-current" />
+            ) : (
+              <ArrowUpIcon className="size-4" />
+            )}
+            <span>{isSubmitting ? "停止" : "发送"}</span>
           </span>
         </Button>
       </div>

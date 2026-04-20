@@ -6,6 +6,7 @@ type MessageRow = {
   conversation_id: string;
   sender_type: "user" | "assistant";
   content: string;
+  status: ChatMessage["status"];
   created_at: string;
 };
 
@@ -15,7 +16,7 @@ function mapMessageRow(row: MessageRow): ChatMessage {
     id: row.id,
     role: row.sender_type,
     content: row.content,
-    status: "complete",
+    status: row.status,
   });
 }
 
@@ -26,7 +27,7 @@ export async function listConversationMessages(
 ) {
   const { data, error } = await supabase
     .from("messages")
-    .select("id, conversation_id, sender_type, content, created_at")
+    .select("id, conversation_id, sender_type, content, status, created_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
 
@@ -42,6 +43,7 @@ export async function createConversationMessage(
   conversationId: string,
   senderType: "user" | "assistant",
   content: string,
+  status: ChatMessage["status"] = "complete",
 ) {
   const { data, error } = await supabase
     .from("messages")
@@ -49,8 +51,48 @@ export async function createConversationMessage(
       conversation_id: conversationId,
       sender_type: senderType,
       content,
+      status,
     })
-    .select("id, conversation_id, sender_type, content, created_at")
+    .select("id, conversation_id, sender_type, content, status, created_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapMessageRow(data as MessageRow);
+}
+
+type UpdateConversationMessageInput = {
+  content?: string;
+  status?: ChatMessage["status"];
+};
+
+export async function updateConversationMessage(
+  supabase: SupabaseClient,
+  conversationId: string,
+  messageId: string,
+  updates: UpdateConversationMessageInput,
+) {
+  const nextMessageUpdate: {
+    content?: string;
+    status?: ChatMessage["status"];
+  } = {};
+
+  if (updates.content !== undefined) {
+    nextMessageUpdate.content = updates.content;
+  }
+
+  if (updates.status !== undefined) {
+    nextMessageUpdate.status = updates.status;
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .update(nextMessageUpdate)
+    .eq("id", messageId)
+    .eq("conversation_id", conversationId)
+    .select("id, conversation_id, sender_type, content, status, created_at")
     .single();
 
   if (error) {

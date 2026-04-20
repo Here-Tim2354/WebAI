@@ -10,7 +10,9 @@ export const chatMessageRoleSchema = z.enum([
 
 export const chatMessageStatusSchema = z.enum([
   "pending",
+  "streaming",
   "complete",
+  "cancelled",
   "error",
 ]);
 
@@ -41,12 +43,45 @@ export const sendMessageRequestSchema = z.object({
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
 });
 
+export const cancelChatRequestSchema = z.object({
+  conversationId: z.string().uuid("会话标识不正确。"),
+});
+
 export const chatSessionResponseSchema = z.object({
   conversation: conversationSchema,
   messages: z.array(chatMessageSchema),
 });
 
+export const assistantMessageCreatedEventSchema = z.object({
+  type: z.literal("assistant-message-created"),
+  message: chatMessageSchema,
+});
+
+export const assistantMessageUpdatedEventSchema = z.object({
+  type: z.literal("assistant-message-updated"),
+  message: chatMessageSchema,
+});
+
+export const conversationUpdatedEventSchema = z.object({
+  type: z.literal("conversation-updated"),
+  conversation: conversationSchema,
+});
+
+export const chatDoneEventSchema = z.object({
+  type: z.literal("done"),
+  conversation: conversationSchema,
+  message: chatMessageSchema,
+});
+
+export const chatStreamEventSchema = z.union([
+  assistantMessageCreatedEventSchema,
+  assistantMessageUpdatedEventSchema,
+  conversationUpdatedEventSchema,
+  chatDoneEventSchema,
+]);
+
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type ChatStreamEvent = z.infer<typeof chatStreamEventSchema>;
 
 type CreateChatMessageInput = {
   id?: string;

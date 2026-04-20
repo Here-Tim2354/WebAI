@@ -9,6 +9,7 @@ import {
   createConversation,
   listConversations,
 } from "@/lib/supabase/conversations";
+import { getEnabledModelById, ModelRegistryError } from "@/lib/supabase/model-registry";
 
 // conversations 集合路由里的所有操作都要求当前请求已经带有有效登录态。
 function unauthorizedResponse() {
@@ -44,40 +45,70 @@ export async function GET() {
  * 这样前端既可以“无参数快速创建”，也可以在未来扩展为带标题和 system prompt 的创建入口。
  */
 export async function POST(request: Request) {
-  const { supabase, user } = await getSupabaseAuthContext();
-
-  if (!user) {
-    return unauthorizedResponse();
-  }
-
-  let payload: unknown = {};
-
   try {
-    payload = await request.json();
-  } catch {
-    // 空 body 在当前产品里也是合法输入，默认按“新会话”创建。
-    payload = {};
-  }
+    const { supabase, user } = await getSupabaseAuthContext();
 
-  const parsed = createConversationRequestSchema.safeParse(payload);
+    if (!user) {
+      return unauthorizedResponse();
+    }
 
-  if (!parsed.success) {
+    let payload: unknown = {};
+
+    try {
+      payload = await request.json();
+    } catch {
+      // 空 body 在当前产品里也是合法输入，默认按“新会话”创建。
+      payload = {};
+    }
+
+    const parsed = createConversationRequestSchema.safeParse(payload);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "新建会话参数不正确。",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    if (parsed.data.modelId) {
+      await getEnabledModelById(supabase, parsed.data.modelId);
+    }
+
+    const conversation = await createConversation(
+      supabase,
+      user.id,
+      parsed.data.title,
+      parsed.data.systemPrompt,
+      parsed.data.modelId,
+    );
+
+    return NextResponse.json(conversationResponseSchema.parse({ conversation }));
+  } catch (error) {
+    if (error instanceof ModelRegistryError) {
+      return NextResponse.json(
+        {
+          error: {
+            message: error.message,
+          },
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: {
-          message: "新建会话参数不正确。",
+          message:
+            error instanceof Error
+              ? error.message
+              : "新建会话失败，请稍后再试。",
         },
       },
-      { status: 400 },
+      { status: 500 },
     );
   }
-
-  const conversation = await createConversation(
-    supabase,
-    user.id,
-    parsed.data.title,
-    parsed.data.systemPrompt,
-  );
-
-  return NextResponse.json(conversationResponseSchema.parse({ conversation }));
 }

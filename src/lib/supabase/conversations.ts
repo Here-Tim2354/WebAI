@@ -5,6 +5,7 @@ type ConversationRow = {
   id: string;
   title: string;
   system_prompt: string | null;
+  model_id: string | null;
   status: "active" | "archived";
   created_at: string;
   updated_at: string;
@@ -16,6 +17,7 @@ function mapConversation(row: ConversationRow): Conversation {
     id: row.id,
     title: row.title,
     systemPrompt: row.system_prompt,
+    modelId: row.model_id,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -23,7 +25,7 @@ function mapConversation(row: ConversationRow): Conversation {
 }
 
 const conversationSelectFields =
-  "id, title, system_prompt, status, created_at, updated_at";
+  "id, title, system_prompt, model_id, status, created_at, updated_at";
 
 export class ConversationAccessError extends Error {
   constructor(message: string) {
@@ -63,6 +65,7 @@ export async function createConversation(
   userId: string,
   title = createDefaultConversationTitle(),
   systemPrompt?: string,
+  modelId?: string,
 ) {
   const { data, error } = await supabase
     .from("conversations")
@@ -70,6 +73,7 @@ export async function createConversation(
       user_id: userId,
       title,
       system_prompt: systemPrompt?.trim() ? systemPrompt.trim() : null,
+      model_id: modelId ?? null,
     })
     .select(conversationSelectFields)
     .single();
@@ -107,6 +111,7 @@ export async function getConversationById(
 type UpdateConversationInput = {
   title?: string;
   systemPrompt?: string;
+  modelId?: string;
 };
 
 /**
@@ -122,6 +127,7 @@ export async function updateConversation(
   const nextConversationUpdate: {
     title?: string;
     system_prompt?: string | null;
+    model_id?: string | null;
   } = {};
 
   if (updates.title !== undefined) {
@@ -132,6 +138,10 @@ export async function updateConversation(
     nextConversationUpdate.system_prompt = updates.systemPrompt.trim()
       ? updates.systemPrompt.trim()
       : null;
+  }
+
+  if (updates.modelId !== undefined) {
+    nextConversationUpdate.model_id = updates.modelId;
   }
 
   const { data, error } = await supabase

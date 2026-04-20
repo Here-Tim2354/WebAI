@@ -12,6 +12,7 @@ import {
   updateConversation,
 } from "@/lib/supabase/conversations";
 import { listConversationMessages } from "@/lib/supabase/messages";
+import { getEnabledModelById, ModelRegistryError } from "@/lib/supabase/model-registry";
 
 type RouteContext = {
   params: Promise<{
@@ -44,6 +45,17 @@ function handleConversationError(error: unknown) {
         },
       },
       { status: 404 },
+    );
+  }
+
+  if (error instanceof ModelRegistryError) {
+    return NextResponse.json(
+      {
+        error: {
+          message: error.message,
+        },
+      },
+      { status: 400 },
     );
   }
 
@@ -130,6 +142,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { conversationId } = await context.params;
+
+    if (parsed.data.modelId) {
+      await getEnabledModelById(supabase, parsed.data.modelId);
+    }
+
     const conversation = await updateConversation(
       supabase,
       user.id,
@@ -137,6 +154,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       {
         title: parsed.data.title,
         systemPrompt: parsed.data.systemPrompt,
+        modelId: parsed.data.modelId,
       },
     );
 

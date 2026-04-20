@@ -1,33 +1,38 @@
 import { ChatMessage } from "@/lib/schemas/chat";
 import { RuntimeAIModel } from "@/lib/supabase/model-registry";
-import { generateWithGemini } from "./gemini";
-import { generateWithOpenAICompatible } from "./openai-compatible";
+import { streamWithGemini } from "./gemini";
+import { streamWithOpenAICompatible } from "./openai-compatible";
 
-type GenerateAssistantReplyOptions = {
+type StreamAssistantReplyOptions = {
   model?: RuntimeAIModel | null;
   conversationSystemPrompt?: string | null;
+  abortSignal?: AbortSignal;
 };
 
 /**
- * AI 调用入口只做 provider 分发，不掺杂 provider 细节。
- * 这样上层聊天接口只关心“给我回复”，而不是“该走哪个 SDK / HTTP 协议”。
+ * AI 流式调用入口只做 provider 分发，不掺杂 provider 细节。
+ * 上层聊天接口始终按“增量文本片段”消费，不再保留一次性整段返回的旧模式。
  */
-export async function generateAssistantReply(
+export async function* streamAssistantReply(
   messages: ChatMessage[],
-  options?: GenerateAssistantReplyOptions,
+  options?: StreamAssistantReplyOptions,
 ) {
   if (options?.model?.provider === "openai_compatible") {
-    return generateWithOpenAICompatible(messages, {
+    yield* streamWithOpenAICompatible(messages, {
       model: options.model,
       conversationSystemPrompt: options.conversationSystemPrompt,
+      abortSignal: options.abortSignal,
     });
+
+    return;
   }
 
-  return generateWithGemini(messages, {
+  yield* streamWithGemini(messages, {
     conversationSystemPrompt: options?.conversationSystemPrompt,
     modelName:
       options?.model?.provider === "gemini"
         ? options.model.upstreamModelId
         : undefined,
+    abortSignal: options?.abortSignal,
   });
 }
