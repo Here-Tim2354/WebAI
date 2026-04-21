@@ -6,6 +6,8 @@ import { streamWithOpenAICompatible } from "./openai-compatible";
 type StreamAssistantReplyOptions = {
   model?: RuntimeAIModel | null;
   conversationSystemPrompt?: string | null;
+  webSearchEnabled?: boolean;
+  urls?: string[];
   abortSignal?: AbortSignal;
 };
 
@@ -29,6 +31,8 @@ export async function* streamAssistantReply(
 
   yield* streamWithGemini(messages, {
     conversationSystemPrompt: options?.conversationSystemPrompt,
+    webSearchEnabled: options?.webSearchEnabled,
+    urls: options?.urls,
     modelName:
       options?.model?.provider === "gemini"
         ? options.model.upstreamModelId

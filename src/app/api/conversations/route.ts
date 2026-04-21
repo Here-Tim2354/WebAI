@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       parsed.data.title,
       parsed.data.systemPrompt,
       parsed.data.modelId,
+      parsed.data.webSearchEnabled,
     );
 
     return NextResponse.json(conversationResponseSchema.parse({ conversation }));

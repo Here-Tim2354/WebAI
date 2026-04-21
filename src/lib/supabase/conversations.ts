@@ -6,6 +6,7 @@ type ConversationRow = {
   title: string;
   system_prompt: string | null;
   model_id: string | null;
+  web_search_enabled: boolean;
   status: "active" | "archived";
   created_at: string;
   updated_at: string;
@@ -18,6 +19,7 @@ function mapConversation(row: ConversationRow): Conversation {
     title: row.title,
     systemPrompt: row.system_prompt,
     modelId: row.model_id,
+    webSearchEnabled: row.web_search_enabled,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -25,7 +27,7 @@ function mapConversation(row: ConversationRow): Conversation {
 }
 
 const conversationSelectFields =
-  "id, title, system_prompt, model_id, status, created_at, updated_at";
+  "id, title, system_prompt, model_id, web_search_enabled, status, created_at, updated_at";
 
 export class ConversationAccessError extends Error {
   constructor(message: string) {
@@ -66,6 +68,7 @@ export async function createConversation(
   title = createDefaultConversationTitle(),
   systemPrompt?: string,
   modelId?: string,
+  webSearchEnabled = true,
 ) {
   const { data, error } = await supabase
     .from("conversations")
@@ -74,6 +77,7 @@ export async function createConversation(
       title,
       system_prompt: systemPrompt?.trim() ? systemPrompt.trim() : null,
       model_id: modelId ?? null,
+      web_search_enabled: webSearchEnabled,
     })
     .select(conversationSelectFields)
     .single();
@@ -112,6 +116,7 @@ type UpdateConversationInput = {
   title?: string;
   systemPrompt?: string;
   modelId?: string;
+  webSearchEnabled?: boolean;
 };
 
 /**
@@ -128,6 +133,7 @@ export async function updateConversation(
     title?: string;
     system_prompt?: string | null;
     model_id?: string | null;
+    web_search_enabled?: boolean;
   } = {};
 
   if (updates.title !== undefined) {
@@ -142,6 +148,10 @@ export async function updateConversation(
 
   if (updates.modelId !== undefined) {
     nextConversationUpdate.model_id = updates.modelId;
+  }
+
+  if (updates.webSearchEnabled !== undefined) {
+    nextConversationUpdate.web_search_enabled = updates.webSearchEnabled;
   }
 
   const { data, error } = await supabase

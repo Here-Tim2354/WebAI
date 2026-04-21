@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { conversationId, content, modelId } = parsedRequest.data;
+    const { conversationId, content, modelId, urls } = parsedRequest.data;
 
     // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
     let conversation = await getConversationById(supabase, user.id, conversationId);
@@ -223,6 +223,8 @@ export async function POST(request: Request) {
             for await (const delta of streamAssistantReply(messagesForModel, {
               model: selectedModel,
               conversationSystemPrompt: nextConversation.systemPrompt,
+              webSearchEnabled: nextConversation.webSearchEnabled,
+              urls,
               abortSignal: mergedAbortController.signal,
             })) {
               if (!delta) {

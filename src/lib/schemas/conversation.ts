@@ -5,6 +5,7 @@ export const conversationSchema = z.object({
   title: z.string().min(1).max(100),
   systemPrompt: z.string().max(2000).nullable(),
   modelId: z.string().uuid().nullable(),
+  webSearchEnabled: z.boolean(),
   status: z.enum(["active", "archived"]),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -31,6 +32,7 @@ export const createConversationRequestSchema = z.object({
     .max(2000, "会话级提示词不能超过 2000 个字符。")
     .optional(),
   modelId: z.string().uuid("模型标识不正确。").optional(),
+  webSearchEnabled: z.boolean().optional(),
 });
 
 export const updateConversationRequestSchema = z.object({
@@ -46,11 +48,13 @@ export const updateConversationRequestSchema = z.object({
     .max(2000, "会话级提示词不能超过 2000 个字符。")
     .optional(),
   modelId: z.string().uuid("模型标识不正确。").optional(),
+  webSearchEnabled: z.boolean().optional(),
 }).refine(
   (value) =>
     value.title !== undefined ||
     value.systemPrompt !== undefined ||
-    value.modelId !== undefined,
+    value.modelId !== undefined ||
+    value.webSearchEnabled !== undefined,
   {
     message: "至少需要提供一个可更新字段。",
   },
