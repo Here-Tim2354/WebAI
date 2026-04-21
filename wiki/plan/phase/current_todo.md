@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-21 13:20:00
+更新时间：2026-04-21 17:40:00
 
 ## 当前阶段
 
@@ -92,6 +92,16 @@
   - `messages.status` 已落库
   - 流式链路相关 migration 已应用到远端 Supabase
   - assistant 中断后的数据库状态已验收到 `cancelled`
+- 已完成联网搜索与 `URL Context` 的后端第一轮接入：
+  - `conversations.web_search_enabled` 已落库，默认值为 `true`
+  - 远端 Supabase 已执行 `20260421120000_phase4_web_search_and_url_context.sql`
+  - `/api/conversations` 与 `/api/conversations/[conversationId]` 已支持读写 `webSearchEnabled`
+  - `/api/chat` 已支持可选 `urls`
+  - `Gemini` 调用层已能按条件注入 `googleSearch` 与 `urlContext`
+  - `OpenAI compatible` 当前未接入 `URL Context` 相关逻辑
+- 已完成本地与远端 migration 历史修复：
+  - 旧 migration 文件已统一重命名为完整时间戳格式
+  - 已补 `20260325144640_phase3_history_placeholder.sql` 用于对齐远端已存在的历史版本
 
 ## 当前代码状态
 
@@ -106,8 +116,12 @@
 - 当前会话级控制语义已经落成第一版：
   - 当前会话模型选择记忆已完成
   - 会话级 `system_prompt` 的正式编辑交互已完成
-  - 会话级联网/搜索开关仍未真正接入，只完成了统一入口占位
+  - 会话级联网搜索的后端与数据库已经接通，但前端入口仍未接成真实开关
 - 当前子表能力字段已进入前端模型对象，并已用于模型能力标签展示与控制区置灰，但尚未全面驱动更深的交互差异
+- 当前 `Gemini URL Context` 已完成后端请求级接入：
+  - 当前 `sendMessage` 请求已具备 `urls` 参数契约
+  - 当前仅后端可消费，前端尚未提供 URL 输入入口
+- 当前本地 migration 历史已与远端 Supabase 对齐，可继续沿用 `supabase db push`
 - 当前流式展示链路已可用，但仍存在后续可继续优化的体验项：
   - reveal 节奏与过渡动画仍可继续细修
   - 提示词弹窗尺寸与通用弹层约束曾发生冲突，当前已在调用点覆盖
@@ -132,8 +146,8 @@
   - 继续收口桌面端与移动端一致性
   - 继续验证 user bubble 紧凑排版是否达到预期，而不是把 assistant 长文排版一起压坏
 - `Phase 4.1.2` 第二顺位任务：
-  - 明确联网/搜索开关的数据落点与前后端契约
-  - 从“置灰占位”推进到真正可接入的会话级能力开关
+  - 把已落地的联网搜索后端能力接到前端真实开关
+  - 为 `Gemini URL Context` 增加前端 URL 输入入口与请求传参
   - 继续让模型能力字段驱动更明确的 UI 差异
   - 视需要继续拆分控制区与代码块相关展示组件，避免体验细修再次回流到 `ChatShell`
 - `Phase 4.2` 预备项：
@@ -169,8 +183,9 @@
   - `src/components/chat/use-chat-workspace.ts`
   - `src/components/chat/use-chat-session.ts`
   - `src/app/api/chat/route.ts`
+  - `src/lib/ai/gemini.ts`
   - `src/lib/supabase/conversations.ts`
-- 下个会话默认先做“流式体验细修 + 联网开关契约”，再决定是否切入 `4.2`
+- 下个会话默认先做“流式体验细修 + 联网开关前端接线 + URL 输入入口”，再决定是否切入 `4.2`
 - 当前不把“补 seed”当作阶段主线，它只作为后续配套工作存在
 
 ## 当前提醒
@@ -184,8 +199,10 @@
 - 当前邮箱登录链路是否完整跑通，仍依赖 Supabase 控制台配置
 - 当前 `Phase 4.1.1` 的主链路已经成立，但阶段文档仍需要继续保持与实现同步
 - 当前 `Phase 4.1.2` 的真正重点不再是“有没有流式能力”，而是“如何把流式体验、控制区语义和会话级能力开关继续收口”
+- 当前联网搜索已经不是“先定数据契约”的状态，而是“后端已通、前端待接”
+- 当前 `URL Context` 已完成 Gemini 专属后端接入，但前端仍未提供可用交互
 - 当前 Markdown / 代码块视觉与复制体验已经过一轮细修，但 user 气泡的最终纵向节奏仍应继续用真实页面观察，而不是只看代码猜测
 
 ## 一句话结论
 
-- 当前项目已经完成 `Phase 4.1.1` 第一轮主链路，并补上了工作区编排层抽离、Markdown 浅色主题恢复和代码块复制可用性修正；下个会话应继续从 `Phase 4.1.2` 推进，优先细修真实页面体验、补稳验收，并推进联网/搜索开关的真正契约落地，同时把 `Phase 3.6` 验收整理作为并行补做项。
+- 当前项目已经完成 `Phase 4.1.1` 第一轮主链路，并补上了联网搜索会话级后端落库、`Gemini URL Context` 请求级接入与远端 migration 同步；下个会话应继续从 `Phase 4.1.2` 推进，优先细修真实页面体验、把联网开关接到前端、补 URL 输入入口，并继续把 `Phase 3.6` 验收整理作为并行补做项。

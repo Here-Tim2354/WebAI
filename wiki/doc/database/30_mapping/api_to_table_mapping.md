@@ -7,9 +7,9 @@
 | `GET /api/conversations` | `conversations` | 读取当前用户会话列表 |
 | `POST /api/conversations` | `conversations` | 新建会话 |
 | `GET /api/conversations/[conversationId]` | `conversations`, `messages` | 读取会话详情与消息快照 |
-| `PATCH /api/conversations/[conversationId]` | `conversations` | 更新标题或提示词 |
+| `PATCH /api/conversations/[conversationId]` | `conversations` | 更新标题、提示词、模型或 `web_search_enabled` |
 | `DELETE /api/conversations/[conversationId]` | `conversations`, `messages` | 删除会话及其消息 |
-| `POST /api/chat` | `conversations`, `messages`, `ai_models`, `openai_compatible_models`, `gemini_models` | 写用户消息、读取注册表、写 assistant 消息 |
+| `POST /api/chat` | `conversations`, `messages`, `ai_models`, `openai_compatible_models`, `gemini_models` | 写用户消息、读取注册表、按会话配置决定 `googleSearch`，按请求参数决定 `urlContext`，再写 assistant 消息 |
 | `GET /api/models` | `ai_models`, `openai_compatible_models`, `gemini_models` | 返回统一模型列表 |
 
 ## 判断规则

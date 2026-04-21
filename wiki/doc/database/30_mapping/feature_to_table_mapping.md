@@ -16,6 +16,7 @@
 | 查看历史消息 | `messages` | 按 `conversation_id` 与时间顺序读取 |
 | 发送消息 | `messages`, `conversations` | 先写用户消息，再 touch 会话更新时间 |
 | 保存会话级提示词 | `conversations` | `system_prompt` |
+| 会话级联网搜索偏好 | `conversations` | `web_search_enabled`，当前默认开启 |
 
 ## 当前系统配置层
 
@@ -24,6 +25,7 @@
 | 模型列表读取 | `ai_models`, `openai_compatible_models`, `gemini_models` | 父表提供统一入口，子表补全实现细节 |
 | 当前模型选择 | `ai_models` | 前端持有注册表主键作为 `modelId` |
 | 按模型发起请求 | `ai_models`, `openai_compatible_models`, `gemini_models` | 服务端先解析父表，再补全 provider 子表 |
+| `Gemini URL Context` 能力判断 | `ai_models`, `gemini_models` | 由模型注册表能力字段决定是否可用 |
 
 ## 当前仍在扩展层
 
