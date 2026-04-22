@@ -147,6 +147,7 @@ const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 - `availableModels`
 - `draftModelId`
 - `draftSystemPrompt`
+- `draftWebSearchEnabled`
 - `isCreatingConversation`
 - `isDeletingConversationId`
 - `isLoadingConversation`
@@ -157,7 +158,7 @@ const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 - 切换当前会话
 - 首屏后同步模型列表
 - 切换会话时拉取会话详情
-- 协调当前会话模型与提示词设置
+- 协调当前会话模型、提示词与联网搜索设置
 - 在首条消息发送前，把草稿控制项一并落入新会话
 
 因此现在的边界是：
@@ -203,7 +204,23 @@ const [inputValue, setInputValue] = useState("");
 
 ---
 
-### 5.3 发送中状态
+### 5.3 URL Context 相关状态
+
+当前 `useChatSession` 还维护：
+
+- `urlContextInputValue`
+- `urlContextUrls`
+- `isUrlContextPanelOpen`
+
+作用：
+
+- 保存当前 URL 输入框内容
+- 保存当前这次发送已确认的 URL 列表
+- 控制 URL Context 输入区是否展开
+
+---
+
+### 5.4 发送中状态
 
 ```tsx
 const [isSubmitting, setIsSubmitting] = useState(false);
@@ -315,7 +332,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 虽然它们不在 `ChatShell` 本体里，但都参与了 `ChatShell` 页面运行。
 
-### 9.1 ChatInput 的两个 effect
+### 9.1 ChatInput 的三个 effect
 
 对应文件：
 - `src/components/chat/chat-input.tsx`
@@ -338,6 +355,14 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 实现：
 - 当 `isSubmitting` 从 `true` 回到 `false` 时
 - 自动重新聚焦输入框
+
+#### effect 3：URL 上限警示清理
+
+作用：
+- 清理 URL 上限反馈使用的 timeout
+
+实现：
+- 组件卸载时清理未结束的 warning timer
 
 ---
 
@@ -436,13 +461,16 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 2. `handleSendMessage()` 调用 `useChatSession().handleSubmit()`
 3. `handleSubmit()` 先确认 `conversationId`
 4. 如果没有激活会话，则通过 `ensureConversationId()` 先建一个
+   - 当前会带上草稿模型、草稿提示词和草稿联网搜索开关
 5. 本地先做乐观更新：
    - 插入用户消息
    - 插入 assistant 占位消息
 6. `POST /api/chat`
+   - 当前若存在 `urlContextUrls`，会一并作为 `urls` 传给后端
 7. 成功后：
    - 用后端返回的真实消息快照覆盖本地缓存
    - 用后端返回的会话信息更新会话列表
+   - 清空 URL 输入值、已确认 URL 列表，并收起 URL 输入区
 8. 失败时：
    - 把 assistant 占位消息替换成 error 气泡
 
@@ -452,7 +480,25 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 9.4 删除会话
+### 9.4 联网搜索开关切换
+
+链路：
+
+1. 用户点击 `ChatInput` 左下角联网搜索按钮
+2. `ChatShell` 调用 `useChatWorkspace.toggleWebSearchEnabled()`
+3. 如果当前还没有真实会话：
+   - 只切换 `draftWebSearchEnabled`
+4. 如果当前已有会话：
+   - 先乐观更新当前会话对象
+   - 再 `PATCH /api/conversations/:id`
+   - 失败则回滚
+
+结果：
+- 联网搜索开关已经成为当前会话的真实控制项
+
+---
+
+### 9.5 删除会话
 
 链路：
 
@@ -469,7 +515,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 9.5 退出登录
+### 9.6 退出登录
 
 链路：
 
@@ -505,6 +551,7 @@ ChatShell
 
 useChatWorkspace
   -> 管会话与模型编排状态
+  -> 管联网搜索草稿与会话级持久化切换
   -> 触发会话与模型请求
   -> 把消息状态委托给 useChatSession
   -> 把滚动状态委托给 useMessageScroll
@@ -512,6 +559,7 @@ useChatWorkspace
 useChatSession
   -> 管各会话消息缓存
   -> 管输入框文本
+  -> 管 URL Context 输入与已确认 URL
   -> 管发送中状态
 
 useMessageScroll

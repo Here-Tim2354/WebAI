@@ -64,11 +64,11 @@
   --color-chart-1:
     var(--chart-1);
   --radius-2xl:
-    calc(var(--radius) * 1.8);
+    calc(var(--radius) * 1.45);
   --radius-3xl:
-    calc(var(--radius) * 2.2);
+    calc(var(--radius) * 1.7);
   --radius-4xl:
-    calc(var(--radius) * 2.6);
+    calc(var(--radius) * 1.95);
 }
 
 :root {
@@ -113,7 +113,7 @@
   --panel-glow: oklch(0.78 0.078 232 / 24%);
   --surface-soft: oklch(0.995 0.004 228 / 84%);
   --radius:
-    0.95rem;
+    0.72rem;
   --shadow-soft: 0 22px 60px rgb(52 91 153 / 0.08);
   --shadow-float: 0 20px 45px rgb(36 73 129 / 0.12);
   --chart-1:

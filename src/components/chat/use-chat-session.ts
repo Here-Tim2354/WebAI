@@ -110,6 +110,40 @@ type SubmitOptions = {
   onConversationSynced: (conversation: Conversation) => void;
 };
 
+export type AddUrlContextResult =
+  | "added"
+  | "duplicate"
+  | "invalid"
+  | "limit";
+
+const MAX_URL_CONTEXT_ITEMS = 4;
+
+function normalizeUrlCandidate(url: string) {
+  const trimmedUrl = url.trim();
+
+  if (!trimmedUrl) {
+    return null;
+  }
+
+  try {
+    const candidateUrl = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmedUrl)
+      ? trimmedUrl
+      : `https://${trimmedUrl}`;
+    const normalizedUrl = new URL(candidateUrl);
+
+    if (
+      normalizedUrl.protocol !== "http:" &&
+      normalizedUrl.protocol !== "https:"
+    ) {
+      return null;
+    }
+
+    return normalizedUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * useChatSession 管的是“消息交互状态”，不是整个页面状态：
  * 输入框内容、发送中状态、各会话消息缓存都集中收在这里。
@@ -119,6 +153,9 @@ export function useChatSession() {
     Record<string, ChatMessage[]>
   >({});
   const [inputValue, setInputValue] = useState("");
+  const [urlContextInputValue, setUrlContextInputValue] = useState("");
+  const [urlContextUrls, setUrlContextUrls] = useState<string[]>([]);
+  const [isUrlContextPanelOpen, setIsUrlContextPanelOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingConversationId, setStreamingConversationId] = useState<
     string | null
@@ -188,6 +225,49 @@ export function useChatSession() {
     setInputValue(prompt);
   }, []);
 
+  const addUrlContextUrl = useCallback((candidateUrl?: string): AddUrlContextResult => {
+    const normalizedUrl = normalizeUrlCandidate(
+      candidateUrl ?? urlContextInputValue,
+    );
+
+    if (!normalizedUrl) {
+      return "invalid";
+    }
+
+    let result: AddUrlContextResult = "invalid";
+    setUrlContextUrls((current) => {
+      if (current.includes(normalizedUrl)) {
+        result = "duplicate";
+        return current;
+      }
+
+      if (current.length >= MAX_URL_CONTEXT_ITEMS) {
+        result = "limit";
+        return current;
+      }
+
+      result = "added";
+      return [...current, normalizedUrl];
+    });
+
+    if (result === "added") {
+      setUrlContextInputValue("");
+      setIsUrlContextPanelOpen(true);
+    }
+
+    return result;
+  }, [urlContextInputValue]);
+
+  const removeUrlContextUrl = useCallback((targetUrl: string) => {
+    setUrlContextUrls((current) =>
+      current.filter((currentUrl) => currentUrl !== targetUrl),
+    );
+  }, []);
+
+  const toggleUrlContextPanel = useCallback(() => {
+    setIsUrlContextPanelOpen((current) => !current);
+  }, []);
+
   const stopStreaming = useCallback(() => {
     const conversationId = streamingConversationIdRef.current;
 
@@ -212,6 +292,7 @@ export function useChatSession() {
     onConversationSynced,
   }: SubmitOptions) => {
     const content = inputValue.trim();
+    const submittedUrlContextUrls = urlContextUrls;
 
     if (!content || isSubmitting) {
       return;
@@ -237,6 +318,9 @@ export function useChatSession() {
       assistantPlaceholder,
     ]);
     setInputValue("");
+    setUrlContextInputValue("");
+    setUrlContextUrls([]);
+    setIsUrlContextPanelOpen(false);
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
     streamingConversationIdRef.current = conversationId;
@@ -252,6 +336,10 @@ export function useChatSession() {
           conversationId,
           content,
           modelId: selectedModelId ?? undefined,
+          urls:
+            submittedUrlContextUrls.length > 0
+              ? submittedUrlContextUrls
+              : undefined,
         }),
         signal: abortController.signal,
       });
@@ -394,18 +482,31 @@ export function useChatSession() {
       setStreamingConversationId(null);
       streamingConversationIdRef.current = null;
     }
-  }, [inputValue, isSubmitting, replaceMessage, updateConversationMessages]);
+  }, [
+    inputValue,
+    isSubmitting,
+    replaceMessage,
+    updateConversationMessages,
+    urlContextUrls,
+  ]);
 
   return {
     conversationMessages,
     inputValue,
+    urlContextInputValue,
+    urlContextUrls,
+    isUrlContextPanelOpen,
     isSubmitting,
     streamingConversationId,
     setInputValue,
+    setUrlContextInputValue,
     getMessages,
     handlePromptSelect,
     handleSubmit,
     stopStreaming,
+    addUrlContextUrl,
+    removeUrlContextUrl,
+    toggleUrlContextPanel,
     syncConversationMessages,
     removeConversationMessages,
   };

@@ -350,7 +350,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {statusLabel ? (
           <Badge
             variant={message.status === "error" ? "destructive" : "secondary"}
-            className="rounded-full px-2 py-0.5 text-[0.68rem] tracking-normal"
+            className="rounded-[10px] px-2 py-0.5 text-[0.68rem] tracking-normal"
           >
             {statusLabel}
           </Badge>
@@ -360,11 +360,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         className={cn(
           "px-4",
           isAssistantLike &&
-            "rounded-[18px] border border-transparent bg-transparent py-3 shadow-none sm:px-1 sm:py-2",
+            "rounded-[14px] border border-transparent bg-transparent py-3 shadow-none sm:px-1 sm:py-2",
           isUser &&
-            "rounded-[20px] border border-blue-100/85 bg-blue-50/82 py-2.5 shadow-[0_10px_20px_rgba(54,88,143,0.05)]",
+            "rounded-[16px] border border-blue-100/85 bg-blue-50/82 py-2.5 shadow-[0_10px_20px_rgba(54,88,143,0.05)]",
           isError &&
-            "rounded-[20px] border border-red-200/90 bg-red-50/90 py-3 text-red-700 shadow-[0_10px_20px_rgba(172,60,60,0.07)]",
+            "rounded-[16px] border border-red-200/90 bg-red-50/90 py-3 text-red-700 shadow-[0_10px_20px_rgba(172,60,60,0.07)]",
         )}
       >
         {(message.status === "pending" || message.status === "streaming") &&

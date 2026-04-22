@@ -169,9 +169,9 @@ export function AuthPanel({
       initial={false}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(133,188,255,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(200,226,255,0.32),transparent_30%)]" />
-      <section className="relative w-full max-w-[31rem] rounded-[26px] border border-border/65 bg-white/86 p-6 shadow-[0_24px_72px_rgba(62,96,154,0.1)] backdrop-blur-xl sm:p-8">
+      <section className="relative w-full max-w-[31rem] rounded-[18px] border border-border/65 bg-white/86 p-6 shadow-[0_24px_72px_rgba(62,96,154,0.1)] backdrop-blur-xl sm:p-8">
         <div className="mx-auto w-full max-w-[27rem]">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[0.72rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+          <div className="inline-flex items-center gap-2 rounded-[12px] border border-border/60 bg-background/70 px-3 py-1 text-[0.72rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
             <SparklesIcon className="size-3.5" />
             WebAI
           </div>
@@ -202,7 +202,7 @@ export function AuthPanel({
             </label>
 
             <Button
-              className="h-12 w-full rounded-2xl bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
+              className="h-12 w-full rounded-[14px] bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
               type="submit"
               disabled={isSubmitting}
             >
@@ -219,7 +219,7 @@ export function AuthPanel({
             <Alert
               variant={feedbackType === "error" ? "destructive" : "default"}
               className={cn(
-                "mt-5 rounded-2xl border bg-white/72 shadow-none",
+                "mt-5 rounded-[14px] border bg-white/72 shadow-none",
                 feedbackType === "error"
                   ? "border-red-200/80 bg-red-50/80 text-red-700"
                   : "border-blue-100/80 bg-blue-50/72 text-foreground",

@@ -7,7 +7,6 @@ import {
   BotIcon,
   CheckIcon,
   ChevronDownIcon,
-  GlobeIcon,
   NotebookPenIcon,
   PanelLeftOpenIcon,
   SparklesIcon,
@@ -80,11 +79,18 @@ export function ChatShell({
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const {
     inputValue,
+    urlContextInputValue,
+    urlContextUrls,
+    isUrlContextPanelOpen,
     isSubmitting,
     setInputValue,
+    setUrlContextInputValue,
     getMessages,
     handleSubmit,
     stopStreaming,
+    addUrlContextUrl,
+    removeUrlContextUrl,
+    toggleUrlContextPanel,
     syncConversationMessages,
     removeConversationMessages,
   } = useChatSession();
@@ -94,6 +100,7 @@ export function ChatShell({
     selectedModelId,
     selectedModel,
     currentSystemPrompt,
+    currentWebSearchEnabled,
     groupedModels,
     workspaceError,
     isCreatingConversation,
@@ -106,6 +113,7 @@ export function ChatShell({
     handleDeleteConversation,
     handleSelectModel,
     saveSystemPrompt,
+    toggleWebSearchEnabled,
     ensureConversationId,
     upsertConversation,
     resetAfterSignOut,
@@ -239,7 +247,7 @@ export function ChatShell({
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    className="shrink-0 rounded-full border-border/70 bg-background/88 shadow-none lg:hidden"
+                    className="shrink-0 rounded-[12px] border-border/70 bg-background/88 shadow-none lg:hidden"
                     type="button"
                     onClick={() => setIsMobileSidebarOpen(true)}
                     aria-label="打开会话侧栏"
@@ -257,7 +265,7 @@ export function ChatShell({
                       render={
                         <button
                           type="button"
-                          className="inline-flex min-h-9 min-w-[12rem] items-center justify-between gap-3 rounded-full border border-slate-300/75 bg-transparent px-3.5 py-1.5 text-left text-[0.83rem] font-medium text-slate-600 transition-colors hover:border-slate-400/85 hover:bg-white/35 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+                          className="inline-flex min-h-9 min-w-[12rem] items-center justify-between gap-3 rounded-[14px] border border-slate-300/75 bg-transparent px-3.5 py-1.5 text-left text-[0.83rem] font-medium text-slate-600 transition-colors hover:border-slate-400/85 hover:bg-white/35 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
                           aria-label="选择模型"
                         />
                       }
@@ -281,7 +289,7 @@ export function ChatShell({
                       side="bottom"
                       align="start"
                       sideOffset={10}
-                      className="w-[22rem] rounded-2xl border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
+                      className="w-[22rem] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
                     >
                       {Object.entries(groupedModels).map(([groupName, models], index) => (
                         <div key={groupName}>
@@ -331,7 +339,7 @@ export function ChatShell({
                                       </div>
                                     </div>
                                     {isActive ? (
-                                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-slate-900 text-white">
+                                      <span className="inline-flex size-5 items-center justify-center rounded-[10px] bg-slate-900 text-white">
                                         <CheckIcon className="size-3.5" />
                                       </span>
                                     ) : null}
@@ -351,22 +359,7 @@ export function ChatShell({
                 <Button
                   variant="outline"
                   size="icon-sm"
-                  className="rounded-full border-border/70 bg-background/82 text-muted-foreground shadow-none disabled:opacity-60"
-                  type="button"
-                  disabled
-                  aria-label="联网搜索功能暂不可用"
-                  title={
-                    selectedModel?.capabilities.webSearch
-                      ? "联网搜索功能将在后续阶段接入。"
-                      : "当前模型暂不支持联网搜索。"
-                  }
-                >
-                  <GlobeIcon className="size-4.5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className={`rounded-full shadow-none ${
+                  className={`rounded-[12px] shadow-none ${
                     currentSystemPrompt?.trim()
                       ? "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82"
                       : "border-border/70 bg-background/82 text-muted-foreground"
@@ -390,7 +383,7 @@ export function ChatShell({
             <div className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">
               <Alert
                 variant="destructive"
-                className="rounded-[20px] border-red-200/80 bg-red-50/88 text-red-700 shadow-none"
+                className="rounded-[16px] border-red-200/80 bg-red-50/88 text-red-700 shadow-none"
                 role="alert"
               >
                 <AlertCircleIcon className="size-4" />
@@ -421,7 +414,18 @@ export function ChatShell({
               <div className="mx-auto w-full max-w-4xl">
                 <ChatInput
                   value={inputValue}
+                  webSearchEnabled={currentWebSearchEnabled}
+                  urlContextInputValue={urlContextInputValue}
+                  urlContextUrls={urlContextUrls}
+                  isUrlContextPanelOpen={isUrlContextPanelOpen}
+                  supportsWebSearch={selectedModel?.capabilities.webSearch ?? false}
+                  supportsUrlContext={selectedModel?.capabilities.urlContext ?? false}
                   onChange={setInputValue}
+                  onToggleWebSearch={toggleWebSearchEnabled}
+                  onUrlContextInputChange={setUrlContextInputValue}
+                  onToggleUrlContextPanel={toggleUrlContextPanel}
+                  onAddUrlContextUrl={addUrlContextUrl}
+                  onRemoveUrlContextUrl={removeUrlContextUrl}
                   onSubmit={handleSendMessage}
                   onStop={stopStreaming}
                   isSubmitting={isSubmitting}
@@ -437,7 +441,7 @@ export function ChatShell({
         onOpenChange={handlePromptDialogOpenChange}
       >
         <DialogContent
-          className="flex aspect-square max-h-[calc(100vh-2rem)] max-w-none flex-col gap-0 overflow-hidden rounded-[24px] border border-border/70 bg-white/97 p-0 shadow-[0_28px_64px_rgba(46,79,134,0.14)] sm:max-w-none"
+          className="flex aspect-square max-h-[calc(100vh-2rem)] max-w-none flex-col gap-0 overflow-hidden rounded-[18px] border border-border/70 bg-white/97 p-0 shadow-[0_28px_64px_rgba(46,79,134,0.14)] sm:max-w-none"
           style={{
             width: "min(calc(100vw - 2rem), 40rem, calc(100vh - 2rem))",
           }}
@@ -456,25 +460,25 @@ export function ChatShell({
               value={promptEditorValue}
               onChange={(event) => setPromptEditorValue(event.target.value)}
               placeholder="例如：请默认用简洁、结构化的中文回答。"
-              className="min-h-0 flex-1 resize-none overflow-y-auto rounded-[20px] border-border/80 bg-slate-50/55 px-5 py-4 text-[0.95rem] leading-8 shadow-none [field-sizing:fixed]"
+              className="min-h-0 flex-1 resize-none overflow-y-auto rounded-[14px] border-border/80 bg-slate-50/55 px-5 py-4 text-[0.95rem] leading-8 shadow-none [field-sizing:fixed]"
             />
             <p className="mt-3 text-xs text-muted-foreground">
               当前长度：{promptEditorValue.trim().length} / 2000
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-3 rounded-b-[24px] border-t border-border/70 bg-slate-50/72 px-6 py-4.5">
+          <div className="flex shrink-0 items-center justify-end gap-3 rounded-b-[18px] border-t border-border/70 bg-slate-50/72 px-6 py-4.5">
             <Button
               variant="outline"
               type="button"
-              className="rounded-full border-slate-200/85 bg-white/70 px-5"
+              className="rounded-[12px] border-slate-200/85 bg-white/70 px-5"
               onClick={() => handlePromptDialogOpenChange(false)}
             >
               取消
             </Button>
             <Button
               type="button"
-              className="rounded-full px-5"
+              className="rounded-[12px] px-5"
               onClick={() => void handleSaveSystemPrompt()}
               disabled={isSavingPrompt || promptEditorValue.trim().length > 2000}
             >

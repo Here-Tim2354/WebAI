@@ -27,7 +27,7 @@ aliases:
 - 当前激活会话
 - 模型列表同步
 - 草稿控制项
-- 会话级提示词与模型设置 patch
+- 会话级提示词、模型与联网搜索开关 patch
 - 当前会话详情同步
 - 工作区级错误状态
 
@@ -48,6 +48,7 @@ aliases:
 - `availableModels`
 - `draftModelId`
 - `draftSystemPrompt`
+- `draftWebSearchEnabled`
 - `workspaceError`
 - `isCreatingConversation`
 - `isDeletingConversationId`
@@ -69,6 +70,7 @@ aliases:
 - `handleDeleteConversation`
 - `handleSelectModel`
 - `saveSystemPrompt`
+- `toggleWebSearchEnabled`
 - `ensureConversationId`
 - `upsertConversation`
 - `resetAfterSignOut`
@@ -105,7 +107,7 @@ aliases:
 作用：
 
 - 同步当前会话的消息快照
-- 同步标题、`systemPrompt`、`modelId`
+- 同步标题、`systemPrompt`、`modelId`、`webSearchEnabled`
 - 避免首页一次性塞入所有历史消息
 
 ---
@@ -118,9 +120,10 @@ aliases:
 - 当前激活会话
 - 模型列表拉取
 - 当前会话详情拉取
-- 草稿模型 / 草稿提示词
+- 草稿模型 / 草稿提示词 / 草稿联网搜索开关
 - 会话级提示词保存
 - 会话级模型切换
+- 会话级联网搜索切换
 
 这会让 `ChatShell` 很快重新膨胀成“页面壳 + 工作区规则总控”。
 
@@ -134,4 +137,4 @@ aliases:
 
 ## 6. 一句话理解
 
-`useChatWorkspace` 是当前聊天工作区的编排层：它把会话、模型、草稿控制项、工作区错误和会话级 patch 收在一起，让 `ChatShell` 可以回到页面壳组件的角色。
+`useChatWorkspace` 是当前聊天工作区的编排层：它把会话、模型、草稿控制项、联网搜索偏好、工作区错误和会话级 patch 收在一起，让 `ChatShell` 可以回到页面壳组件的角色。

@@ -29,7 +29,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -264,7 +263,7 @@ export function ConversationSidebar({
           </span>
           <Badge
             variant="secondary"
-            className={cn("rounded-full px-2 py-0.5", isCollapsed && "lg:hidden")}
+            className={cn("rounded-[10px] px-2 py-0.5", isCollapsed && "lg:hidden")}
           >
             {conversations.length}
           </Badge>
@@ -414,7 +413,7 @@ export function ConversationSidebar({
         <Button
           variant="ghost"
           className={cn(
-            "rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            "rounded-[12px] text-muted-foreground hover:bg-muted/60 hover:text-foreground",
             isCollapsed && "lg:mx-auto lg:size-10",
           )}
           type="button"
@@ -462,9 +461,9 @@ export function ConversationSidebar({
           }
         }}
       >
-        <DialogContent className="max-w-[28rem] rounded-[18px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
+        <DialogContent className="max-w-[28rem] rounded-[16px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
           <DialogHeader className="px-4 pt-4 pb-2">
-            <div className="inline-flex size-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+            <div className="inline-flex size-10 items-center justify-center rounded-[12px] bg-red-50 text-red-600">
               <Trash2Icon className="size-5" />
             </div>
             <DialogTitle className="pt-1 text-[1.2rem] leading-none tracking-[-0.02em] text-foreground">
@@ -479,7 +478,7 @@ export function ConversationSidebar({
           <div className="flex items-center justify-end gap-3 border-t border-border/50 bg-slate-50/70 px-6 py-2">
             <Button
               variant="outline"
-              className="h-10 rounded-full px-5"
+              className="h-10 rounded-[12px] px-5"
               type="button"
               onClick={() => setPendingDeleteConversation(null)}
             >
@@ -487,7 +486,7 @@ export function ConversationSidebar({
             </Button>
             <Button
               variant="destructive"
-              className="h-10 rounded-full bg-red-600 px-5 text-white hover:bg-red-700"
+              className="h-10 rounded-[12px] bg-red-600 px-5 text-white hover:bg-red-700"
               type="button"
               onClick={() => void handleConfirmDeleteConversation()}
               disabled={

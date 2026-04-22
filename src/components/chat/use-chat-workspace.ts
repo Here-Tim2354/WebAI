@@ -22,6 +22,7 @@ type CreateConversationOptions = {
   activate?: boolean;
   modelId?: string | null;
   systemPrompt?: string | null;
+  webSearchEnabled?: boolean;
   consumeDraftControls?: boolean;
 };
 
@@ -71,12 +72,15 @@ export function useChatWorkspace({
     getDefaultModelId(initialModels),
   );
   const [draftSystemPrompt, setDraftSystemPrompt] = useState<string | null>(null);
+  const [draftWebSearchEnabled, setDraftWebSearchEnabled] = useState(true);
 
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
   const selectedModelId = activeConversation?.modelId ?? draftModelId;
   const currentSystemPrompt = activeConversation?.systemPrompt ?? draftSystemPrompt;
+  const currentWebSearchEnabled =
+    activeConversation?.webSearchEnabled ?? draftWebSearchEnabled;
   const selectedModel = availableModels.find(
     (model) => model.id === selectedModelId,
   ) ?? (
@@ -98,6 +102,7 @@ export function useChatWorkspace({
   const resetDraftConversationControls = useCallback((models = availableModels) => {
     setDraftModelId(getDefaultModelId(models));
     setDraftSystemPrompt(null);
+    setDraftWebSearchEnabled(true);
   }, [availableModels]);
 
   // upsert 的目标是“有则更新，无则插入”，这样重命名、拉取详情、发送消息后都能复用同一入口刷新列表。
@@ -130,6 +135,7 @@ export function useChatWorkspace({
         body: JSON.stringify({
           modelId: options?.modelId ?? undefined,
           systemPrompt: options?.systemPrompt ?? undefined,
+          webSearchEnabled: options?.webSearchEnabled,
         }),
       });
       const payload = await response.json();
@@ -296,7 +302,11 @@ export function useChatWorkspace({
 
   const patchConversationControls = useCallback(async (
     conversationId: string,
-    updates: { modelId?: string; systemPrompt?: string },
+    updates: {
+      modelId?: string;
+      systemPrompt?: string;
+      webSearchEnabled?: boolean;
+    },
   ) => {
     const response = await fetch(`/api/conversations/${conversationId}`, {
       method: "PATCH",
@@ -369,6 +379,41 @@ export function useChatWorkspace({
     upsertConversation,
   ]);
 
+  const toggleWebSearchEnabled = useCallback(async () => {
+    setWorkspaceError(null);
+
+    if (!activeConversationId || !activeConversation) {
+      setDraftWebSearchEnabled((current) => !current);
+      return;
+    }
+
+    const previousConversation = activeConversation;
+    const nextWebSearchEnabled = !activeConversation.webSearchEnabled;
+
+    upsertConversation({
+      ...activeConversation,
+      webSearchEnabled: nextWebSearchEnabled,
+    });
+
+    try {
+      const nextConversation = await patchConversationControls(
+        activeConversationId,
+        {
+          webSearchEnabled: nextWebSearchEnabled,
+        },
+      );
+      upsertConversation(nextConversation);
+    } catch (error) {
+      upsertConversation(previousConversation);
+      setWorkspaceError(getErrorMessage(error));
+    }
+  }, [
+    activeConversation,
+    activeConversationId,
+    patchConversationControls,
+    upsertConversation,
+  ]);
+
   const handleDeleteConversation = useCallback(async (conversationId: string) => {
     setIsDeletingConversationId(conversationId);
     setWorkspaceError(null);
@@ -431,6 +476,7 @@ export function useChatWorkspace({
         activate: true,
         modelId: draftModelId ?? undefined,
         systemPrompt: draftSystemPrompt ?? undefined,
+        webSearchEnabled: draftWebSearchEnabled,
         consumeDraftControls: true,
       });
       return conversation.id;
@@ -438,7 +484,13 @@ export function useChatWorkspace({
       setWorkspaceError(getErrorMessage(error));
       return null;
     }
-  }, [activeConversationId, createConversation, draftModelId, draftSystemPrompt]);
+  }, [
+    activeConversationId,
+    createConversation,
+    draftModelId,
+    draftSystemPrompt,
+    draftWebSearchEnabled,
+  ]);
 
   const resetAfterSignOut = useCallback(() => {
     setConversations([]);
@@ -457,6 +509,7 @@ export function useChatWorkspace({
     selectedModelId,
     selectedModel,
     currentSystemPrompt,
+    currentWebSearchEnabled,
     groupedModels,
     workspaceError,
     isCreatingConversation,
@@ -469,6 +522,7 @@ export function useChatWorkspace({
     handleDeleteConversation,
     handleSelectModel,
     saveSystemPrompt,
+    toggleWebSearchEnabled,
     ensureConversationId,
     upsertConversation,
     resetAfterSignOut,
