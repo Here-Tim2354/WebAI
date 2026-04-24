@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { ServerEnvError } from "@/lib/env/server";
-import { sendMessageRequestSchema } from "@/lib/schemas/chat";
+import { editMessageRequestSchema } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
-import {
-  getEnabledModelById,
-  ModelRegistryError,
-} from "@/lib/supabase/model-registry";
 import {
   ConversationAccessError,
   getConversationById,
@@ -14,11 +10,21 @@ import {
   updateConversation,
 } from "@/lib/supabase/conversations";
 import {
-  createConversationMessage,
+  getEnabledModelById,
+  ModelRegistryError,
+} from "@/lib/supabase/model-registry";
+import {
+  editUserMessageAndDeleteFollowing,
+  getConversationMessage,
   listConversationMessages,
 } from "@/lib/supabase/messages";
 
-// 聊天接口一定绑定真实登录用户，避免匿名请求直接驱动数据库写入与模型调用。
+type RouteContext = {
+  params: Promise<{
+    messageId: string;
+  }>;
+};
+
 function unauthorizedResponse() {
   return NextResponse.json(
     {
@@ -30,11 +36,7 @@ function unauthorizedResponse() {
   );
 }
 
-/**
- * 聊天链路同时依赖数据库、模型注册表和环境变量。
- * 这里把不同来源的错误分开翻译，避免前端只能收到模糊的 500。
- */
-function handleChatError(error: unknown) {
+function handleMessageError(error: unknown) {
   if (error instanceof ConversationAccessError) {
     return NextResponse.json(
       {
@@ -69,9 +71,7 @@ function handleChatError(error: unknown) {
   }
 
   const message =
-    error instanceof Error
-      ? error.message
-      : "模型暂时不可用，请稍后重试。";
+    error instanceof Error ? error.message : "消息操作失败，请稍后再试。";
 
   return NextResponse.json(
     {
@@ -84,14 +84,10 @@ function handleChatError(error: unknown) {
 }
 
 /**
- * 发送消息的主链路已经切换成纯流式：
- * 1. 校验请求和会话归属
- * 2. 写入用户消息
- * 3. 创建 assistant 占位记录
- * 4. 边生成边更新同一条 assistant 消息
- * 5. 通过 NDJSON 事件把增量内容推给前端
+ * 编辑 user 消息采用覆盖式语义：
+ * 原子更新目标消息并移除后续上下文，然后立即创建新的 assistant 流式回复。
  */
-export async function POST(request: Request) {
+export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { supabase, user } = await getSupabaseAuthContext();
 
@@ -114,24 +110,42 @@ export async function POST(request: Request) {
       );
     }
 
-    const parsedRequest = sendMessageRequestSchema.safeParse(payload);
+    const parsed = editMessageRequestSchema.safeParse(payload);
 
-    if (!parsedRequest.success) {
+    if (!parsed.success) {
       return NextResponse.json(
         {
           error: {
-            message:
-              parsedRequest.error.issues[0]?.message ?? "请求数据格式不正确。",
+            message: parsed.error.issues[0]?.message ?? "消息编辑参数不正确。",
           },
         },
         { status: 400 },
       );
     }
 
-    const { conversationId, content, modelId, urls } = parsedRequest.data;
+    const { messageId } = await context.params;
+    const { conversationId, content, modelId } = parsed.data;
+    let conversation = await getConversationById(
+      supabase,
+      user.id,
+      conversationId,
+    );
+    const targetMessage = await getConversationMessage(
+      supabase,
+      conversationId,
+      messageId,
+    );
 
-    // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
-    let conversation = await getConversationById(supabase, user.id, conversationId);
+    if (targetMessage.sender_type !== "user") {
+      return NextResponse.json(
+        {
+          error: {
+            message: "只能编辑你发送的消息。",
+          },
+        },
+        { status: 400 },
+      );
+    }
 
     if (modelId && conversation.modelId !== modelId) {
       conversation = await updateConversation(supabase, user.id, conversationId, {
@@ -139,12 +153,21 @@ export async function POST(request: Request) {
       });
     }
 
-    await createConversationMessage(supabase, conversationId, "user", content);
-
-    conversation = await touchConversation(supabase, user.id, conversationId);
-    // messagesForModel 读取的是“用户消息已写入数据库之后”的完整上下文，
-    // 这样模型看到的上下文和最终持久化状态保持一致。
-    const messagesForModel = await listConversationMessages(supabase, conversationId);
+    await editUserMessageAndDeleteFollowing(
+      supabase,
+      conversationId,
+      messageId,
+      content,
+    );
+    conversation = await touchConversation(
+      supabase,
+      user.id,
+      conversationId,
+    );
+    const messagesForModel = await listConversationMessages(
+      supabase,
+      conversationId,
+    );
     const effectiveModelId = modelId ?? conversation.modelId;
     const selectedModel = effectiveModelId
       ? await getEnabledModelById(supabase, effectiveModelId)
@@ -155,10 +178,9 @@ export async function POST(request: Request) {
       conversation,
       messagesForModel,
       model: selectedModel,
-      urls,
       requestSignal: request.signal,
     });
   } catch (error) {
-    return handleChatError(error);
+    return handleMessageError(error);
   }
 }

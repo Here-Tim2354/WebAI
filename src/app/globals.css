@@ -211,6 +211,14 @@ a {
   margin: 0;
 }
 
+.markdown--chat > :first-child {
+  margin-top: 0;
+}
+
+.markdown--chat > :last-child {
+  margin-bottom: 0;
+}
+
 .markdown ul,
 .markdown ol {
   padding-left: 1.35rem;

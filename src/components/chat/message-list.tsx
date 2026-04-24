@@ -12,6 +12,10 @@ type MessageListProps = {
   messageEndRef: RefObject<HTMLDivElement | null>;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   loadingHint?: string | null;
+  actionsDisabled?: boolean;
+  onCopyMessage: (message: ChatMessage) => Promise<void> | void;
+  onEditMessage: (message: ChatMessage, content: string) => Promise<void>;
+  onBranchFromMessage: (message: ChatMessage) => Promise<void>;
   onScroll: () => void;
   onJumpToLatest: () => void;
   showJumpToLatest: boolean;
@@ -27,6 +31,10 @@ export function MessageList({
   messageEndRef,
   scrollContainerRef,
   loadingHint = null,
+  actionsDisabled = false,
+  onCopyMessage,
+  onEditMessage,
+  onBranchFromMessage,
   onScroll,
   onJumpToLatest,
   showJumpToLatest,
@@ -114,7 +122,14 @@ export function MessageList({
       ) : (
         <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-7 px-1 pt-8 pb-10 sm:px-3 sm:pt-10 sm:pb-12">
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              actionsDisabled={actionsDisabled}
+              onCopy={onCopyMessage}
+              onEdit={onEditMessage}
+              onBranch={onBranchFromMessage}
+            />
           ))}
           <div ref={messageEndRef} />
           {showJumpToLatest ? (

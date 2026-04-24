@@ -464,6 +464,39 @@ export function useChatWorkspace({
     }
   }, [removeConversationMessages, resetDraftConversationControls]);
 
+  const handleBranchConversation = useCallback(async (
+    conversationId: string,
+    messageId: string,
+  ) => {
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/branch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messageId }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "创建分支会话失败。");
+      }
+
+      const parsed = chatSessionResponseSchema.parse(payload);
+      upsertConversation(parsed.conversation);
+      syncConversationMessages(parsed.conversation.id, parsed.messages);
+      setActiveConversationId(parsed.conversation.id);
+
+      return parsed.conversation;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
+    }
+  }, [syncConversationMessages, upsertConversation]);
+
   const ensureConversationId = useCallback(async () => {
     if (activeConversationId) {
       return activeConversationId;
@@ -520,6 +553,7 @@ export function useChatWorkspace({
     handleCreateConversation,
     handleRenameConversation,
     handleDeleteConversation,
+    handleBranchConversation,
     handleSelectModel,
     saveSystemPrompt,
     toggleWebSearchEnabled,

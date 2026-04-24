@@ -41,6 +41,10 @@ import { ModelIcon } from "./model-icon";
 import { useChatSession } from "./use-chat-session";
 import { useChatWorkspace } from "./use-chat-workspace";
 import { useMessageScroll } from "./use-message-scroll";
+import {
+  WorkspaceNotice,
+  WorkspaceNoticeState,
+} from "./workspace-notice";
 
 type ChatShellProps = {
   initialUser: AuthUser | null;
@@ -57,6 +61,30 @@ function getErrorMessage(error: unknown) {
   }
 
   return "暂时无法完成操作，请稍后再试。";
+}
+
+function copyTextWithFallback(text: string) {
+  const textarea = document.createElement("textarea");
+
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "0";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+
+    if (!copied) {
+      throw new Error("复制失败，当前浏览器没有开放剪贴板权限。");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }
 
 /**
@@ -77,6 +105,8 @@ export function ChatShell({
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptEditorValue, setPromptEditorValue] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [workspaceNotice, setWorkspaceNotice] =
+    useState<WorkspaceNoticeState>(null);
   const {
     inputValue,
     urlContextInputValue,
@@ -87,6 +117,7 @@ export function ChatShell({
     setUrlContextInputValue,
     getMessages,
     handleSubmit,
+    editMessageAndRegenerate,
     stopStreaming,
     addUrlContextUrl,
     removeUrlContextUrl,
@@ -111,6 +142,7 @@ export function ChatShell({
     handleCreateConversation,
     handleRenameConversation,
     handleDeleteConversation,
+    handleBranchConversation,
     handleSelectModel,
     saveSystemPrompt,
     toggleWebSearchEnabled,
@@ -132,6 +164,23 @@ export function ChatShell({
     scrollToLatest,
   } = useMessageScroll({ messages });
   const hasMessages = messages.length > 0;
+
+  function showWorkspaceNotice(
+    notice: NonNullable<WorkspaceNoticeState>,
+    duration?: number,
+  ) {
+    setWorkspaceNotice(notice);
+
+    if (!duration) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      setWorkspaceNotice((current) =>
+        current?.id === notice.id ? null : current,
+      );
+    }, duration);
+  }
 
   function handlePromptDialogOpenChange(nextOpen: boolean) {
     setIsPromptDialogOpen(nextOpen);
@@ -209,6 +258,86 @@ export function ChatShell({
     });
   }
 
+  async function handleCopyMessage(message: { content: string }) {
+    setWorkspaceError(null);
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(message.content);
+          return;
+        } catch {
+          copyTextWithFallback(message.content);
+          return;
+        }
+      }
+
+      copyTextWithFallback(message.content);
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
+      throw error;
+    }
+  }
+
+  async function handleEditMessage(
+    message: { id: string },
+    content: string,
+  ) {
+    setWorkspaceError(null);
+
+    if (!activeConversationId) {
+      return;
+    }
+
+    try {
+      await editMessageAndRegenerate({
+        conversationId: activeConversationId,
+        messageId: message.id,
+        content,
+        selectedModelId,
+        onConversationSynced(conversation) {
+          upsertConversation(conversation);
+        },
+      });
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
+    }
+  }
+
+  async function handleBranchFromMessage(message: { id: string }) {
+    setWorkspaceError(null);
+
+    if (!activeConversationId) {
+      return;
+    }
+
+    const noticeId = Date.now();
+    showWorkspaceNotice({
+      id: noticeId,
+      type: "loading",
+      title: "正在创建对话分支",
+      description: "正在复制当前上下文。",
+    });
+
+    try {
+      await handleBranchConversation(activeConversationId, message.id);
+      showWorkspaceNotice({
+        id: noticeId + 1,
+        type: "success",
+        title: "分支已创建",
+        description: "已切换到新的对话分支。",
+      }, 2200);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      showWorkspaceNotice({
+        id: noticeId + 2,
+        type: "error",
+        title: "分支创建失败",
+        description: message,
+      }, 3200);
+    }
+  }
+
   if (!user) {
     return (
       <AuthPanel
@@ -220,6 +349,7 @@ export function ChatShell({
 
   return (
     <>
+      <WorkspaceNotice notice={workspaceNotice} />
       <div className="flex h-[100dvh] overflow-hidden bg-background lg:flex-row">
         <ConversationSidebar
           conversations={conversations}
@@ -403,6 +533,10 @@ export function ChatShell({
               messageEndRef={messageEndRef}
               scrollContainerRef={scrollContainerRef}
               loadingHint={isLoadingConversation ? "请稍等，我们正在从数据库同步当前会话。" : null}
+              actionsDisabled={isSubmitting || isLoadingConversation}
+              onCopyMessage={handleCopyMessage}
+              onEditMessage={handleEditMessage}
+              onBranchFromMessage={handleBranchFromMessage}
               onScroll={handleScroll}
               showJumpToLatest={showJumpToLatest}
               onJumpToLatest={() => scrollToLatest()}

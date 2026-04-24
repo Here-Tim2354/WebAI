@@ -44,8 +44,19 @@ export const sendMessageRequestSchema = z.object({
   urls: z.array(z.string().trim().url("URL 格式不正确。")).max(20).optional(),
 });
 
+export const regenerateMessageRequestSchema = z.object({
+  conversationId: z.string().uuid("会话标识不正确。"),
+  modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+});
+
 export const cancelChatRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
+});
+
+export const editMessageRequestSchema = z.object({
+  conversationId: z.string().uuid("会话标识不正确。"),
+  content: z.string().trim().min(1, "消息不能为空。"),
+  modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
 });
 
 export const chatSessionResponseSchema = z.object({

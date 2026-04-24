@@ -60,4 +60,8 @@ export const updateConversationRequestSchema = z.object({
   },
 );
 
+export const branchConversationRequestSchema = z.object({
+  messageId: z.string().uuid("消息标识不正确。"),
+});
+
 export type Conversation = z.infer<typeof conversationSchema>;

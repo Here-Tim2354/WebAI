@@ -1,24 +1,20 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { ServerEnvError } from "@/lib/env/server";
-import { sendMessageRequestSchema } from "@/lib/schemas/chat";
+import { regenerateMessageRequestSchema } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
-import {
-  getEnabledModelById,
-  ModelRegistryError,
-} from "@/lib/supabase/model-registry";
 import {
   ConversationAccessError,
   getConversationById,
   touchConversation,
   updateConversation,
 } from "@/lib/supabase/conversations";
+import { listConversationMessages } from "@/lib/supabase/messages";
 import {
-  createConversationMessage,
-  listConversationMessages,
-} from "@/lib/supabase/messages";
+  getEnabledModelById,
+  ModelRegistryError,
+} from "@/lib/supabase/model-registry";
 
-// 聊天接口一定绑定真实登录用户，避免匿名请求直接驱动数据库写入与模型调用。
 function unauthorizedResponse() {
   return NextResponse.json(
     {
@@ -30,11 +26,7 @@ function unauthorizedResponse() {
   );
 }
 
-/**
- * 聊天链路同时依赖数据库、模型注册表和环境变量。
- * 这里把不同来源的错误分开翻译，避免前端只能收到模糊的 500。
- */
-function handleChatError(error: unknown) {
+function handleRegenerateError(error: unknown) {
   if (error instanceof ConversationAccessError) {
     return NextResponse.json(
       {
@@ -84,12 +76,8 @@ function handleChatError(error: unknown) {
 }
 
 /**
- * 发送消息的主链路已经切换成纯流式：
- * 1. 校验请求和会话归属
- * 2. 写入用户消息
- * 3. 创建 assistant 占位记录
- * 4. 边生成边更新同一条 assistant 消息
- * 5. 通过 NDJSON 事件把增量内容推给前端
+ * 重新生成不会再插入 user 消息。
+ * 它基于当前数据库里已经截断好的上下文，创建新的 assistant 消息并流式更新。
  */
 export async function POST(request: Request) {
   try {
@@ -114,7 +102,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const parsedRequest = sendMessageRequestSchema.safeParse(payload);
+    const parsedRequest = regenerateMessageRequestSchema.safeParse(payload);
 
     if (!parsedRequest.success) {
       return NextResponse.json(
@@ -128,10 +116,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const { conversationId, content, modelId, urls } = parsedRequest.data;
-
-    // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
-    let conversation = await getConversationById(supabase, user.id, conversationId);
+    const { conversationId, modelId } = parsedRequest.data;
+    let conversation = await getConversationById(
+      supabase,
+      user.id,
+      conversationId,
+    );
 
     if (modelId && conversation.modelId !== modelId) {
       conversation = await updateConversation(supabase, user.id, conversationId, {
@@ -139,12 +129,11 @@ export async function POST(request: Request) {
       });
     }
 
-    await createConversationMessage(supabase, conversationId, "user", content);
-
     conversation = await touchConversation(supabase, user.id, conversationId);
-    // messagesForModel 读取的是“用户消息已写入数据库之后”的完整上下文，
-    // 这样模型看到的上下文和最终持久化状态保持一致。
-    const messagesForModel = await listConversationMessages(supabase, conversationId);
+    const messagesForModel = await listConversationMessages(
+      supabase,
+      conversationId,
+    );
     const effectiveModelId = modelId ?? conversation.modelId;
     const selectedModel = effectiveModelId
       ? await getEnabledModelById(supabase, effectiveModelId)
@@ -155,10 +144,9 @@ export async function POST(request: Request) {
       conversation,
       messagesForModel,
       model: selectedModel,
-      urls,
       requestSignal: request.signal,
     });
   } catch (error) {
-    return handleChatError(error);
+    return handleRegenerateError(error);
   }
 }

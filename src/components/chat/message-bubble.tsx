@@ -1,13 +1,29 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { ChatMessage } from "@/lib/schemas/chat";
 import { motion, useReducedMotion } from "motion/react";
-import { BotIcon, CircleAlertIcon, LoaderCircleIcon, UserIcon } from "lucide-react";
+import {
+  BotIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  CopyIcon,
+  GitBranchIcon,
+  LoaderCircleIcon,
+  PencilIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MarkdownMessage } from "./markdown-message";
 
 type MessageBubbleProps = {
   message: ChatMessage;
+  actionsDisabled?: boolean;
+  onCopy: (message: ChatMessage) => Promise<void> | void;
+  onEdit: (message: ChatMessage, content: string) => Promise<void>;
+  onBranch: (message: ChatMessage) => Promise<void>;
 };
 
 const roleLabelMap = {
@@ -130,10 +146,12 @@ function StreamingMarkdownMessage({
   content,
   isStreaming,
   shouldReduceMotion,
+  className,
 }: {
   content: string;
   isStreaming: boolean;
   shouldReduceMotion: boolean;
+  className?: string;
 }) {
   const [displayContent, setDisplayContent] = useState(content);
   const [isFreshReveal, setIsFreshReveal] = useState(false);
@@ -280,7 +298,7 @@ function StreamingMarkdownMessage({
           ease: "easeOut",
         }}
       >
-        <MarkdownMessage content={displayContent} />
+        <MarkdownMessage content={displayContent} className={className} />
       </motion.div>
       {showCursor ? (
         <motion.span
@@ -305,13 +323,34 @@ function StreamingMarkdownMessage({
  * MessageBubble 只关心单条消息的视觉语义：
  * 谁发的、是否报错、是否仍在生成，最终都映射成统一气泡样式。
  */
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  actionsDisabled = false,
+  onCopy,
+  onEdit,
+  onBranch,
+}: MessageBubbleProps) {
   const shouldReduceMotion = Boolean(useReducedMotion());
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(message.content);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isBranching, setIsBranching] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const isAssistantLike =
     message.role === "assistant" || message.role === "system";
   const isUser = message.role === "user";
   const isError = message.role === "error";
   const isStreaming = message.status === "streaming";
+  const isActionLocked =
+    actionsDisabled ||
+    message.status === "pending" ||
+    message.status === "streaming";
+  const canCopy = !isActionLocked && message.content.trim().length > 0;
+  const canEdit = isUser && !isActionLocked;
+  const canBranch =
+    message.role === "assistant" &&
+    !isActionLocked &&
+    message.content.trim().length > 0;
   const statusLabel =
     message.status === "pending"
       ? "等待中"
@@ -323,10 +362,60 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         ? "失败"
         : null;
 
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(message.content);
+    }
+  }, [isEditing, message.content]);
+
+  const handleCopy = async () => {
+    if (!canCopy) {
+      return;
+    }
+
+    await onCopy(message);
+    setCopiedMessageId(message.id);
+    window.setTimeout(() => {
+      setCopiedMessageId((current) => (current === message.id ? null : current));
+    }, 1300);
+  };
+
+  const handleSaveEdit = async () => {
+    const trimmedValue = editValue.trim();
+
+    if (!canEdit || !trimmedValue || trimmedValue === message.content) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+
+    try {
+      await onEdit(message, trimmedValue);
+      setIsEditing(false);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleBranch = async () => {
+    if (!canBranch) {
+      return;
+    }
+
+    setIsBranching(true);
+
+    try {
+      await onBranch(message);
+    } finally {
+      setIsBranching(false);
+    }
+  };
+
   return (
     <motion.article
       className={cn(
-        "flex max-w-[min(100%,52rem)] flex-col gap-2",
+        "group/message flex max-w-[min(100%,52rem)] flex-col gap-1",
         isUser ? "self-end" : "self-start",
       )}
       initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
@@ -367,7 +456,44 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             "rounded-[16px] border border-red-200/90 bg-red-50/90 py-3 text-red-700 shadow-[0_10px_20px_rgba(172,60,60,0.07)]",
         )}
       >
-        {(message.status === "pending" || message.status === "streaming") &&
+        {isEditing ? (
+          <div className="w-[min(72vw,32rem)] space-y-2">
+            <Textarea
+              value={editValue}
+              onChange={(event) => setEditValue(event.target.value)}
+              className="max-h-72 min-h-28 resize-y rounded-[12px] border-blue-100/90 bg-white/72 px-3 py-2 text-[0.95rem] leading-7 shadow-none"
+              disabled={isSubmittingEdit}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-[10px]"
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isSubmittingEdit}
+              >
+                <XIcon className="size-3.5" />
+                取消
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 rounded-[10px]"
+                type="button"
+                onClick={() => void handleSaveEdit()}
+                disabled={isSubmittingEdit || editValue.trim().length === 0}
+              >
+                {isSubmittingEdit ? (
+                  <LoaderCircleIcon className="size-3.5 animate-spin" />
+                ) : (
+                  <CheckIcon className="size-3.5" />
+                )}
+                保存
+              </Button>
+            </div>
+          </div>
+        ) : (message.status === "pending" || message.status === "streaming") &&
         message.content.length === 0 ? (
           // assistant 占位气泡在真正文本返回前只展示加载态。
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
@@ -383,14 +509,72 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             content={message.content}
             isStreaming={isStreaming}
             shouldReduceMotion={shouldReduceMotion}
+            className="markdown--chat"
           />
         ) : (
           <MarkdownMessage
             content={message.content}
-            className={isUser ? "markdown--compact" : undefined}
+            className={isUser ? "markdown--compact" : "markdown--chat"}
           />
         )}
       </div>
+      {canCopy || canEdit || canBranch ? (
+        <div
+          className={cn(
+            "flex h-6 items-center gap-0.5 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100",
+            isUser ? "justify-end pr-1" : "justify-start pl-1",
+          )}
+        >
+          {canCopy ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+              type="button"
+              onClick={() => void handleCopy()}
+              aria-label="复制"
+              title="复制"
+            >
+              {copiedMessageId === message.id ? (
+                <CheckIcon className="size-3.5" />
+              ) : (
+                <CopyIcon className="size-3.5" />
+              )}
+            </Button>
+          ) : null}
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+              type="button"
+              onClick={() => setIsEditing(true)}
+              aria-label="编辑消息"
+              title="编辑并重新生成"
+            >
+              <PencilIcon className="size-3.5" />
+            </Button>
+          ) : null}
+          {canBranch ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+              type="button"
+              onClick={() => void handleBranch()}
+              disabled={isBranching}
+              aria-label="分支"
+              title="分支"
+            >
+              {isBranching ? (
+                <LoaderCircleIcon className="size-3.5 animate-spin" />
+              ) : (
+                <GitBranchIcon className="size-3.5" />
+              )}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </motion.article>
   );
 }

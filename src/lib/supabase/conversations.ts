@@ -41,6 +41,14 @@ export function createDefaultConversationTitle() {
   return "新会话";
 }
 
+export function createBranchConversationTitle(title: string) {
+  const suffix = " · 分支";
+  const maxBaseLength = 100 - suffix.length;
+  const baseTitle = title.trim() || createDefaultConversationTitle();
+
+  return `${baseTitle.slice(0, maxBaseLength)}${suffix}`;
+}
+
 export async function listConversations(
   supabase: SupabaseClient,
   userId: string,

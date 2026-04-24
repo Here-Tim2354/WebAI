@@ -110,6 +110,11 @@ type SubmitOptions = {
   onConversationSynced: (conversation: Conversation) => void;
 };
 
+type EditMessageOptions = SubmitOptions & {
+  messageId: string;
+  content: string;
+};
+
 export type AddUrlContextResult =
   | "added"
   | "duplicate"
@@ -234,7 +239,7 @@ export function useChatSession() {
       return "invalid";
     }
 
-    let result: AddUrlContextResult = "invalid";
+    let result = "invalid" as AddUrlContextResult;
     setUrlContextUrls((current) => {
       if (current.includes(normalizedUrl)) {
         result = "duplicate";
@@ -285,6 +290,137 @@ export function useChatSession() {
 
     abortControllerRef.current?.abort();
   }, []);
+
+  const consumeAssistantStream = useCallback(async ({
+    response,
+    conversationId,
+    assistantPlaceholder,
+    onConversationSynced,
+  }: {
+    response: Response;
+    conversationId: string;
+    assistantPlaceholder: ChatMessage;
+    onConversationSynced: (conversation: Conversation) => void;
+  }) => {
+    if (!response.body) {
+      throw new Error("聊天接口未返回流式响应。");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentAssistantMessageId = assistantPlaceholder.id;
+    let latestAssistantMessage = assistantPlaceholder;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+
+          if (!trimmedLine) {
+            continue;
+          }
+
+          const parsedEvent = chatStreamEventSchema.parse(
+            JSON.parse(trimmedLine),
+          );
+
+          switch (parsedEvent.type) {
+            case "assistant-message-created": {
+              const nextAssistantMessage = mergeAssistantMessageParts(
+                latestAssistantMessage,
+                parsedEvent.message,
+              );
+              currentAssistantMessageId = nextAssistantMessage.id;
+              latestAssistantMessage = nextAssistantMessage;
+              replaceMessage(
+                conversationId,
+                assistantPlaceholder.id,
+                nextAssistantMessage,
+              );
+              break;
+            }
+            case "assistant-message-updated": {
+              const nextAssistantMessage = mergeAssistantMessageParts(
+                latestAssistantMessage,
+                parsedEvent.message,
+              );
+              const previousAssistantMessageId = currentAssistantMessageId;
+              currentAssistantMessageId = nextAssistantMessage.id;
+              latestAssistantMessage = nextAssistantMessage;
+              replaceMessage(
+                conversationId,
+                previousAssistantMessageId,
+                nextAssistantMessage,
+              );
+              break;
+            }
+            case "conversation-updated": {
+              onConversationSynced(parsedEvent.conversation);
+              break;
+            }
+            case "done": {
+              const nextAssistantMessage = mergeAssistantMessageParts(
+                latestAssistantMessage,
+                parsedEvent.message,
+              );
+              const previousAssistantMessageId = currentAssistantMessageId;
+              currentAssistantMessageId = nextAssistantMessage.id;
+              latestAssistantMessage = nextAssistantMessage;
+              replaceMessage(
+                conversationId,
+                previousAssistantMessageId,
+                nextAssistantMessage,
+              );
+              onConversationSynced(parsedEvent.conversation);
+              break;
+            }
+          }
+        }
+      }
+
+      const trailingLine = buffer.trim();
+
+      if (trailingLine) {
+        const parsedEvent = chatStreamEventSchema.parse(
+          JSON.parse(trailingLine),
+        );
+
+        if (parsedEvent.type === "done") {
+          const nextAssistantMessage = mergeAssistantMessageParts(
+            latestAssistantMessage,
+            parsedEvent.message,
+          );
+          const previousAssistantMessageId = currentAssistantMessageId;
+          currentAssistantMessageId = nextAssistantMessage.id;
+          latestAssistantMessage = nextAssistantMessage;
+          replaceMessage(
+            conversationId,
+            previousAssistantMessageId,
+            nextAssistantMessage,
+          );
+          onConversationSynced(parsedEvent.conversation);
+        }
+      }
+
+      return {
+        currentAssistantMessageId,
+        latestAssistantMessage,
+      };
+    } finally {
+      reader.releaseLock();
+    }
+  }, [replaceMessage]);
 
   const handleSubmit = useCallback(async ({
     conversationId,
@@ -349,117 +485,14 @@ export function useChatSession() {
         throw new Error(payload?.error?.message ?? "模型暂时不可用。");
       }
 
-      if (!response.body) {
-        throw new Error("聊天接口未返回流式响应。");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-
-            if (!trimmedLine) {
-              continue;
-            }
-
-            const parsedEvent = chatStreamEventSchema.parse(
-              JSON.parse(trimmedLine),
-            );
-
-            switch (parsedEvent.type) {
-              case "assistant-message-created": {
-                const nextAssistantMessage = mergeAssistantMessageParts(
-                  latestAssistantMessage,
-                  parsedEvent.message,
-                );
-                currentAssistantMessageId = nextAssistantMessage.id;
-                latestAssistantMessage = nextAssistantMessage;
-                replaceMessage(
-                  conversationId,
-                  assistantPlaceholder.id,
-                  nextAssistantMessage,
-                );
-                break;
-              }
-              case "assistant-message-updated": {
-                const nextAssistantMessage = mergeAssistantMessageParts(
-                  latestAssistantMessage,
-                  parsedEvent.message,
-                );
-                const previousAssistantMessageId = currentAssistantMessageId;
-                currentAssistantMessageId = nextAssistantMessage.id;
-                latestAssistantMessage = nextAssistantMessage;
-                replaceMessage(
-                  conversationId,
-                  previousAssistantMessageId,
-                  nextAssistantMessage,
-                );
-                break;
-              }
-              case "conversation-updated": {
-                onConversationSynced(parsedEvent.conversation);
-                break;
-              }
-              case "done": {
-                const nextAssistantMessage = mergeAssistantMessageParts(
-                  latestAssistantMessage,
-                  parsedEvent.message,
-                );
-                const previousAssistantMessageId = currentAssistantMessageId;
-                currentAssistantMessageId = nextAssistantMessage.id;
-                latestAssistantMessage = nextAssistantMessage;
-                replaceMessage(
-                  conversationId,
-                  previousAssistantMessageId,
-                  nextAssistantMessage,
-                );
-                onConversationSynced(parsedEvent.conversation);
-                break;
-              }
-            }
-          }
-        }
-
-        const trailingLine = buffer.trim();
-
-        if (trailingLine) {
-          const parsedEvent = chatStreamEventSchema.parse(
-            JSON.parse(trailingLine),
-          );
-
-          if (parsedEvent.type === "done") {
-            const nextAssistantMessage = mergeAssistantMessageParts(
-              latestAssistantMessage,
-              parsedEvent.message,
-            );
-            const previousAssistantMessageId = currentAssistantMessageId;
-            currentAssistantMessageId = nextAssistantMessage.id;
-            latestAssistantMessage = nextAssistantMessage;
-            replaceMessage(
-              conversationId,
-              previousAssistantMessageId,
-              nextAssistantMessage,
-            );
-            onConversationSynced(parsedEvent.conversation);
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
+      const result = await consumeAssistantStream({
+        response,
+        conversationId,
+        assistantPlaceholder,
+        onConversationSynced,
+      });
+      currentAssistantMessageId = result.currentAssistantMessageId;
+      latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       const nextAssistantMessage = createChatMessage({
         id: currentAssistantMessageId,
@@ -483,11 +516,139 @@ export function useChatSession() {
       streamingConversationIdRef.current = null;
     }
   }, [
+    consumeAssistantStream,
     inputValue,
     isSubmitting,
     replaceMessage,
     updateConversationMessages,
     urlContextUrls,
+  ]);
+
+  const editMessageAndRegenerate = useCallback(async ({
+    conversationId,
+    messageId,
+    content,
+    selectedModelId,
+    onConversationSynced,
+  }: EditMessageOptions) => {
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent || isSubmitting) {
+      return;
+    }
+
+    const previousMessages = conversationMessages[conversationId] ?? [];
+    const assistantPlaceholder = createChatMessage({
+      role: "assistant",
+      content: "",
+      status: "pending",
+    });
+    const abortController = new AbortController();
+    let currentAssistantMessageId = assistantPlaceholder.id;
+    let latestAssistantMessage = assistantPlaceholder;
+
+    updateConversationMessages(conversationId, (current) => {
+      const targetMessageIndex = current.findIndex(
+        (message) => message.id === messageId,
+      );
+
+      if (targetMessageIndex === -1) {
+        return current;
+      }
+
+      const nextMessages = current.slice(0, targetMessageIndex + 1);
+      nextMessages[targetMessageIndex] = {
+        ...nextMessages[targetMessageIndex],
+        content: trimmedContent,
+        parts: trimmedContent
+          ? [
+              {
+                type: "text",
+                text: trimmedContent,
+              },
+            ]
+          : [],
+        status: "complete",
+      };
+
+      return [...nextMessages, assistantPlaceholder];
+    });
+    setIsSubmitting(true);
+    setStreamingConversationId(conversationId);
+    streamingConversationIdRef.current = conversationId;
+    abortControllerRef.current = abortController;
+
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          content: trimmedContent,
+          modelId: selectedModelId ?? undefined,
+        }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        syncConversationMessages(conversationId, previousMessages);
+        throw new Error(payload?.error?.message ?? "编辑消息失败。");
+      }
+
+      const result = await consumeAssistantStream({
+        response,
+        conversationId,
+        assistantPlaceholder,
+        onConversationSynced,
+      });
+      currentAssistantMessageId = result.currentAssistantMessageId;
+      latestAssistantMessage = result.latestAssistantMessage;
+    } catch (error) {
+      if (isAbortError(error)) {
+        const nextAssistantMessage = createChatMessage({
+          id: currentAssistantMessageId,
+          role: "assistant",
+          content: latestAssistantMessage.content,
+          status: "cancelled",
+        });
+
+        replaceMessage(
+          conversationId,
+          currentAssistantMessageId,
+          nextAssistantMessage,
+        );
+        return;
+      }
+
+      const nextAssistantMessage = createChatMessage({
+        id: currentAssistantMessageId,
+        role: "assistant",
+        content: latestAssistantMessage.content || getErrorMessage(error),
+        status: "error",
+      });
+
+      replaceMessage(
+        conversationId,
+        currentAssistantMessageId,
+        nextAssistantMessage,
+      );
+      throw error;
+    } finally {
+      abortControllerRef.current = null;
+      setIsSubmitting(false);
+      setStreamingConversationId(null);
+      streamingConversationIdRef.current = null;
+    }
+  }, [
+    consumeAssistantStream,
+    conversationMessages,
+    isSubmitting,
+    replaceMessage,
+    syncConversationMessages,
+    updateConversationMessages,
   ]);
 
   return {
@@ -503,6 +664,7 @@ export function useChatSession() {
     getMessages,
     handlePromptSelect,
     handleSubmit,
+    editMessageAndRegenerate,
     stopStreaming,
     addUrlContextUrl,
     removeUrlContextUrl,
