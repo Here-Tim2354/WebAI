@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-24 22:30:00
+更新时间：2026-04-27 00:17:20
 
 ## 当前阶段
 
@@ -11,7 +11,8 @@
   - `Phase 3` 的数据库驱动聊天主链路已经稳定，可作为后续迭代基线
   - `Phase 3.6` 仍需继续完成验收与材料整理，但当前不再作为阶段主线
   - `Phase 4` 已成为当前阶段主线，并已按 `4.1` 至 `4.5+` 形成阶段拆分
-  - 当前默认从 `Phase 4.1` 正式开工，优先推进“生成体验与会话控制基础升级”
+  - `Phase 4.1`、`Phase 4.2` 已完成
+  - 当前即将进入 `Phase 4.3`，默认优先推进“会话管理增强与组织能力扩展”
 
 ## 已完成的关键节点
 
@@ -108,7 +109,7 @@
 - 已完成本地与远端 migration 历史修复：
   - 旧 migration 文件已统一重命名为完整时间戳格式
   - 已补 `20260325144640_phase3_history_placeholder.sql` 用于对齐远端已存在的历史版本
-- 已完成 `Phase 4.2` 消息侧增强第一轮落地：
+- 已完成 `Phase 4.2` 消息侧增强与会话分支能力：
   - assistant 与 user 消息已具备复制入口
   - 复制逻辑已补 `Clipboard API` 失败后的 `execCommand` 降级通道，用于兼容 in-app browser 权限限制
   - user 消息已支持覆盖式编辑，并由后端直接进入重新生成流
@@ -121,8 +122,24 @@
   - 消息操作按钮已收口为更轻的图标按钮，悬停提示简化为“复制”“分支”
 - 已完成后端流式响应复用整理：
   - 新增统一 assistant 流式响应 helper
-  - `/api/chat`、消息编辑重新生成、再生成入口已复用同一套流式落库与 NDJSON 事件输出逻辑
-  - 前端编辑流程已不再拆成“PATCH 后再 POST regenerate”两段请求
+  - `/api/chat` 与消息编辑重新生成已复用同一套流式落库与 NDJSON 事件输出逻辑
+  - 独立 `/api/chat/regenerate` 入口已删除，前端编辑流程统一由消息 PATCH 接口直接进入重新生成流
+  - 已新增 assistant 消息专用重新生成入口：仅当前会话最后一条 assistant 可重新生成，失败状态也可重试
+- 已完成消息级 metadata 第一轮接入：
+  - `messages.metadata` 已新增，用于保存单条消息附带的上下文资源
+  - 当前首批落地 `metadata.urls`
+  - 带 URL Context 发送时，URL 会写入对应 user 消息
+  - assistant 重新生成时会默认复用前一条 user 消息保存的 URL Context
+  - 分支复制消息时会保留 metadata，为后续图片、文件、视频输入预留结构
+  - user 消息已增加 URL Context 的轻量展示，支持查看数量和打开链接
+  - user 消息进入编辑态后可展开 URL Context 修改区，并与正文共用保存按钮触发重新生成
+- 已完成前端交互与视觉一致性收口：
+  - 输入区按钮、顶部模型选择、侧栏与消息编辑态进一步统一到小圆角语言
+  - 输入框高度自适应已改为 Motion 驱动，并保留缓入缓出的展开体验
+  - 聊天输入框改为本地草稿态，避免长文本输入时把高频状态提升到工作区层导致轻微卡顿
+  - 自定义轻量 Tooltip 已替代浏览器原生 `title` 的主要悬停提示
+  - 常规滚动区域已接入 `OverlayScrollbars`，textarea 保留原生滚动并用 CSS 做主题化
+  - 已修复 OverlayScrollbars 手动初始化 React 子节点导致的 `removeChild` 运行时异常风险
 
 ## 当前代码状态
 
@@ -157,8 +174,15 @@
   - 图标按钮已替代原文字按钮
 - 当前消息侧操作已进入第一版可用状态：
   - 复制、编辑、分支已在消息气泡上形成统一操作入口
+  - 最新 assistant 消息已形成重新生成入口
+  - user 消息会展示已附加的 URL Context，并支持在编辑消息时同步修改 URL Context
   - assistant 回复正文与操作按钮的垂直间距已收紧
   - user 与 assistant 的 Markdown 排版节奏已分离，避免短消息和长文回复互相牵制
+- 当前前端基础 UI primitive 已形成新增约束：
+  - `ScrollArea` 使用 `OverlayScrollbarsComponent`，不再手动初始化已有 DOM
+  - `DropdownMenu` 暂不接 OverlayScrollbars，避免 Portal 弹层卸载时与滚动库争抢 DOM
+  - `Tooltip` 采用无 Portal 的 CSS-only 实现，优先保证稳定性；代价是可能被 `overflow-hidden` 容器裁切
+  - textarea 不直接接 OverlayScrollbars，避免破坏原生输入滚动与鼠标滚轮行为
 - 当前分支上下文问题已通过远端 Supabase 数据排查定位：
   - 旧分支会话存在克隆消息 `created_at` 完全相同导致读取顺序退化为 UUID 排序的问题
   - 当前代码已修复后续新建分支的消息顺序
@@ -166,18 +190,17 @@
 
 ## 当前待办
 
-- `Phase 4.2` 继续收口项：
-  - 用真实页面继续验证复制、编辑、分支三条交互链路
-  - 确认远端 Supabase 已执行消息编辑/删除 policy 与 RPC migration
-  - 视需要补旧分支会话的消息顺序修复 SQL
-  - 继续观察消息操作按钮在移动端和长回复下的可点击性与间距
-  - 决定是否保留独立 `/api/chat/regenerate` 入口；当前前端编辑流程已不依赖它
-- `Phase 4.3` 预备项：
+- `Phase 4.3` 开工项：
   - 会话归档
   - 归档恢复
   - 收藏
   - 会话搜索
   - 扩展对象逐步落库
+- `Phase 4.2` 后续观察项：
+  - 继续观察 Tooltip 在被 `overflow-hidden` 容器包裹时是否存在裁切；如出现，再设计安全的非 Base UI Portal 方案
+  - 继续观察 OverlayScrollbars 在消息列表、侧栏、代码块和 Markdown 表格中的滚动稳定性
+  - 视需要补旧分支会话的消息顺序修复 SQL
+  - 继续观察消息操作按钮在移动端和长回复下的可点击性与间距
 - `Phase 4.4` 预备项：
   - 会话级联网开关
   - 显式搜索能力接入
@@ -192,7 +215,7 @@
 
 ## 切换会话前建议保留的接手点
 
-- 下个会话默认从 `Phase 4.2` 第一轮验收与收口开始，不再重复讨论 `4.1.1` 是否具备开工条件
+- 下个会话默认从 `Phase 4.3` 会话管理增强开始，不再重复讨论 `4.1` / `4.2` 是否完成
 - 第一站建议优先阅读：
   - `wiki/plan/phase/phase_4.md`
   - `wiki/plan/phase/current_todo.md`
@@ -205,7 +228,7 @@
   - `src/lib/ai/assistant-stream-response.ts`
   - `src/lib/ai/gemini.ts`
   - `src/lib/supabase/conversations.ts`
-- 下个会话默认先做“消息复制 / 编辑 / 分支真实链路验收 + migration 应用确认”，再决定是否继续扩展 `4.2` 或切回 `4.1.2` 视觉细修
+- 下个会话默认先设计 `Phase 4.3` 的会话归档 / 收藏 / 搜索数据边界，再决定第一批实现顺序
 - 当前不把“补 seed”当作阶段主线，它只作为后续配套工作存在
 
 ## 当前提醒
@@ -223,8 +246,10 @@
 - 当前 `URL Context` 已完成 Gemini 专属前后端第一轮接入，当前重点已转为排版、反馈和一致性收口
 - 当前 Markdown / 代码块视觉与复制体验已经过一轮细修，但 user 气泡的最终纵向节奏仍应继续用真实页面观察，而不是只看代码猜测
 - 当前 `.codex-dev.log` 在 git 状态中显示为删除，是否保留删除状态需要用户自行确认
-- 当前新增 migration 需要执行到远端 Supabase 后，编辑消息 RPC 才能在远端环境生效
+- 当前消息编辑 RPC、消息级 metadata migration 已执行到远端 Supabase
+- 当前 `npm run typecheck`、`npm run lint`、`npm run build` 已通过；`build` 在沙箱内仍可能因 `spawn EPERM` 失败，越权运行可通过
+- 当前 `Phase 4.2` 已标记为完成；后续只保留观察和历史数据修复项，不再作为主线推进
 
 ## 一句话结论
 
-- 当前项目已经完成 `Phase 4.1.1` 主链路、`Phase 4.1.2` 联网搜索与 `Gemini URL Context` 第一轮接线，并提前落地 `Phase 4.2` 的消息复制、编辑、分支与顶部通知；下个会话应优先验收消息侧真实链路、确认远端 migration 状态，并继续把 `Phase 3.6` 验收整理作为并行补做项。
+- 当前项目已经完成 `Phase 4.1` 生成体验与会话控制基础升级、`Phase 4.2` 消息侧增强与会话分支能力；下一阶段即将进入 `Phase 4.3` 会话管理增强与组织能力扩展，同时继续把 `Phase 3.6` 验收整理作为并行补做项。

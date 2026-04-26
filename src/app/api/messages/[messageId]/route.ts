@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { ServerEnvError } from "@/lib/env/server";
-import { editMessageRequestSchema } from "@/lib/schemas/chat";
+import {
+  chatMessageMetadataSchema,
+  editMessageRequestSchema,
+} from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 import {
   ConversationAccessError,
@@ -17,6 +20,7 @@ import {
   editUserMessageAndDeleteFollowing,
   getConversationMessage,
   listConversationMessages,
+  updateConversationMessage,
 } from "@/lib/supabase/messages";
 
 type RouteContext = {
@@ -124,7 +128,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, content, modelId } = parsed.data;
+    const { conversationId, content, modelId, urls } = parsed.data;
     let conversation = await getConversationById(
       supabase,
       user.id,
@@ -153,12 +157,28 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
 
+    const currentMetadata = chatMessageMetadataSchema.parse(
+      targetMessage.metadata ?? {},
+    );
+    const nextMetadata =
+      urls === undefined
+        ? currentMetadata
+        : {
+            ...currentMetadata,
+            urls,
+          };
+
     await editUserMessageAndDeleteFollowing(
       supabase,
       conversationId,
       messageId,
       content,
     );
+    if (urls !== undefined) {
+      await updateConversationMessage(supabase, conversationId, messageId, {
+        metadata: nextMetadata,
+      });
+    }
     conversation = await touchConversation(
       supabase,
       user.id,
@@ -178,6 +198,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       conversation,
       messagesForModel,
       model: selectedModel,
+      urls: nextMetadata.urls,
       requestSignal: request.signal,
     });
   } catch (error) {

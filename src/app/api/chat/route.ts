@@ -139,7 +139,14 @@ export async function POST(request: Request) {
       });
     }
 
-    await createConversationMessage(supabase, conversationId, "user", content);
+    await createConversationMessage(
+      supabase,
+      conversationId,
+      "user",
+      content,
+      "complete",
+      urls && urls.length > 0 ? { urls } : {},
+    );
 
     conversation = await touchConversation(supabase, user.id, conversationId);
     // messagesForModel 读取的是“用户消息已写入数据库之后”的完整上下文，

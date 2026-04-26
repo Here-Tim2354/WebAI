@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { ChatMessage } from "@/lib/schemas/chat";
 
 const SCROLL_THRESHOLD = 120;
@@ -38,13 +38,13 @@ export function useMessageScroll({
   const shouldStickToBottomRef = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
 
-  function scrollToLatest(behavior: ScrollBehavior = "smooth") {
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = "smooth") => {
     messageEndRef.current?.scrollIntoView({ behavior, block: "end" });
     shouldStickToBottomRef.current = true;
     setShowJumpToLatest(false);
-  }
+  }, []);
 
-  function handleScroll() {
+  const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
 
     if (!container) {
@@ -54,7 +54,7 @@ export function useMessageScroll({
     const nearBottom = isNearBottom(container);
     shouldStickToBottomRef.current = nearBottom;
     setShowJumpToLatest(!nearBottom);
-  }
+  }, []);
 
   // 管理消息流的自动吸底行为。
   // 当前实现会在 messages 变化后判断是否仍应吸底，并根据“是否是新消息”决定 smooth 还是 auto 滚动。

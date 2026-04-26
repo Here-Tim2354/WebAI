@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { softSpring } from "./motion-presets";
 
 export type WorkspaceNoticeState = {
   id: number;
@@ -59,8 +60,8 @@ export function WorkspaceNotice({ notice }: WorkspaceNoticeProps) {
             key={notice.id}
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
+            exit={{ opacity: 0, y: -8, scale: 0.985 }}
+            transition={softSpring}
             className={cn(
               "pointer-events-auto flex min-h-12 w-full items-center gap-3 rounded-[14px] border px-3.5 py-3 backdrop-blur-xl",
               noticeStyles[notice.type].shell,

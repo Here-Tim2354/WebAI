@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -174,7 +175,7 @@ export function ConversationSidebar({
             isCollapsed && "lg:hidden",
           )}
         >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[16px] border border-border/70 bg-background/92 text-sm font-semibold shadow-none">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[8px] border border-border/70 bg-background/92 text-sm font-semibold shadow-none">
             W
           </div>
           <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
@@ -195,7 +196,7 @@ export function ConversationSidebar({
           className={cn(
             "hidden lg:inline-flex",
             isCollapsed &&
-              `${collapsedTrackClass} lg:rounded-[10px] lg:border lg:border-border/70 lg:bg-muted/55 lg:shadow-none`,
+              `${collapsedTrackClass} lg:rounded-[8px] lg:border lg:border-border/70 lg:bg-muted/55 lg:shadow-none`,
           )}
           type="button"
           onClick={() => setIsCollapsed((current) => !current)}
@@ -207,7 +208,7 @@ export function ConversationSidebar({
         {isCollapsed ? (
           <div
             className={cn(
-              "hidden rounded-[10px] border border-border/70 bg-background/92 text-sm font-semibold",
+              "hidden rounded-[8px] border border-border/70 bg-background/92 text-sm font-semibold",
               collapsedTrackClass,
             )}
           >
@@ -218,7 +219,7 @@ export function ConversationSidebar({
 
       <Button
         className={cn(
-          "h-10 rounded-2xl border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+          "h-10 rounded-[8px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
           isCollapsed && "lg:hidden",
         )}
         variant="outline"
@@ -234,7 +235,7 @@ export function ConversationSidebar({
         <Button
           variant="ghost"
           className={cn(
-            "hidden rounded-[10px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+            "hidden rounded-[8px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
             collapsedTrackClass,
           )}
           type="button"
@@ -263,22 +264,22 @@ export function ConversationSidebar({
           </span>
           <Badge
             variant="secondary"
-            className={cn("rounded-[10px] px-2 py-0.5", isCollapsed && "lg:hidden")}
+            className={cn("rounded-[7px] px-2 py-0.5", isCollapsed && "lg:hidden")}
           >
             {conversations.length}
           </Badge>
         </div>
 
-        <div
+        <ScrollArea
           className={cn(
-            "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden pr-1",
+            "flex min-h-0 flex-1 flex-col gap-0.5 pr-1",
             isCollapsed && "lg:items-center lg:pr-0",
           )}
         >
           {conversations.length === 0 ? (
             <div
               className={cn(
-                "rounded-[18px] border border-dashed border-border/75 bg-background/55 px-4 py-4 text-sm leading-6 text-muted-foreground",
+                "rounded-[8px] border border-dashed border-border/75 bg-background/55 px-4 py-4 text-sm leading-6 text-muted-foreground",
                 isCollapsed && "lg:hidden",
               )}
             >
@@ -294,7 +295,7 @@ export function ConversationSidebar({
                 <div
                   key={conversation.id}
                   className={cn(
-                    "rounded-[16px] border border-transparent bg-transparent transition-colors hover:bg-muted/40",
+                    "rounded-[8px] border border-transparent bg-transparent transition-colors hover:bg-muted/40",
                     isActive && !isCollapsed &&
                       "border-border/70 bg-background/88",
                     isCollapsed && "lg:w-14",
@@ -305,7 +306,7 @@ export function ConversationSidebar({
                       <Input
                         autoFocus
                         value={titleDraft}
-                        className="h-10 rounded-xl border-border/70 bg-background/92"
+                        className="h-10 rounded-[8px] border-border/70 bg-background/92"
                         onChange={(event) => setTitleDraft(event.target.value)}
                         onBlur={() => {
                           // 这里用 blur 直接收口编辑态，保证点击其它会话或空白区时不会残留半编辑状态。
@@ -318,9 +319,9 @@ export function ConversationSidebar({
                     <div className={cn("flex items-start gap-2 p-1.5", isCollapsed && "lg:block lg:p-0")}>
                       <button
                         className={cn(
-                          "flex min-w-0 flex-1 items-start gap-3 rounded-[14px] px-3 py-2.5 text-left",
+                          "flex min-w-0 flex-1 items-start gap-3 rounded-[8px] px-3 py-2.5 text-left",
                           isCollapsed &&
-                            "lg:size-14 lg:flex-none lg:items-center lg:justify-center lg:self-center lg:rounded-[18px] lg:px-0 lg:py-0",
+                            "lg:size-14 lg:flex-none lg:items-center lg:justify-center lg:self-center lg:rounded-[8px] lg:px-0 lg:py-0",
                           isCollapsed && isActive && "lg:bg-muted/55",
                         )}
                         type="button"
@@ -329,9 +330,9 @@ export function ConversationSidebar({
                       >
                         <div
                           className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-2xl text-accent-foreground ring-1 ring-border/60",
+                            "flex size-9 shrink-0 items-center justify-center rounded-[8px] text-accent-foreground ring-1 ring-border/60",
                             isActive ? "bg-blue-50/90 text-primary" : "bg-background/88 text-muted-foreground",
-                            isCollapsed && "lg:size-9 lg:rounded-2xl",
+                            isCollapsed && "lg:size-9 lg:rounded-[8px]",
                           )}
                         >
                           <MessageSquareTextIcon className="size-4" />
@@ -390,7 +391,7 @@ export function ConversationSidebar({
               );
             })
           )}
-        </div>
+        </ScrollArea>
       </section>
 
       <div
@@ -413,7 +414,7 @@ export function ConversationSidebar({
         <Button
           variant="ghost"
           className={cn(
-            "rounded-[12px] text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            "rounded-[8px] text-muted-foreground hover:bg-muted/60 hover:text-foreground",
             isCollapsed && "lg:mx-auto lg:size-10",
           )}
           type="button"
@@ -461,9 +462,9 @@ export function ConversationSidebar({
           }
         }}
       >
-        <DialogContent className="max-w-[28rem] rounded-[16px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
+        <DialogContent className="max-w-[28rem] rounded-[10px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
           <DialogHeader className="px-4 pt-4 pb-2">
-            <div className="inline-flex size-10 items-center justify-center rounded-[12px] bg-red-50 text-red-600">
+            <div className="inline-flex size-10 items-center justify-center rounded-[8px] bg-red-50 text-red-600">
               <Trash2Icon className="size-5" />
             </div>
             <DialogTitle className="pt-1 text-[1.2rem] leading-none tracking-[-0.02em] text-foreground">
@@ -478,7 +479,7 @@ export function ConversationSidebar({
           <div className="flex items-center justify-end gap-3 border-t border-border/50 bg-slate-50/70 px-6 py-2">
             <Button
               variant="outline"
-              className="h-10 rounded-[12px] px-5"
+              className="h-10 rounded-[8px] px-5"
               type="button"
               onClick={() => setPendingDeleteConversation(null)}
             >
@@ -486,7 +487,7 @@ export function ConversationSidebar({
             </Button>
             <Button
               variant="destructive"
-              className="h-10 rounded-[12px] bg-red-600 px-5 text-white hover:bg-red-700"
+              className="h-10 rounded-[8px] bg-red-600 px-5 text-white hover:bg-red-700"
               type="button"
               onClick={() => void handleConfirmDeleteConversation()}
               disabled={

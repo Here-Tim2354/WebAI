@@ -155,24 +155,42 @@
   - 用户可以围绕现有消息继续修改、延展和重走上下文
   - 会话之间的演化关系开始形成更清楚的产品语义
 
-#### 4.2 当前第一轮落地情况
+#### 4.2 完成情况
 - 当前已经完成的主链路包括：
   - 消息复制入口
   - user 消息覆盖式编辑
   - 编辑后由服务端直接流式重新生成 assistant 回复
+  - 最新 assistant 消息重新生成入口
   - 从 assistant 消息创建新会话分支
   - 分支会话沿用原会话模型、提示词与联网开关
   - 分支创建过程的顶部工作区通知
+  - `URL Context` 已开始写入 user 消息级 metadata，为重新生成与后续多模态输入保留上下文
+  - user 消息已能轻量展示已附加的 URL Context 数量和链接入口
+  - user 消息编辑态已支持修改 URL Context，并与正文共用保存按钮进入重新生成流
+  - 聊天输入区、消息操作区、顶部模型选择和侧栏已进一步统一到小圆角视觉语言
+  - 主要滚动区域已接入 `OverlayScrollbars`，悬停提示已切到项目内轻量 Tooltip
 - 当前实现语义：
   - 复制优先使用 `Clipboard API`，失败后继续尝试隐藏 `textarea + execCommand` 降级通道
   - 编辑消息不再由前端拆成两个请求，而是由消息 PATCH 接口完成“编辑、截断、重新生成”一条流式链路
+  - 编辑消息时如果只修改 URL Context，仍会保存到该 user 消息 metadata 并重新生成后续 assistant 回复
+  - assistant 重新生成只允许作用于当前会话最后一条 assistant 消息，并沿用当前会话模型、提示词、联网开关与对应 user 消息保存的 URL Context
+  - 如果重新生成前输入了新的 URL Context，则本次重新生成会使用新 URL 并覆盖对应 user 消息的 metadata
+  - URL Context 的消息级展示只作为辅助信息，不改变当前输入区的发送与清空行为
   - 编辑消息与删除后续消息依赖数据库 RPC 保证原子性，避免半更新上下文
   - 分支不是会话内树状结构，而是复制目标消息之前的上下文到新会话
-  - 分支复制不再依赖 `created_at <= target.created_at` 判断边界，而是按完整消息列表定位目标消息后截断
+  - 分支复制不再依赖 `created_at <= target.created_at` 判断边界，而是按完整消息列表定位目标消息后截断，并保留消息 metadata
+  - 输入框文本草稿保留在 `ChatInput` 本地，发送时再把内容上交工作区，减少长文本输入时的全局重渲染
+  - textarea 保留原生滚动条能力，避免 OverlayScrollbars 直接接管输入元素导致滚轮失效
+  - `ScrollArea` 只通过官方 React wrapper 初始化 OverlayScrollbars，避免外部库改写 React 正在管理的 DOM 子树
 - 当前剩余风险：
-  - 新增 Supabase migration 需要执行到远端后，编辑 RPC 和相关 policy 才能在远端环境生效
+  - 消息编辑 RPC、相关 policy 与消息级 metadata migration 已执行到远端；后续如果继续扩表仍需同步远端 migration
   - 已创建过的旧分支会话如果存在相同 `created_at` 导致的乱序，需要单独 SQL 修复，不应由应用代码隐式修改历史数据
-  - 独立 `/api/chat/regenerate` 入口当前不是前端编辑流程的必需路径，后续可根据产品入口决定保留或收口
+  - 旧独立 `/api/chat/regenerate` 入口已删除；当前重新生成入口为 assistant 消息专用的 `/api/messages/[messageId]/regenerate`
+  - 当前 Tooltip 为无 Portal 的 CSS-only 方案，稳定性优先；如果后续出现裁切，再补专门的安全浮层策略
+- 当前阶段判断：
+  - `Phase 4.2` 已完成
+  - 后续只保留运行观察和旧分支历史数据修复项
+  - 主线即将进入 `Phase 4.3`
 
 ### 4.3 会话管理增强与组织能力扩展
 - 目标：

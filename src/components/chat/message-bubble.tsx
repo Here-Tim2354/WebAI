@@ -9,22 +9,41 @@ import {
   GitBranchIcon,
   LoaderCircleIcon,
   PencilIcon,
+  RefreshCwIcon,
   UserIcon,
   XIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownMessage } from "./markdown-message";
+import {
+  areUrlListsEqual,
+  EditableMessageUrlContext,
+  MAX_EDIT_URL_CONTEXT_ITEMS,
+  MessageUrlContextSummary,
+  normalizeUrlCandidate,
+} from "./message-url-context";
+import { softSpring, smoothEase } from "./motion-presets";
+
+export type EditMessageUpdate = {
+  content: string;
+  urls?: string[];
+};
 
 type MessageBubbleProps = {
   message: ChatMessage;
   actionsDisabled?: boolean;
+  canRegenerate?: boolean;
   onCopy: (message: ChatMessage) => Promise<void> | void;
-  onEdit: (message: ChatMessage, content: string) => Promise<void>;
+  onEdit: (message: ChatMessage, update: EditMessageUpdate) => Promise<void>;
   onBranch: (message: ChatMessage) => Promise<void>;
+  onRegenerate: (message: ChatMessage) => Promise<void>;
 };
+
+const EMPTY_METADATA_URLS: string[] = [];
 
 const roleLabelMap = {
   assistant: "Assistant",
@@ -295,7 +314,7 @@ function StreamingMarkdownMessage({
         }
         transition={{
           duration: shouldReduceMotion ? 0 : 0.16,
-          ease: "easeOut",
+          ease: smoothEase,
         }}
       >
         <MarkdownMessage content={displayContent} className={className} />
@@ -311,7 +330,7 @@ function StreamingMarkdownMessage({
           transition={
             shouldReduceMotion
               ? undefined
-              : { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 1.05, repeat: Infinity, ease: "easeInOut" }
           }
         />
       ) : null}
@@ -326,21 +345,30 @@ function StreamingMarkdownMessage({
 export function MessageBubble({
   message,
   actionsDisabled = false,
+  canRegenerate: canRegenerateMessage = false,
   onCopy,
   onEdit,
   onBranch,
+  onRegenerate,
 }: MessageBubbleProps) {
   const shouldReduceMotion = Boolean(useReducedMotion());
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
+  const [editUrls, setEditUrls] = useState(message.metadata.urls ?? []);
+  const [editUrlValue, setEditUrlValue] = useState("");
+  const [editUrlError, setEditUrlError] = useState<string | null>(null);
+  const [isEditingUrlContext, setIsEditingUrlContext] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isBranching, setIsBranching] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const isAssistantLike =
     message.role === "assistant" || message.role === "system";
   const isUser = message.role === "user";
   const isError = message.role === "error";
   const isStreaming = message.status === "streaming";
+  const messageMetadataUrls = message.metadata.urls;
+  const metadataUrls = messageMetadataUrls ?? EMPTY_METADATA_URLS;
   const isActionLocked =
     actionsDisabled ||
     message.status === "pending" ||
@@ -351,6 +379,16 @@ export function MessageBubble({
     message.role === "assistant" &&
     !isActionLocked &&
     message.content.trim().length > 0;
+  const showRegenerate = message.role === "assistant";
+  const canRegenerate =
+    showRegenerate &&
+    canRegenerateMessage &&
+    !isActionLocked;
+  const regenerateTitle = canRegenerate
+    ? "重新生成"
+    : !canRegenerateMessage
+      ? "仅最新对话可重新生成"
+      : "消息生成完成后可重新生成";
   const statusLabel =
     message.status === "pending"
       ? "等待中"
@@ -365,8 +403,12 @@ export function MessageBubble({
   useEffect(() => {
     if (!isEditing) {
       setEditValue(message.content);
+      setEditUrls(messageMetadataUrls ?? []);
+      setEditUrlValue("");
+      setEditUrlError(null);
+      setIsEditingUrlContext(false);
     }
-  }, [isEditing, message.content]);
+  }, [isEditing, message.content, messageMetadataUrls]);
 
   const handleCopy = async () => {
     if (!canCopy) {
@@ -380,10 +422,91 @@ export function MessageBubble({
     }, 1300);
   };
 
+  const handleStartEdit = () => {
+    setEditValue(message.content);
+    setEditUrls(message.metadata.urls ?? []);
+    setEditUrlValue("");
+    setEditUrlError(null);
+    setIsEditingUrlContext(false);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditValue(message.content);
+    setEditUrls(message.metadata.urls ?? []);
+    setEditUrlValue("");
+    setEditUrlError(null);
+    setIsEditingUrlContext(false);
+  };
+
+  const getUrlsWithPendingInput = () => {
+    const pendingUrl = editUrlValue.trim();
+
+    if (!pendingUrl) {
+      return editUrls;
+    }
+
+    const normalizedUrl = normalizeUrlCandidate(pendingUrl);
+
+    if (!normalizedUrl) {
+      setEditUrlError("URL 格式不正确。");
+      return null;
+    }
+
+    if (editUrls.includes(normalizedUrl)) {
+      return editUrls;
+    }
+
+    if (editUrls.length >= MAX_EDIT_URL_CONTEXT_ITEMS) {
+      setEditUrlError(`最多保留 ${MAX_EDIT_URL_CONTEXT_ITEMS} 个 URL。`);
+      return null;
+    }
+
+    return [...editUrls, normalizedUrl];
+  };
+
+  const handleAddEditUrl = () => {
+    const normalizedUrl = normalizeUrlCandidate(editUrlValue);
+
+    if (!normalizedUrl) {
+      setEditUrlError("URL 格式不正确。");
+      return;
+    }
+
+    if (editUrls.includes(normalizedUrl)) {
+      setEditUrlValue("");
+      setEditUrlError(null);
+      return;
+    }
+
+    if (editUrls.length >= MAX_EDIT_URL_CONTEXT_ITEMS) {
+      setEditUrlError(`最多保留 ${MAX_EDIT_URL_CONTEXT_ITEMS} 个 URL。`);
+      return;
+    }
+
+    setEditUrls((current) => [...current, normalizedUrl]);
+    setEditUrlValue("");
+    setEditUrlError(null);
+  };
+
+  const handleRemoveEditUrl = (targetUrl: string) => {
+    setEditUrls((current) => current.filter((url) => url !== targetUrl));
+    setEditUrlError(null);
+  };
+
   const handleSaveEdit = async () => {
     const trimmedValue = editValue.trim();
+    const nextUrls = getUrlsWithPendingInput();
 
-    if (!canEdit || !trimmedValue || trimmedValue === message.content) {
+    if (!canEdit || !trimmedValue || !nextUrls) {
+      return;
+    }
+
+    const contentChanged = trimmedValue !== message.content;
+    const urlsChanged = !areUrlListsEqual(nextUrls, metadataUrls);
+
+    if (!contentChanged && !urlsChanged) {
       setIsEditing(false);
       return;
     }
@@ -391,8 +514,16 @@ export function MessageBubble({
     setIsSubmittingEdit(true);
 
     try {
-      await onEdit(message, trimmedValue);
+      const editPromise = onEdit(message, {
+        content: trimmedValue,
+        urls: nextUrls,
+      });
+
       setIsEditing(false);
+      setEditUrlValue("");
+      setEditUrlError(null);
+
+      await editPromise;
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -412,15 +543,29 @@ export function MessageBubble({
     }
   };
 
+  const handleRegenerate = async () => {
+    if (!canRegenerate) {
+      return;
+    }
+
+    setIsRegenerating(true);
+
+    try {
+      await onRegenerate(message);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   return (
     <motion.article
       className={cn(
         "group/message flex max-w-[min(100%,52rem)] flex-col gap-1",
         isUser ? "self-end" : "self-start",
       )}
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 8, scale: 0.995 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={shouldReduceMotion ? { duration: 0 } : softSpring}
     >
       <div
         className={cn(
@@ -465,32 +610,48 @@ export function MessageBubble({
               disabled={isSubmittingEdit}
               autoFocus
             />
+            <EditableMessageUrlContext
+              urls={editUrls}
+              inputValue={editUrlValue}
+              error={editUrlError}
+              expanded={isEditingUrlContext}
+              disabled={isSubmittingEdit}
+              onExpandedChange={setIsEditingUrlContext}
+              onInputChange={setEditUrlValue}
+              onAddUrl={handleAddEditUrl}
+              onRemoveUrl={handleRemoveEditUrl}
+              onClearError={() => setEditUrlError(null)}
+            />
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-[10px]"
-                type="button"
-                onClick={() => setIsEditing(false)}
-                disabled={isSubmittingEdit}
-              >
-                <XIcon className="size-3.5" />
-                取消
-              </Button>
-              <Button
-                size="sm"
-                className="h-8 rounded-[10px]"
-                type="button"
-                onClick={() => void handleSaveEdit()}
-                disabled={isSubmittingEdit || editValue.trim().length === 0}
-              >
-                {isSubmittingEdit ? (
-                  <LoaderCircleIcon className="size-3.5 animate-spin" />
-                ) : (
-                  <CheckIcon className="size-3.5" />
-                )}
-                保存
-              </Button>
+              <Tooltip content="取消">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-12 rounded-[9px] border-blue-100/85 bg-white/70 text-slate-500 shadow-none hover:bg-white hover:text-slate-800"
+                  type="button"
+                  onClick={handleCancelEdit}
+                  disabled={isSubmittingEdit}
+                  aria-label="取消编辑"
+                >
+                  <XIcon className="size-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content="保存">
+                <Button
+                  size="icon-sm"
+                  className="h-8 w-12 rounded-[9px] shadow-none"
+                  type="button"
+                  onClick={() => void handleSaveEdit()}
+                  disabled={isSubmittingEdit || editValue.trim().length === 0}
+                  aria-label="保存编辑"
+                >
+                  {isSubmittingEdit ? (
+                    <LoaderCircleIcon className="size-3.5 animate-spin" />
+                  ) : (
+                    <CheckIcon className="size-3.5" />
+                  )}
+                </Button>
+              </Tooltip>
             </div>
           </div>
         ) : (message.status === "pending" || message.status === "streaming") &&
@@ -517,8 +678,14 @@ export function MessageBubble({
             className={isUser ? "markdown--compact" : "markdown--chat"}
           />
         )}
+        {!isEditing && isUser && metadataUrls.length > 0 ? (
+          <MessageUrlContextSummary
+            urls={metadataUrls}
+            className="mt-2.5 border-t border-blue-100/80 pt-2"
+          />
+        ) : null}
       </div>
-      {canCopy || canEdit || canBranch ? (
+      {canCopy || canEdit || canBranch || showRegenerate ? (
         <div
           className={cn(
             "flex h-6 items-center gap-0.5 opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100",
@@ -526,52 +693,76 @@ export function MessageBubble({
           )}
         >
           {canCopy ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
-              type="button"
-              onClick={() => void handleCopy()}
-              aria-label="复制"
-              title="复制"
-            >
-              {copiedMessageId === message.id ? (
-                <CheckIcon className="size-3.5" />
-              ) : (
-                <CopyIcon className="size-3.5" />
-              )}
-            </Button>
+            <Tooltip content={copiedMessageId === message.id ? "已复制" : "复制"}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+                type="button"
+                onClick={() => void handleCopy()}
+                aria-label="复制"
+              >
+                {copiedMessageId === message.id ? (
+                  <CheckIcon className="size-3.5" />
+                ) : (
+                  <CopyIcon className="size-3.5" />
+                )}
+              </Button>
+            </Tooltip>
           ) : null}
           {canEdit ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
-              type="button"
-              onClick={() => setIsEditing(true)}
-              aria-label="编辑消息"
-              title="编辑并重新生成"
-            >
-              <PencilIcon className="size-3.5" />
-            </Button>
+            <Tooltip content="编辑并重新生成">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+                type="button"
+                onClick={handleStartEdit}
+                aria-label="编辑消息"
+              >
+                <PencilIcon className="size-3.5" />
+              </Button>
+            </Tooltip>
           ) : null}
           {canBranch ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
-              type="button"
-              onClick={() => void handleBranch()}
-              disabled={isBranching}
-              aria-label="分支"
-              title="分支"
-            >
-              {isBranching ? (
-                <LoaderCircleIcon className="size-3.5 animate-spin" />
-              ) : (
-                <GitBranchIcon className="size-3.5" />
-              )}
-            </Button>
+            <Tooltip content="分支">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+                type="button"
+                onClick={() => void handleBranch()}
+                disabled={isBranching}
+                aria-label="分支"
+              >
+                {isBranching ? (
+                  <LoaderCircleIcon className="size-3.5 animate-spin" />
+                ) : (
+                  <GitBranchIcon className="size-3.5" />
+                )}
+              </Button>
+            </Tooltip>
+          ) : null}
+          {showRegenerate ? (
+            <Tooltip content={regenerateTitle}>
+              <span className="inline-flex">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-6 rounded-[8px] text-slate-400 hover:bg-transparent hover:text-slate-700"
+                  type="button"
+                  onClick={() => void handleRegenerate()}
+                  disabled={!canRegenerate || isRegenerating}
+                  aria-label="重新生成"
+                >
+                  {isRegenerating ? (
+                    <LoaderCircleIcon className="size-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCwIcon className="size-3.5" />
+                  )}
+                </Button>
+              </span>
+            </Tooltip>
           ) : null}
         </div>
       ) : null}

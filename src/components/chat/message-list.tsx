@@ -1,11 +1,14 @@
-import { RefObject, useEffect, useState } from "react";
+import { memo, RefObject, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowDownIcon,
   LoaderCircleIcon,
 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/lib/schemas/chat";
+import type { EditMessageUpdate } from "./message-bubble";
 import { MessageBubble } from "./message-bubble";
+import { smoothEase } from "./motion-presets";
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -14,19 +17,30 @@ type MessageListProps = {
   loadingHint?: string | null;
   actionsDisabled?: boolean;
   onCopyMessage: (message: ChatMessage) => Promise<void> | void;
-  onEditMessage: (message: ChatMessage, content: string) => Promise<void>;
+  onEditMessage: (message: ChatMessage, update: EditMessageUpdate) => Promise<void>;
   onBranchFromMessage: (message: ChatMessage) => Promise<void>;
+  onRegenerateMessage: (message: ChatMessage) => Promise<void>;
   onScroll: () => void;
   onJumpToLatest: () => void;
   showJumpToLatest: boolean;
 };
+
+function getLatestAssistantMessageId(messages: ChatMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "assistant") {
+      return messages[index].id;
+    }
+  }
+
+  return null;
+}
 
 /**
  * MessageList 负责两种界面态：
  * 1. 空会话欢迎页
  * 2. 已有消息时的滚动消息流
  */
-export function MessageList({
+function MessageListComponent({
   messages,
   messageEndRef,
   scrollContainerRef,
@@ -35,6 +49,7 @@ export function MessageList({
   onCopyMessage,
   onEditMessage,
   onBranchFromMessage,
+  onRegenerateMessage,
   onScroll,
   onJumpToLatest,
   showJumpToLatest,
@@ -84,11 +99,12 @@ export function MessageList({
   }, [emptyTitle, messages.length]);
 
   const showTypingCursor = messages.length === 0;
+  const latestAssistantMessageId = getLatestAssistantMessageId(messages);
 
   return (
-    <div
+    <ScrollArea
       ref={scrollContainerRef}
-      className="relative flex-1 overflow-y-auto px-2 sm:px-3"
+      className="relative flex-1 px-2 sm:px-3"
       onScroll={onScroll}
     >
       {messages.length === 0 ? (
@@ -103,8 +119,12 @@ export function MessageList({
                 {showTypingCursor ? (
                   <motion.span
                     className="ml-[0.2em] inline-block text-foreground/70"
-                    animate={{ opacity: [1, 1, 0, 0] }}
-                    transition={{ duration:2, repeat: Infinity, times: [0, 0.5, 0.51, 1], ease: "linear" }}
+                    animate={{ opacity: [0.28, 1, 0.28] }}
+                    transition={{
+                      duration: 1.25,
+                      repeat: Infinity,
+                      ease: smoothEase,
+                    }}
                   >
                     _
                   </motion.span>
@@ -126,9 +146,11 @@ export function MessageList({
               key={message.id}
               message={message}
               actionsDisabled={actionsDisabled}
+              canRegenerate={message.id === latestAssistantMessageId}
               onCopy={onCopyMessage}
               onEdit={onEditMessage}
               onBranch={onBranchFromMessage}
+              onRegenerate={onRegenerateMessage}
             />
           ))}
           <div ref={messageEndRef} />
@@ -144,6 +166,8 @@ export function MessageList({
           ) : null}
         </div>
       )}
-    </div>
+    </ScrollArea>
   );
 }
+
+export const MessageList = memo(MessageListComponent);

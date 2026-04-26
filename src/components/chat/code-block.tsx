@@ -3,6 +3,8 @@
 import hljs from "highlight.js";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type CodeBlockProps = {
   className?: string;
@@ -39,7 +41,7 @@ function fallbackCopyText(text: string) {
   try {
     return document.execCommand("copy");
   } finally {
-    document.body.removeChild(textarea);
+    textarea.parentNode?.removeChild(textarea);
   }
 }
 
@@ -72,25 +74,28 @@ export function CodeBlock({ className, code, language }: CodeBlockProps) {
     <div className="code-block">
       <div className="code-block__header">
         <span>{language}</span>
-        <button
-          type="button"
-          onClick={() => void handleCopy()}
-          aria-label={copied ? "代码已复制" : "复制代码"}
-          title={copied ? "代码已复制" : "复制代码"}
-        >
-          {copied ? (
-            <CheckIcon className="size-4" />
-          ) : (
-            <CopyIcon className="size-4" />
-          )}
-        </button>
+        <Tooltip content={copied ? "代码已复制" : "复制代码"}>
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            aria-label={copied ? "代码已复制" : "复制代码"}
+          >
+            {copied ? (
+              <CheckIcon className="size-4" />
+            ) : (
+              <CopyIcon className="size-4" />
+            )}
+          </button>
+        </Tooltip>
       </div>
-      <pre>
-        <code
-          className={["hljs", className].filter(Boolean).join(" ")}
-          dangerouslySetInnerHTML={{ __html: highlightedCode }}
-        />
-      </pre>
+      <ScrollArea axis="horizontal" className="code-block__scroll">
+        <pre>
+          <code
+            className={["hljs", className].filter(Boolean).join(" ")}
+            dangerouslySetInnerHTML={{ __html: highlightedCode }}
+          />
+        </pre>
+      </ScrollArea>
     </div>
   );
 }

@@ -36,6 +36,10 @@ aliases:
 - [[chat-input]]
 - [[chat-input-stateflow]]
 
+## 通用 UI Primitive
+
+- [[ui-primitives]]
+
 ## 登录页
 
 - [[auth-panel]]

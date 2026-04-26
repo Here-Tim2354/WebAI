@@ -15,6 +15,7 @@ aliases:
 - [[message-list]]
 - [[markdown-message]]
 - [[code-block]]
+- [[ui-primitives]]
 
 ## 1. 组件职责
 
@@ -26,6 +27,8 @@ aliases:
 - 识别消息状态
 - 选择对应的标签、图标和气泡样式
 - 把正文继续交给 `MarkdownMessage`
+- 管理消息复制、编辑、分支、重新生成等消息侧操作入口
+- 展示和编辑 user 消息附带的 URL Context metadata
 
 ---
 
@@ -96,6 +99,33 @@ assistant 流式回复时，并不是 `MessageList` 在逐字渲染。
 
 ---
 
-## 6. 一句话理解
+## 6. 消息侧操作
 
-`MessageBubble` 是消息区里真正负责“单条消息长什么样”的组件：角色、状态、流式 reveal、正文入口都在这里决定。
+当前消息气泡支持这些操作：
+
+- 复制：assistant 和 user 都可复制，失败时走隐藏 textarea 的降级复制通道
+- 编辑：仅 user 消息可编辑，保存后会触发后续 assistant 重新生成
+- 分支：assistant 消息可创建新会话分支
+- 重新生成：仅最新 assistant 消息可重新生成，非最新 assistant 只展示禁用提示
+
+这些操作都通过轻量图标按钮呈现，并使用项目内 `Tooltip` 代替浏览器原生 `title`。
+
+---
+
+## 7. URL Context metadata
+
+user 消息如果带有 `metadata.urls`，会在正文下方展示一行轻量 URL Context 摘要。
+
+进入编辑态后，URL Context 不默认展开；用户点击修改入口后，可在同一个编辑面板里增删 URL，并与正文共用保存按钮。
+
+保存时的语义是：
+
+- 正文变化：更新正文并重新生成后续 assistant
+- URL 变化：更新 `metadata.urls` 并重新生成后续 assistant
+- 正文和 URL 都未变化：直接退出编辑态
+
+---
+
+## 8. 一句话理解
+
+`MessageBubble` 是消息区里真正负责“单条消息长什么样、能做什么”的组件：角色、状态、流式 reveal、正文入口、消息操作和 URL Context metadata 都在这里汇合。

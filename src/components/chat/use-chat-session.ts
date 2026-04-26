@@ -106,6 +106,7 @@ function mergeAssistantMessageParts(
 
 type SubmitOptions = {
   conversationId: string;
+  content: string;
   selectedModelId?: string | null;
   onConversationSynced: (conversation: Conversation) => void;
 };
@@ -113,6 +114,13 @@ type SubmitOptions = {
 type EditMessageOptions = SubmitOptions & {
   messageId: string;
   content: string;
+  urls?: string[];
+};
+
+type RegenerateAssistantMessageOptions = Omit<SubmitOptions, "content"> & {
+  messageId: string;
+  webSearchEnabled?: boolean;
+  urls?: string[];
 };
 
 export type AddUrlContextResult =
@@ -157,7 +165,6 @@ export function useChatSession() {
   const [conversationMessages, setConversationMessages] = useState<
     Record<string, ChatMessage[]>
   >({});
-  const [inputValue, setInputValue] = useState("");
   const [urlContextInputValue, setUrlContextInputValue] = useState("");
   const [urlContextUrls, setUrlContextUrls] = useState<string[]>([]);
   const [isUrlContextPanelOpen, setIsUrlContextPanelOpen] = useState(false);
@@ -225,10 +232,6 @@ export function useChatSession() {
       return nextMessages;
     });
   }, [updateConversationMessages]);
-
-  const handlePromptSelect = useCallback((prompt: string) => {
-    setInputValue(prompt);
-  }, []);
 
   const addUrlContextUrl = useCallback((candidateUrl?: string): AddUrlContextResult => {
     const normalizedUrl = normalizeUrlCandidate(
@@ -424,10 +427,11 @@ export function useChatSession() {
 
   const handleSubmit = useCallback(async ({
     conversationId,
+    content: submittedContent,
     selectedModelId,
     onConversationSynced,
   }: SubmitOptions) => {
-    const content = inputValue.trim();
+    const content = submittedContent.trim();
     const submittedUrlContextUrls = urlContextUrls;
 
     if (!content || isSubmitting) {
@@ -438,6 +442,10 @@ export function useChatSession() {
       role: "user",
       content,
       status: "complete",
+      metadata:
+        submittedUrlContextUrls.length > 0
+          ? { urls: submittedUrlContextUrls }
+          : {},
     });
     const assistantPlaceholder = createChatMessage({
       role: "assistant",
@@ -453,7 +461,6 @@ export function useChatSession() {
       userMessage,
       assistantPlaceholder,
     ]);
-    setInputValue("");
     setUrlContextInputValue("");
     setUrlContextUrls([]);
     setIsUrlContextPanelOpen(false);
@@ -517,7 +524,6 @@ export function useChatSession() {
     }
   }, [
     consumeAssistantStream,
-    inputValue,
     isSubmitting,
     replaceMessage,
     updateConversationMessages,
@@ -528,6 +534,7 @@ export function useChatSession() {
     conversationId,
     messageId,
     content,
+    urls,
     selectedModelId,
     onConversationSynced,
   }: EditMessageOptions) => {
@@ -538,6 +545,7 @@ export function useChatSession() {
     }
 
     const previousMessages = conversationMessages[conversationId] ?? [];
+    const submittedUrlContextUrls = urls;
     const assistantPlaceholder = createChatMessage({
       role: "assistant",
       content: "",
@@ -560,6 +568,13 @@ export function useChatSession() {
       nextMessages[targetMessageIndex] = {
         ...nextMessages[targetMessageIndex],
         content: trimmedContent,
+        metadata:
+          submittedUrlContextUrls === undefined
+            ? nextMessages[targetMessageIndex].metadata
+            : {
+                ...nextMessages[targetMessageIndex].metadata,
+                urls: submittedUrlContextUrls,
+              },
         parts: trimmedContent
           ? [
               {
@@ -588,6 +603,7 @@ export function useChatSession() {
           conversationId,
           content: trimmedContent,
           modelId: selectedModelId ?? undefined,
+          urls: submittedUrlContextUrls,
         }),
         signal: abortController.signal,
       });
@@ -651,20 +667,162 @@ export function useChatSession() {
     updateConversationMessages,
   ]);
 
+  const regenerateAssistantMessage = useCallback(async ({
+    conversationId,
+    messageId,
+    selectedModelId,
+    webSearchEnabled,
+    urls,
+    onConversationSynced,
+  }: RegenerateAssistantMessageOptions) => {
+    if (isSubmitting) {
+      return;
+    }
+
+    const previousMessages = conversationMessages[conversationId] ?? [];
+    const submittedUrlContextUrls = urls ?? [];
+    const assistantPlaceholder = createChatMessage({
+      role: "assistant",
+      content: "",
+      status: "pending",
+    });
+    const abortController = new AbortController();
+    let currentAssistantMessageId = assistantPlaceholder.id;
+    let latestAssistantMessage = assistantPlaceholder;
+    let restoredPreviousMessages = false;
+
+    updateConversationMessages(conversationId, (current) => {
+      const targetMessageIndex = current.findIndex(
+        (message) => message.id === messageId,
+      );
+
+      if (targetMessageIndex === -1) {
+        return current;
+      }
+
+      const nextMessages = current.slice(0, targetMessageIndex);
+
+      if (submittedUrlContextUrls.length > 0) {
+        for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+          if (nextMessages[index].role !== "user") {
+            continue;
+          }
+
+          nextMessages[index] = {
+            ...nextMessages[index],
+            metadata: {
+              ...nextMessages[index].metadata,
+              urls: submittedUrlContextUrls,
+            },
+          };
+          break;
+        }
+      }
+
+      return [...nextMessages, assistantPlaceholder];
+    });
+    setUrlContextInputValue("");
+    setUrlContextUrls([]);
+    setIsUrlContextPanelOpen(false);
+    setIsSubmitting(true);
+    setStreamingConversationId(conversationId);
+    streamingConversationIdRef.current = conversationId;
+    abortControllerRef.current = abortController;
+
+    try {
+      const response = await fetch(`/api/messages/${messageId}/regenerate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          modelId: selectedModelId ?? undefined,
+          webSearchEnabled,
+          urls:
+            submittedUrlContextUrls.length > 0
+              ? submittedUrlContextUrls
+              : undefined,
+        }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        syncConversationMessages(conversationId, previousMessages);
+        restoredPreviousMessages = true;
+        throw new Error(payload?.error?.message ?? "重新生成失败。");
+      }
+
+      const result = await consumeAssistantStream({
+        response,
+        conversationId,
+        assistantPlaceholder,
+        onConversationSynced,
+      });
+      currentAssistantMessageId = result.currentAssistantMessageId;
+      latestAssistantMessage = result.latestAssistantMessage;
+    } catch (error) {
+      if (restoredPreviousMessages) {
+        throw error;
+      }
+
+      if (isAbortError(error)) {
+        const nextAssistantMessage = createChatMessage({
+          id: currentAssistantMessageId,
+          role: "assistant",
+          content: latestAssistantMessage.content,
+          status: "cancelled",
+        });
+
+        replaceMessage(
+          conversationId,
+          currentAssistantMessageId,
+          nextAssistantMessage,
+        );
+        return;
+      }
+
+      const nextAssistantMessage = createChatMessage({
+        id: currentAssistantMessageId,
+        role: "assistant",
+        content: latestAssistantMessage.content || getErrorMessage(error),
+        status: "error",
+      });
+
+      replaceMessage(
+        conversationId,
+        currentAssistantMessageId,
+        nextAssistantMessage,
+      );
+      throw error;
+    } finally {
+      abortControllerRef.current = null;
+      setIsSubmitting(false);
+      setStreamingConversationId(null);
+      streamingConversationIdRef.current = null;
+    }
+  }, [
+    consumeAssistantStream,
+    conversationMessages,
+    isSubmitting,
+    replaceMessage,
+    syncConversationMessages,
+    updateConversationMessages,
+  ]);
+
   return {
     conversationMessages,
-    inputValue,
     urlContextInputValue,
     urlContextUrls,
     isUrlContextPanelOpen,
     isSubmitting,
     streamingConversationId,
-    setInputValue,
     setUrlContextInputValue,
     getMessages,
-    handlePromptSelect,
     handleSubmit,
     editMessageAndRegenerate,
+    regenerateAssistantMessage,
     stopStreaming,
     addUrlContextUrl,
     removeUrlContextUrl,

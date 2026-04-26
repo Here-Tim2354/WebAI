@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkCjkFriendlyGfmStrikethrough from "remark-cjk-friendly-gfm-strikethrough";
 import remarkGfm from "remark-gfm";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CodeBlock } from "./code-block";
 
 type MarkdownMessageProps = {
@@ -49,9 +50,9 @@ export function MarkdownMessage({
         components={{
           table({ children }) {
             return (
-              <div className="markdown-table-wrap">
+              <ScrollArea axis="horizontal" className="markdown-table-wrap">
                 <table>{children}</table>
-              </div>
+              </ScrollArea>
             );
           },
           pre({ children }) {

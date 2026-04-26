@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "overlayscrollbars/overlayscrollbars.css";
 @import "highlight.js/styles/github.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -188,6 +189,54 @@ a {
   background: oklch(0.61 0.17 252 / 80%);
 }
 
+.os-theme-webai {
+  --os-size: 8px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-handle-bg: color-mix(in oklch, var(--foreground) 28%, transparent 72%);
+  --os-handle-bg-hover: color-mix(in oklch, var(--primary) 46%, transparent 54%);
+  --os-handle-bg-active: color-mix(in oklch, var(--primary) 58%, transparent 42%);
+  --os-handle-border-radius: 5px;
+  --os-handle-min-size: 36px;
+  --os-handle-max-size: none;
+  --os-handle-perpendicular-size: 5px;
+  --os-handle-perpendicular-size-hover: 6px;
+  --os-handle-perpendicular-size-active: 6px;
+}
+
+textarea[data-slot="textarea"] {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in oklch, var(--foreground) 28%, transparent 72%)
+    transparent;
+}
+
+textarea[data-slot="textarea"]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+textarea[data-slot="textarea"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+textarea[data-slot="textarea"]::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background:
+    color-mix(in oklch, var(--foreground) 28%, transparent 72%)
+    padding-box;
+}
+
+textarea[data-slot="textarea"]::-webkit-scrollbar-thumb:hover {
+  background:
+    color-mix(in oklch, var(--primary) 46%, transparent 54%)
+    padding-box;
+}
+
 .markdown {
   font-size: 0.98rem;
   line-height: 1.8;
@@ -288,7 +337,6 @@ a {
 
 .markdown-table-wrap {
   margin: 1rem 0;
-  overflow-x: auto;
   border: 1px solid color-mix(in oklch, var(--border) 88%, white 12%);
   border-radius: 1rem;
   background: color-mix(in oklch, white 78%, var(--background) 22%);
@@ -387,11 +435,13 @@ a {
   color: color-mix(in oklch, var(--foreground) 88%, var(--primary) 12%);
 }
 
+.code-block__scroll {
+  background: color-mix(in oklch, white 96%, var(--background) 4%);
+}
+
 .code-block pre {
   margin: 0;
   padding: 1rem 1rem 1.05rem;
-  overflow-x: auto;
-  background: color-mix(in oklch, white 96%, var(--background) 4%);
 }
 
 .code-block code {

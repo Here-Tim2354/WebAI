@@ -1,5 +1,10 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ChatMessage, createChatMessage } from "@/lib/schemas/chat";
+import {
+  ChatMessage,
+  ChatMessageMetadata,
+  chatMessageMetadataSchema,
+  createChatMessage,
+} from "@/lib/schemas/chat";
 
 type MessageRow = {
   id: string;
@@ -7,11 +12,12 @@ type MessageRow = {
   sender_type: "user" | "assistant";
   content: string;
   status: ChatMessage["status"];
+  metadata: unknown;
   created_at: string;
 };
 
 const messageSelectFields =
-  "id, conversation_id, sender_type, content, status, created_at";
+  "id, conversation_id, sender_type, content, status, metadata, created_at";
 
 // messages 表里用 sender_type 表示消息来源，这里映射回前端统一的 role/status 结构。
 function mapMessageRow(row: MessageRow): ChatMessage {
@@ -20,6 +26,7 @@ function mapMessageRow(row: MessageRow): ChatMessage {
     role: row.sender_type,
     content: row.content,
     status: row.status,
+    metadata: chatMessageMetadataSchema.parse(row.metadata ?? {}),
   });
 }
 
@@ -98,6 +105,7 @@ export async function createConversationMessage(
   senderType: "user" | "assistant",
   content: string,
   status: ChatMessage["status"] = "complete",
+  metadata: ChatMessageMetadata = {},
 ) {
   const { data, error } = await supabase
     .from("messages")
@@ -106,6 +114,7 @@ export async function createConversationMessage(
       sender_type: senderType,
       content,
       status,
+      metadata,
     })
     .select(messageSelectFields)
     .single();
@@ -139,6 +148,7 @@ export async function cloneConversationMessages(
         sender_type: message.role,
         content: message.content,
         status: message.status,
+        metadata: message.metadata,
         created_at: new Date(firstCreatedAt + index).toISOString(),
       })),
     )
@@ -156,6 +166,7 @@ export async function cloneConversationMessages(
 type UpdateConversationMessageInput = {
   content?: string;
   status?: ChatMessage["status"];
+  metadata?: ChatMessageMetadata;
 };
 
 export async function updateConversationMessage(
@@ -167,6 +178,7 @@ export async function updateConversationMessage(
   const nextMessageUpdate: {
     content?: string;
     status?: ChatMessage["status"];
+    metadata?: ChatMessageMetadata;
   } = {};
 
   if (updates.content !== undefined) {
@@ -175,6 +187,10 @@ export async function updateConversationMessage(
 
   if (updates.status !== undefined) {
     nextMessageUpdate.status = updates.status;
+  }
+
+  if (updates.metadata !== undefined) {
+    nextMessageUpdate.metadata = updates.metadata;
   }
 
   const { data, error } = await supabase
@@ -190,6 +206,26 @@ export async function updateConversationMessage(
   }
 
   return mapMessageRow(data as MessageRow);
+}
+
+export async function deleteConversationMessagesById(
+  supabase: SupabaseClient,
+  conversationId: string,
+  messageIds: string[],
+) {
+  if (messageIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("messages")
+    .delete()
+    .eq("conversation_id", conversationId)
+    .in("id", messageIds);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function editUserMessageAndDeleteFollowing(

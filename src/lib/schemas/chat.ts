@@ -21,12 +21,24 @@ export const chatMessagePartSchema = z.object({
   text: z.string().min(1),
 });
 
+export const urlContextUrlsSchema = z
+  .array(z.string().trim().url("URL 格式不正确。"))
+  .max(20);
+
+export const chatMessageMetadataSchema = z
+  .object({
+    urls: urlContextUrlsSchema.optional(),
+  })
+  .passthrough()
+  .default({});
+
 export const chatMessageSchema = z.object({
   id: z.string().min(1),
   role: chatMessageRoleSchema,
   content: z.string(),
   parts: z.array(chatMessagePartSchema).default([]),
   status: chatMessageStatusSchema,
+  metadata: chatMessageMetadataSchema,
 });
 
 export const chatRequestSchema = z.object({
@@ -41,12 +53,7 @@ export const sendMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   content: z.string().trim().min(1, "消息不能为空。"),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
-  urls: z.array(z.string().trim().url("URL 格式不正确。")).max(20).optional(),
-});
-
-export const regenerateMessageRequestSchema = z.object({
-  conversationId: z.string().uuid("会话标识不正确。"),
-  modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  urls: urlContextUrlsSchema.optional(),
 });
 
 export const cancelChatRequestSchema = z.object({
@@ -57,6 +64,14 @@ export const editMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   content: z.string().trim().min(1, "消息不能为空。"),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  urls: urlContextUrlsSchema.optional(),
+});
+
+export const regenerateAssistantMessageRequestSchema = z.object({
+  conversationId: z.string().uuid("会话标识不正确。"),
+  modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  webSearchEnabled: z.boolean().optional(),
+  urls: urlContextUrlsSchema.optional(),
 });
 
 export const chatSessionResponseSchema = z.object({
@@ -93,6 +108,7 @@ export const chatStreamEventSchema = z.union([
 ]);
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type ChatMessageMetadata = z.infer<typeof chatMessageMetadataSchema>;
 export type ChatStreamEvent = z.infer<typeof chatStreamEventSchema>;
 
 type CreateChatMessageInput = {
@@ -100,6 +116,7 @@ type CreateChatMessageInput = {
   role: ChatMessage["role"];
   content: string;
   status: ChatMessage["status"];
+  metadata?: ChatMessageMetadata;
 };
 
 // createChatMessage 是前端本地构造消息对象的统一入口。
@@ -118,5 +135,6 @@ export function createChatMessage(input: CreateChatMessageInput): ChatMessage {
         ]
       : [],
     status: input.status,
+    metadata: input.metadata ?? {},
   };
 }

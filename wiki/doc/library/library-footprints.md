@@ -16,6 +16,7 @@ aliases:
 
 - [[library/shadcn-footprint]]
 - [[library/tailwindcss-footprint]]
+- [[library/overlayscrollbars-footprint]]
 
 ## 相关阅读
 
@@ -24,8 +25,10 @@ aliases:
 - [[conversation-sidebar]]
 - [[chat-input]]
 - [[message-list]]
+- [[ui-primitives]]
 
 ## 使用建议
 
 - 想知道“为什么这个项目的 UI 组件长得比较统一”，先看 [[library/shadcn-footprint]]
 - 想知道“为什么样式大多写在 className 里、CSS 文件却没有爆炸”，看 [[library/tailwindcss-footprint]]
+- 想知道“为什么滚动条没有直接套到 textarea 和 Dropdown Portal 上”，看 [[library/overlayscrollbars-footprint]]

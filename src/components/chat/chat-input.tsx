@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpIcon,
   GlobeIcon,
@@ -12,38 +12,38 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { panelSpring, smoothEase } from "./motion-presets";
 import type { AddUrlContextResult } from "./use-chat-session";
 
+const MotionTextarea = motion.create(Textarea);
+
 type ChatInputProps = {
-  value: string;
   webSearchEnabled: boolean;
   urlContextInputValue: string;
   urlContextUrls: string[];
   isUrlContextPanelOpen: boolean;
   supportsWebSearch: boolean;
   supportsUrlContext: boolean;
-  onChange: (value: string) => void;
   onToggleWebSearch: () => void | Promise<void>;
   onUrlContextInputChange: (value: string) => void;
   onToggleUrlContextPanel: () => void;
   onAddUrlContextUrl: () => AddUrlContextResult;
   onRemoveUrlContextUrl: (url: string) => void;
-  onSubmit: () => Promise<void>;
+  onSubmit: (content: string) => Promise<void>;
   onStop: () => void;
   isSubmitting: boolean;
   disabled?: boolean;
 };
 
 export function ChatInput({
-  value,
   webSearchEnabled,
   urlContextInputValue,
   urlContextUrls,
   isUrlContextPanelOpen,
   supportsWebSearch,
   supportsUrlContext,
-  onChange,
   onToggleWebSearch,
   onUrlContextInputChange,
   onToggleUrlContextPanel,
@@ -54,9 +54,12 @@ export function ChatInput({
   isSubmitting,
   disabled = false,
 }: ChatInputProps) {
+  const shouldReduceMotion = Boolean(useReducedMotion());
+  const [draftValue, setDraftValue] = useState("");
+  const [textareaHeight, setTextareaHeight] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const urlLimitWarningTimeoutRef = useRef<number | null>(null);
-  const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
+  const canSend = draftValue.trim().length > 0 && !isSubmitting && !disabled;
   const canStop = isSubmitting && !disabled;
   const hasUrlContext = urlContextUrls.length > 0;
   const canToggleWebSearch = !disabled && !isSubmitting;
@@ -64,9 +67,17 @@ export function ChatInput({
   const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
   const urlContextHint = isUrlLimitWarningVisible
     ? "至多输入4条URL"
-    : supportsUrlContext
-      ? "Gemini将检索输入的URL"
-      : "当前模型暂不支持 URL Context";
+      : supportsUrlContext
+        ? "Gemini将检索输入的URL"
+        : "当前模型暂不支持 URL Context";
+  const webSearchTooltip = supportsWebSearch
+    ? webSearchEnabled
+      ? "当前会话已开启联网搜索。"
+      : "当前会话已关闭联网搜索。"
+    : "当前模型不支持联网搜索，但你仍可以提前调整这个会话级开关。";
+  const urlContextTooltip = supportsUrlContext
+    ? `为当前这次发送补充 URL Context。已添加 ${urlContextUrls.length} 条 URL。`
+    : "当前模型不支持 URL Context，但你仍可以先查看或整理待发送的 URL。";
 
   const showUrlLimitWarning = () => {
     setIsUrlLimitWarningVisible(true);
@@ -89,18 +100,36 @@ export function ChatInput({
     }
   };
 
-  // 管理输入框高度自适应。
-  // 当前实现是在 value 变化后读取 scrollHeight，并把 textarea 高度限制在 240px 内。
-  useEffect(() => {
+  const handleSubmitDraft = async () => {
+    const submittedValue = draftValue;
+
+    if (!submittedValue.trim() || isSubmitting || disabled) {
+      return;
+    }
+
+    setDraftValue("");
+
+    try {
+      await onSubmit(submittedValue);
+    } catch {
+      setDraftValue(submittedValue);
+    }
+  };
+
+  // 管理输入框高度自适应：只测量目标高度，实际高度交给 Motion 驱动。
+  useLayoutEffect(() => {
     const textarea = textareaRef.current;
 
     if (!textarea) {
       return;
     }
 
-    textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
-  }, [value]);
+    const previousHeight = textarea.style.height;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, 224);
+    textarea.style.height = previousHeight;
+    setTextareaHeight(nextHeight);
+  }, [draftValue]);
 
   // 管理发送完成后的焦点回归。
   // 当前实现是在 isSubmitting 重新变回 false 时，把光标焦点放回输入框。
@@ -122,8 +151,8 @@ export function ChatInput({
     <motion.div
       className={cn(
         "mx-auto flex w-full flex-col border border-border/90 bg-background/95 backdrop-blur-xl",
-        isUrlContextPanelOpen ? "gap-1.5" : "gap-3",
-        "max-w-4xl rounded-[14px] px-4 pt-2 pb-4 shadow-[0_40px_48px_rgba(48,82,139,0.12)]",
+        isUrlContextPanelOpen ? "gap-1.5" : "gap-2.5",
+        "max-w-4xl rounded-[10px] px-3.5 pt-2 pb-3.5 shadow-[0_28px_38px_rgba(48,82,139,0.1)]",
       )}
       initial={false}
       animate={
@@ -135,26 +164,34 @@ export function ChatInput({
                 "rgba(226,232,240,0.9)",
               ],
               boxShadow: [
-                "0 40px 48px rgba(48,82,139,0.12)",
-                "0 0 0 2px rgba(248,113,113,0.14), 0 40px 48px rgba(48,82,139,0.12)",
-                "0 40px 48px rgba(48,82,139,0.12)",
+                "0 28px 38px rgba(48,82,139,0.1)",
+                "0 0 0 2px rgba(248,113,113,0.14), 0 28px 38px rgba(48,82,139,0.1)",
+                "0 28px 38px rgba(48,82,139,0.1)",
               ],
             }
           : {
               borderColor: "rgba(226,232,240,0.9)",
-              boxShadow: "0 40px 48px rgba(48,82,139,0.12)",
+              boxShadow: "0 28px 38px rgba(48,82,139,0.1)",
             }
       }
-      transition={{ duration: 0.8, ease: "easeInOut" }}
+      transition={
+        shouldReduceMotion
+          ? { duration: 0 }
+          : {
+              duration: 0.55,
+              ease: smoothEase,
+              layout: { duration: 0.16, ease: smoothEase },
+            }
+      }
     >
       <AnimatePresence initial={false}>
         {isUrlContextPanelOpen ? (
           <motion.div
             className="overflow-hidden"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
+            initial={{ height: 0, opacity: 0, y: -4 }}
+            animate={{ height: "auto", opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -4 }}
+            transition={shouldReduceMotion ? { duration: 0 } : panelSpring}
           >
             <div className="space-y-1 px-0.5 pb-0.5">
               {hasUrlContext ? (
@@ -215,87 +252,85 @@ export function ChatInput({
 
       <div
         className={cn(
-          "flex flex-col gap-3",
-          isUrlContextPanelOpen && "pt-1.5",
+          "flex flex-col gap-2",
+          isUrlContextPanelOpen && "pt-1",
         )}
       >
-        <Textarea
+        <MotionTextarea
           ref={textareaRef}
           className={cn(
-            "max-h-60 resize-none border-0 bg-transparent px-1 py-0 text-[1rem] leading-8 shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-transparent",
+            "max-h-56 resize-none border-0 bg-transparent px-1 py-0 text-[0.98rem] leading-8 shadow-none ring-0 [field-sizing:fixed] focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-transparent",
             "min-h-8 rounded-none",
           )}
+          animate={textareaHeight ? { height: textareaHeight } : undefined}
+          transition={
+            shouldReduceMotion
+              ? { duration: 0 }
+              : { duration: 0.2, ease: smoothEase }
+          }
           placeholder="随便说些什么..."
-          value={value}
+          value={draftValue}
           rows={1}
           disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => setDraftValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !isSubmitting) {
               event.preventDefault();
-              void onSubmit();
+              void handleSubmitDraft();
             }
           }}
         />
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className={cn(
-                "rounded-[10px] border-border/70 bg-background/82 text-muted-foreground shadow-none",
-                webSearchEnabled &&
-                  "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82",
-                !supportsWebSearch && "opacity-80",
-              )}
-              type="button"
-              onClick={onToggleWebSearch}
-              disabled={!canToggleWebSearch}
-              aria-label={webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
-              title={
-                supportsWebSearch
-                  ? webSearchEnabled
-                    ? "当前会话已开启联网搜索。"
-                    : "当前会话已关闭联网搜索。"
-                  : "当前模型不支持联网搜索，但你仍可以提前调整这个会话级开关。"
-              }
-            >
-              <GlobeIcon className="size-4.5" />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className={cn(
-                "relative rounded-[10px] border-border/70 bg-background/82 text-muted-foreground shadow-none",
-                (isUrlContextPanelOpen || hasUrlContext) &&
-                  "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82",
-                !supportsUrlContext && !hasUrlContext && "opacity-80",
-              )}
-              type="button"
-              onClick={onToggleUrlContextPanel}
-              disabled={!canToggleUrlContext}
-              aria-label={isUrlContextPanelOpen ? "收起 URL Context" : "展开 URL Context"}
-              title={
-                supportsUrlContext
-                  ? `为当前这次发送补充 URL Context。已添加 ${urlContextUrls.length} 条 URL。`
-                  : "当前模型不支持 URL Context，但你仍可以先查看或整理待发送的 URL。"
-              }
-            >
-              <Link2Icon className="size-4.5" />
-              <span
-                className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[0.65rem] font-medium leading-4 text-white"
-                aria-hidden="true"
+            <Tooltip content={webSearchTooltip}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className={cn(
+                  "h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
+                  webSearchEnabled &&
+                    "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
+                  !supportsWebSearch && "opacity-80",
+                )}
+                type="button"
+                onClick={onToggleWebSearch}
+                disabled={!canToggleWebSearch}
+                aria-label={webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
               >
-                {urlContextUrls.length}
-              </span>
-              <span className="sr-only">已添加 {urlContextUrls.length} 条 URL</span>
-            </Button>
+                <GlobeIcon className="size-4" />
+              </Button>
+            </Tooltip>
+
+            <Tooltip content={urlContextTooltip}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className={cn(
+                  "relative h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
+                  (isUrlContextPanelOpen || hasUrlContext) &&
+                    "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
+                  !supportsUrlContext && !hasUrlContext && "opacity-80",
+                )}
+                type="button"
+                onClick={onToggleUrlContextPanel}
+                disabled={!canToggleUrlContext}
+                aria-label={isUrlContextPanelOpen ? "收起 URL Context" : "展开 URL Context"}
+              >
+                <Link2Icon className="size-4" />
+                <span
+                  className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-[7px] bg-sky-600 px-1 text-[0.65rem] font-medium leading-4 text-white shadow-[0_4px_10px_rgba(2,132,199,0.2)]"
+                  aria-hidden="true"
+                >
+                  {urlContextUrls.length}
+                </span>
+                <span className="sr-only">已添加 {urlContextUrls.length} 条 URL</span>
+              </Button>
+            </Tooltip>
           </div>
 
           <Button
-            className="h-10 rounded-[10px] px-1 shadow-[0_12px_24px_rgba(72,115,195,0.14)]"
+            className="h-8 rounded-[8px] px-1 shadow-[0_10px_18px_rgba(72,115,195,0.13)]"
             type="button"
             onClick={() => {
               if (isSubmitting) {
@@ -303,16 +338,16 @@ export function ChatInput({
                 return;
               }
 
-              void onSubmit();
+              void handleSubmitDraft();
             }}
             disabled={!canSend && !canStop}
             aria-label={isSubmitting ? "停止生成" : "发送消息"}
           >
-            <span className="flex min-w-[5.5rem] items-center justify-center gap-2">
+            <span className="flex min-w-[4.25rem] items-center justify-center gap-1.5 px-1 text-[0.86rem]">
               {isSubmitting ? (
-                <SquareIcon className="size-4 fill-current" />
+                <SquareIcon className="size-3.5 fill-current" />
               ) : (
-                <ArrowUpIcon className="size-4" />
+                <ArrowUpIcon className="size-3.5" />
               )}
               <span>{isSubmitting ? "停止" : "发送"}</span>
             </span>
