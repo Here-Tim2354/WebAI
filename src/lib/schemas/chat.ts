@@ -25,9 +25,25 @@ export const urlContextUrlsSchema = z
   .array(z.string().trim().url("URL 格式不正确。"))
   .max(20);
 
+export const messageAttachmentKindSchema = z.enum(["image", "file"]);
+
+export const messageAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  kind: messageAttachmentKindSchema,
+  fileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  storagePath: z.string().min(1),
+  originalFileName: z.string().min(1).optional(),
+  originalMimeType: z.string().min(1).optional(),
+});
+
+export const messageAttachmentsSchema = z.array(messageAttachmentSchema).max(5);
+
 export const chatMessageMetadataSchema = z
   .object({
     urls: urlContextUrlsSchema.optional(),
+    attachments: messageAttachmentsSchema.optional(),
   })
   .passthrough()
   .default({});
@@ -51,10 +67,15 @@ export const chatResponseSchema = z.object({
 
 export const sendMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
-  content: z.string().trim().min(1, "消息不能为空。"),
+  content: z.string().trim(),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
   urls: urlContextUrlsSchema.optional(),
-});
+  attachments: messageAttachmentsSchema.optional(),
+}).refine(
+  (value) =>
+    value.content.length > 0 || (value.attachments?.length ?? 0) > 0,
+  "消息正文和附加项至少需要保留一个。",
+);
 
 export const cancelChatRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
@@ -62,16 +83,22 @@ export const cancelChatRequestSchema = z.object({
 
 export const editMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
-  content: z.string().trim().min(1, "消息不能为空。"),
+  content: z.string().trim(),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
   urls: urlContextUrlsSchema.optional(),
-});
+  attachments: messageAttachmentsSchema.optional(),
+}).refine(
+  (value) =>
+    value.content.length > 0 || (value.attachments?.length ?? 0) > 0,
+  "消息正文和附加项至少需要保留一个。",
+);
 
 export const regenerateAssistantMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
   webSearchEnabled: z.boolean().optional(),
   urls: urlContextUrlsSchema.optional(),
+  attachments: messageAttachmentsSchema.optional(),
 });
 
 export const chatSessionResponseSchema = z.object({
@@ -109,6 +136,7 @@ export const chatStreamEventSchema = z.union([
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatMessageMetadata = z.infer<typeof chatMessageMetadataSchema>;
+export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
 export type ChatStreamEvent = z.infer<typeof chatStreamEventSchema>;
 
 type CreateChatMessageInput = {

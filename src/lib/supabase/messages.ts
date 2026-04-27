@@ -233,13 +233,15 @@ export async function editUserMessageAndDeleteFollowing(
   conversationId: string,
   messageId: string,
   content: string,
+  metadata: ChatMessageMetadata,
 ) {
   const { error } = await supabase.rpc(
-    "edit_user_message_and_delete_following",
+    "edit_user_message_metadata_and_delete_following",
     {
       p_conversation_id: conversationId,
       p_message_id: messageId,
       p_content: content,
+      p_metadata: metadata,
     },
   );
 

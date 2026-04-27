@@ -15,7 +15,7 @@ export const aiModelCapabilitiesSchema = z.object({
   tools: z.boolean(),
   streaming: z.boolean(),
   reasoning: z.boolean(),
-  fileSearch: z.boolean(),
+  files: z.boolean(),
   structuredOutputs: z.boolean(),
   googleSearch: z.boolean(),
   urlContext: z.boolean(),

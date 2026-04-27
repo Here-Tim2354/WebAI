@@ -25,7 +25,7 @@ type OpenAICompatibleModelRow = {
   supports_web_search: boolean;
   supports_function_calling: boolean;
   supports_tools: boolean;
-  supports_file_search: boolean;
+  supports_files: boolean;
   supports_structured_outputs: boolean;
   supports_streaming: boolean;
   supports_reasoning: boolean;
@@ -43,7 +43,7 @@ type GeminiModelRow = {
   supports_code_execution: boolean;
   supports_function_calling: boolean;
   supports_tools: boolean;
-  supports_file_search: boolean;
+  supports_files: boolean;
   supports_structured_outputs: boolean;
   supports_streaming: boolean;
   supports_reasoning: boolean;
@@ -85,7 +85,7 @@ const openAIModelSelectFields = [
   "supports_web_search",
   "supports_function_calling",
   "supports_tools",
-  "supports_file_search",
+  "supports_files",
   "supports_structured_outputs",
   "supports_streaming",
   "supports_reasoning",
@@ -103,7 +103,7 @@ const geminiModelSelectFields = [
   "supports_code_execution",
   "supports_function_calling",
   "supports_tools",
-  "supports_file_search",
+  "supports_files",
   "supports_structured_outputs",
   "supports_streaming",
   "supports_reasoning",
@@ -134,7 +134,7 @@ function mapOpenAICompatibleModel(
       tools: row.supports_tools,
       streaming: row.supports_streaming,
       reasoning: row.supports_reasoning,
-      fileSearch: row.supports_file_search,
+      files: row.supports_files,
       structuredOutputs: row.supports_structured_outputs,
       googleSearch: false,
       urlContext: false,
@@ -165,7 +165,7 @@ function mapGeminiModel(model: AIModelRow, row: GeminiModelRow): RuntimeAIModel 
       tools: row.supports_tools,
       streaming: row.supports_streaming,
       reasoning: row.supports_reasoning,
-      fileSearch: row.supports_file_search,
+      files: row.supports_files,
       structuredOutputs: row.supports_structured_outputs,
       googleSearch: row.supports_google_search,
       urlContext: row.supports_url_context,

@@ -128,7 +128,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { conversationId, content, modelId, urls } = parsedRequest.data;
+    const { conversationId, content, modelId, urls, attachments } =
+      parsedRequest.data;
 
     // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
     let conversation = await getConversationById(supabase, user.id, conversationId);
@@ -139,23 +140,44 @@ export async function POST(request: Request) {
       });
     }
 
+    const effectiveModelId = modelId ?? conversation.modelId;
+    const selectedModel = effectiveModelId
+      ? await getEnabledModelById(supabase, effectiveModelId)
+      : null;
+
+    if (attachments && attachments.length > 0 && selectedModel) {
+      const hasImageAttachment = attachments.some(
+        (attachment) => attachment.kind === "image",
+      );
+      const hasFileAttachment = attachments.some(
+        (attachment) => attachment.kind === "file",
+      );
+
+      if (hasImageAttachment && !selectedModel.capabilities.image) {
+        throw new ModelRegistryError("当前模型不支持图片输入。");
+      }
+
+      if (hasFileAttachment && !selectedModel.capabilities.files) {
+        throw new ModelRegistryError("当前模型不支持文件输入。");
+      }
+    }
+
     await createConversationMessage(
       supabase,
       conversationId,
       "user",
       content,
       "complete",
-      urls && urls.length > 0 ? { urls } : {},
+      {
+        ...(urls && urls.length > 0 ? { urls } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      },
     );
 
     conversation = await touchConversation(supabase, user.id, conversationId);
     // messagesForModel 读取的是“用户消息已写入数据库之后”的完整上下文，
     // 这样模型看到的上下文和最终持久化状态保持一致。
     const messagesForModel = await listConversationMessages(supabase, conversationId);
-    const effectiveModelId = modelId ?? conversation.modelId;
-    const selectedModel = effectiveModelId
-      ? await getEnabledModelById(supabase, effectiveModelId)
-      : null;
     return createAssistantStreamResponse({
       supabase,
       userId: user.id,

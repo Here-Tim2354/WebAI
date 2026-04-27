@@ -5,7 +5,7 @@ import {
   LoaderCircleIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChatMessage } from "@/lib/schemas/chat";
+import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
 import type { EditMessageUpdate } from "./message-bubble";
 import { MessageBubble } from "./message-bubble";
 import { smoothEase } from "./motion-presets";
@@ -16,8 +16,12 @@ type MessageListProps = {
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   loadingHint?: string | null;
   actionsDisabled?: boolean;
+  supportsImages: boolean;
+  supportsFiles: boolean;
+  isUploadingAttachments?: boolean;
   onCopyMessage: (message: ChatMessage) => Promise<void> | void;
   onEditMessage: (message: ChatMessage, update: EditMessageUpdate) => Promise<void>;
+  onUploadAttachments: (files: File[]) => Promise<MessageAttachment[]>;
   onBranchFromMessage: (message: ChatMessage) => Promise<void>;
   onRegenerateMessage: (message: ChatMessage) => Promise<void>;
   onScroll: () => void;
@@ -46,8 +50,12 @@ function MessageListComponent({
   scrollContainerRef,
   loadingHint = null,
   actionsDisabled = false,
+  supportsImages,
+  supportsFiles,
+  isUploadingAttachments = false,
   onCopyMessage,
   onEditMessage,
+  onUploadAttachments,
   onBranchFromMessage,
   onRegenerateMessage,
   onScroll,
@@ -147,8 +155,12 @@ function MessageListComponent({
               message={message}
               actionsDisabled={actionsDisabled}
               canRegenerate={message.id === latestAssistantMessageId}
+              supportsImages={supportsImages}
+              supportsFiles={supportsFiles}
+              isUploadingAttachments={isUploadingAttachments}
               onCopy={onCopyMessage}
               onEdit={onEditMessage}
+              onUploadAttachments={onUploadAttachments}
               onBranch={onBranchFromMessage}
               onRegenerate={onRegenerateMessage}
             />

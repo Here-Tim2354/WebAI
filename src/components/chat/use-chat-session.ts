@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import {
   ChatMessage,
+  MessageAttachment,
   chatStreamEventSchema,
   createChatMessage,
 } from "@/lib/schemas/chat";
@@ -107,6 +108,7 @@ function mergeAssistantMessageParts(
 type SubmitOptions = {
   conversationId: string;
   content: string;
+  attachments?: MessageAttachment[];
   selectedModelId?: string | null;
   onConversationSynced: (conversation: Conversation) => void;
 };
@@ -115,12 +117,14 @@ type EditMessageOptions = SubmitOptions & {
   messageId: string;
   content: string;
   urls?: string[];
+  attachments?: MessageAttachment[];
 };
 
 type RegenerateAssistantMessageOptions = Omit<SubmitOptions, "content"> & {
   messageId: string;
   webSearchEnabled?: boolean;
   urls?: string[];
+  attachments?: MessageAttachment[];
 };
 
 export type AddUrlContextResult =
@@ -167,6 +171,8 @@ export function useChatSession() {
   >({});
   const [urlContextInputValue, setUrlContextInputValue] = useState("");
   const [urlContextUrls, setUrlContextUrls] = useState<string[]>([]);
+  const [draftAttachments, setDraftAttachments] = useState<MessageAttachment[]>([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [isUrlContextPanelOpen, setIsUrlContextPanelOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingConversationId, setStreamingConversationId] = useState<
@@ -274,6 +280,32 @@ export function useChatSession() {
 
   const toggleUrlContextPanel = useCallback(() => {
     setIsUrlContextPanelOpen((current) => !current);
+  }, []);
+
+  const uploadAttachments = useCallback(async (files: File[]) => {
+    setIsUploadingAttachments(true);
+
+    try {
+      const formData = new FormData();
+
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await fetch("/api/attachments/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "附件上传失败。");
+      }
+
+      return payload.attachments as MessageAttachment[];
+    } finally {
+      setIsUploadingAttachments(false);
+    }
   }, []);
 
   const stopStreaming = useCallback(() => {
@@ -428,13 +460,18 @@ export function useChatSession() {
   const handleSubmit = useCallback(async ({
     conversationId,
     content: submittedContent,
+    attachments,
     selectedModelId,
     onConversationSynced,
   }: SubmitOptions) => {
     const content = submittedContent.trim();
     const submittedUrlContextUrls = urlContextUrls;
+    const submittedAttachments = attachments ?? draftAttachments;
 
-    if (!content || isSubmitting) {
+    if (
+      (content.length === 0 && submittedAttachments.length === 0) ||
+      isSubmitting
+    ) {
       return;
     }
 
@@ -443,8 +480,15 @@ export function useChatSession() {
       content,
       status: "complete",
       metadata:
-        submittedUrlContextUrls.length > 0
-          ? { urls: submittedUrlContextUrls }
+        submittedUrlContextUrls.length > 0 || submittedAttachments.length > 0
+          ? {
+              ...(submittedUrlContextUrls.length > 0
+                ? { urls: submittedUrlContextUrls }
+                : {}),
+              ...(submittedAttachments.length > 0
+                ? { attachments: submittedAttachments }
+                : {}),
+            }
           : {},
     });
     const assistantPlaceholder = createChatMessage({
@@ -463,6 +507,7 @@ export function useChatSession() {
     ]);
     setUrlContextInputValue("");
     setUrlContextUrls([]);
+    setDraftAttachments([]);
     setIsUrlContextPanelOpen(false);
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
@@ -483,6 +528,8 @@ export function useChatSession() {
             submittedUrlContextUrls.length > 0
               ? submittedUrlContextUrls
               : undefined,
+          attachments:
+            submittedAttachments.length > 0 ? submittedAttachments : undefined,
         }),
         signal: abortController.signal,
       });
@@ -528,6 +575,7 @@ export function useChatSession() {
     replaceMessage,
     updateConversationMessages,
     urlContextUrls,
+    draftAttachments,
   ]);
 
   const editMessageAndRegenerate = useCallback(async ({
@@ -535,12 +583,21 @@ export function useChatSession() {
     messageId,
     content,
     urls,
+    attachments,
     selectedModelId,
     onConversationSynced,
   }: EditMessageOptions) => {
     const trimmedContent = content.trim();
+    const submittedAttachments = attachments;
 
-    if (!trimmedContent || isSubmitting) {
+    if (
+      trimmedContent.length === 0 &&
+      (submittedAttachments?.length ?? 0) === 0
+    ) {
+      return;
+    }
+
+    if (isSubmitting) {
       return;
     }
 
@@ -569,11 +626,16 @@ export function useChatSession() {
         ...nextMessages[targetMessageIndex],
         content: trimmedContent,
         metadata:
-          submittedUrlContextUrls === undefined
+          submittedUrlContextUrls === undefined && submittedAttachments === undefined
             ? nextMessages[targetMessageIndex].metadata
             : {
                 ...nextMessages[targetMessageIndex].metadata,
-                urls: submittedUrlContextUrls,
+                ...(submittedUrlContextUrls !== undefined
+                  ? { urls: submittedUrlContextUrls }
+                  : {}),
+                ...(submittedAttachments !== undefined
+                  ? { attachments: submittedAttachments }
+                  : {}),
               },
         parts: trimmedContent
           ? [
@@ -604,6 +666,7 @@ export function useChatSession() {
           content: trimmedContent,
           modelId: selectedModelId ?? undefined,
           urls: submittedUrlContextUrls,
+          attachments: submittedAttachments,
         }),
         signal: abortController.signal,
       });
@@ -673,6 +736,7 @@ export function useChatSession() {
     selectedModelId,
     webSearchEnabled,
     urls,
+    attachments,
     onConversationSynced,
   }: RegenerateAssistantMessageOptions) => {
     if (isSubmitting) {
@@ -681,6 +745,7 @@ export function useChatSession() {
 
     const previousMessages = conversationMessages[conversationId] ?? [];
     const submittedUrlContextUrls = urls ?? [];
+    const submittedAttachments = attachments ?? [];
     const assistantPlaceholder = createChatMessage({
       role: "assistant",
       content: "",
@@ -702,7 +767,10 @@ export function useChatSession() {
 
       const nextMessages = current.slice(0, targetMessageIndex);
 
-      if (submittedUrlContextUrls.length > 0) {
+      if (
+        submittedUrlContextUrls.length > 0 ||
+        submittedAttachments.length > 0
+      ) {
         for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
           if (nextMessages[index].role !== "user") {
             continue;
@@ -712,7 +780,12 @@ export function useChatSession() {
             ...nextMessages[index],
             metadata: {
               ...nextMessages[index].metadata,
-              urls: submittedUrlContextUrls,
+              ...(submittedUrlContextUrls.length > 0
+                ? { urls: submittedUrlContextUrls }
+                : {}),
+              ...(submittedAttachments.length > 0
+                ? { attachments: submittedAttachments }
+                : {}),
             },
           };
           break;
@@ -723,6 +796,7 @@ export function useChatSession() {
     });
     setUrlContextInputValue("");
     setUrlContextUrls([]);
+    setDraftAttachments([]);
     setIsUrlContextPanelOpen(false);
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
@@ -743,6 +817,8 @@ export function useChatSession() {
             submittedUrlContextUrls.length > 0
               ? submittedUrlContextUrls
               : undefined,
+          attachments:
+            submittedAttachments.length > 0 ? submittedAttachments : undefined,
         }),
         signal: abortController.signal,
       });
@@ -815,10 +891,14 @@ export function useChatSession() {
     conversationMessages,
     urlContextInputValue,
     urlContextUrls,
+    draftAttachments,
+    isUploadingAttachments,
     isUrlContextPanelOpen,
     isSubmitting,
     streamingConversationId,
     setUrlContextInputValue,
+    setUrlContextUrls,
+    setDraftAttachments,
     getMessages,
     handleSubmit,
     editMessageAndRegenerate,
@@ -827,6 +907,7 @@ export function useChatSession() {
     addUrlContextUrl,
     removeUrlContextUrl,
     toggleUrlContextPanel,
+    uploadAttachments,
     syncConversationMessages,
     removeConversationMessages,
   };

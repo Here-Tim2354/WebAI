@@ -158,7 +158,7 @@ const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 - 切换当前会话
 - 首屏后同步模型列表
 - 切换会话时拉取会话详情
-- 协调当前会话模型、提示词与联网搜索设置
+- 协调当前会话模型、提示词与联网设置
 - 在首条消息发送前，把草稿控制项一并落入新会话
 
 因此现在的边界是：
@@ -461,7 +461,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 2. `handleSendMessage()` 调用 `useChatSession().handleSubmit()`
 3. `handleSubmit()` 先确认 `conversationId`
 4. 如果没有激活会话，则通过 `ensureConversationId()` 先建一个
-   - 当前会带上草稿模型、草稿提示词和草稿联网搜索开关
+   - 当前会带上草稿模型、草稿提示词和草稿联网开关
 5. 本地先做乐观更新：
    - 插入用户消息
    - 插入 assistant 占位消息
@@ -480,11 +480,11 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 ---
 
-### 9.4 联网搜索开关切换
+### 9.4 联网开关切换
 
 链路：
 
-1. 用户点击 `ChatInput` 左下角联网搜索按钮
+1. 用户点击 `ChatInput` 左下角联网按钮
 2. `ChatShell` 调用 `useChatWorkspace.toggleWebSearchEnabled()`
 3. 如果当前还没有真实会话：
    - 只切换 `draftWebSearchEnabled`
@@ -494,7 +494,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
    - 失败则回滚
 
 结果：
-- 联网搜索开关已经成为当前会话的真实控制项
+- 联网开关已经成为当前会话的真实控制项
 
 ---
 
@@ -551,7 +551,7 @@ ChatShell
 
 useChatWorkspace
   -> 管会话与模型编排状态
-  -> 管联网搜索草稿与会话级持久化切换
+  -> 管联网草稿与会话级持久化切换
   -> 触发会话与模型请求
   -> 把消息状态委托给 useChatSession
   -> 把滚动状态委托给 useMessageScroll

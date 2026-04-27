@@ -29,6 +29,7 @@ aliases:
 - 把正文继续交给 `MarkdownMessage`
 - 管理消息复制、编辑、分支、重新生成等消息侧操作入口
 - 展示和编辑 user 消息附带的 URL Context metadata
+- 展示和编辑 user 消息附带的图片、文件 metadata
 
 ---
 
@@ -112,20 +113,29 @@ assistant 流式回复时，并不是 `MessageList` 在逐字渲染。
 
 ---
 
-## 7. URL Context metadata
+## 7. 消息 metadata
 
 user 消息如果带有 `metadata.urls`，会在正文下方展示一行轻量 URL Context 摘要。
 
-进入编辑态后，URL Context 不默认展开；用户点击修改入口后，可在同一个编辑面板里增删 URL，并与正文共用保存按钮。
+user 消息如果带有 `metadata.attachments`，会在正文下方展示附件摘要：
+
+- 图片显示小缩略图
+- 点击图片后通过页面级遮罩进入放大预览
+- 文件显示文件名与大小
+
+进入编辑态后，用户可以打开“修改附加项”窗口，在同一个窗口里管理 URL、图片和文件，并与正文共用保存按钮。
 
 保存时的语义是：
 
 - 正文变化：更新正文并重新生成后续 assistant
 - URL 变化：更新 `metadata.urls` 并重新生成后续 assistant
-- 正文和 URL 都未变化：直接退出编辑态
+- 附件变化：更新 `metadata.attachments` 并重新生成后续 assistant
+- 正文、URL 和附件都未变化：直接退出编辑态
+
+当前注意：附件编辑仍属于 `Phase 4.4` 首轮接入能力，需要继续用真实图片、PDF、文本文件验证保存、重新生成、分支和历史恢复。这里尤其要关注带附件 user 消息编辑失败时的错误提示，以及前端本地状态是否和数据库最终 metadata 保持一致。
 
 ---
 
 ## 8. 一句话理解
 
-`MessageBubble` 是消息区里真正负责“单条消息长什么样、能做什么”的组件：角色、状态、流式 reveal、正文入口、消息操作和 URL Context metadata 都在这里汇合。
+`MessageBubble` 是消息区里真正负责“单条消息长什么样、能做什么”的组件：角色、状态、流式 reveal、正文入口、消息操作和消息级 metadata 都在这里汇合。

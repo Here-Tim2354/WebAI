@@ -1,4 +1,5 @@
 import { ChatMessage } from "@/lib/schemas/chat";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { streamWithGemini } from "./gemini";
 import { streamWithOpenAICompatible } from "./openai-compatible";
@@ -8,6 +9,7 @@ type StreamAssistantReplyOptions = {
   conversationSystemPrompt?: string | null;
   webSearchEnabled?: boolean;
   urls?: string[];
+  supabase?: SupabaseClient;
   abortSignal?: AbortSignal;
 };
 
@@ -33,6 +35,7 @@ export async function* streamAssistantReply(
     conversationSystemPrompt: options?.conversationSystemPrompt,
     webSearchEnabled: options?.webSearchEnabled,
     urls: options?.urls,
+    supabase: options?.supabase,
     modelName:
       options?.model?.provider === "gemini"
         ? options.model.upstreamModelId

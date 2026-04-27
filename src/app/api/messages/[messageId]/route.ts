@@ -17,10 +17,14 @@ import {
   ModelRegistryError,
 } from "@/lib/supabase/model-registry";
 import {
+  cleanupUnreferencedAttachments,
+  getAttachmentPaths,
+  normalizeMessageAttachments,
+} from "@/lib/attachments";
+import {
   editUserMessageAndDeleteFollowing,
   getConversationMessage,
   listConversationMessages,
-  updateConversationMessage,
 } from "@/lib/supabase/messages";
 
 type RouteContext = {
@@ -128,16 +132,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, content, modelId, urls } = parsed.data;
+    const { conversationId, content, modelId, urls, attachments } = parsed.data;
     let conversation = await getConversationById(
       supabase,
       user.id,
+      conversationId,
+    );
+    const previousMessages = await listConversationMessages(
+      supabase,
       conversationId,
     );
     const targetMessage = await getConversationMessage(
       supabase,
       conversationId,
       messageId,
+    );
+    const targetMessageIndex = previousMessages.findIndex(
+      (message) => message.id === messageId,
     );
 
     if (targetMessage.sender_type !== "user") {
@@ -161,24 +172,57 @@ export async function PATCH(request: Request, context: RouteContext) {
       targetMessage.metadata ?? {},
     );
     const nextMetadata =
-      urls === undefined
+      urls === undefined && attachments === undefined
         ? currentMetadata
         : {
             ...currentMetadata,
-            urls,
+            ...(urls !== undefined ? { urls } : {}),
+            ...(attachments !== undefined
+              ? { attachments: normalizeMessageAttachments(attachments) }
+              : {}),
           };
+    const effectiveModelId = modelId ?? conversation.modelId;
+    const selectedModel = effectiveModelId
+      ? await getEnabledModelById(supabase, effectiveModelId)
+      : null;
+
+    if (nextMetadata.attachments && nextMetadata.attachments.length > 0 && selectedModel) {
+      const hasImageAttachment = nextMetadata.attachments.some(
+        (attachment) => attachment.kind === "image",
+      );
+      const hasFileAttachment = nextMetadata.attachments.some(
+        (attachment) => attachment.kind === "file",
+      );
+
+      if (hasImageAttachment && !selectedModel.capabilities.image) {
+        throw new ModelRegistryError("当前模型不支持图片输入。");
+      }
+
+      if (hasFileAttachment && !selectedModel.capabilities.files) {
+        throw new ModelRegistryError("当前模型不支持文件输入。");
+      }
+    }
 
     await editUserMessageAndDeleteFollowing(
       supabase,
       conversationId,
       messageId,
       content,
+      nextMetadata,
     );
-    if (urls !== undefined) {
-      await updateConversationMessage(supabase, conversationId, messageId, {
-        metadata: nextMetadata,
-      });
-    }
+    const previousAttachments =
+      targetMessageIndex === -1
+        ? currentMetadata.attachments ?? []
+        : previousMessages
+            .slice(targetMessageIndex)
+            .flatMap((message) => message.metadata.attachments ?? []);
+    void cleanupUnreferencedAttachments(
+      supabase,
+      previousAttachments.filter(
+        (attachment) =>
+          !getAttachmentPaths(nextMetadata).includes(attachment.storagePath),
+      ),
+    ).catch(() => null);
     conversation = await touchConversation(
       supabase,
       user.id,
@@ -188,10 +232,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       supabase,
       conversationId,
     );
-    const effectiveModelId = modelId ?? conversation.modelId;
-    const selectedModel = effectiveModelId
-      ? await getEnabledModelById(supabase, effectiveModelId)
-      : null;
+
     return createAssistantStreamResponse({
       supabase,
       userId: user.id,

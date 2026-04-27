@@ -18,9 +18,10 @@ aliases:
 
 `ChatInput` 仍然是受控输入组件，但它现在不只控制主消息文本，还承接：
 
-- 会话级联网搜索开关入口
+- 会话级联网开关入口
 - 请求级 URL Context 输入区
 - URL 上限的局部警示反馈
+- 图片与文件附加项入口
 
 它自己不保存主消息文本或 URL 列表，而是依赖父层传入：
 
@@ -114,7 +115,7 @@ const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
 ### `canToggleWebSearch`
 
 作用：
-- 联网搜索按钮当前是否允许切换
+- 联网按钮当前是否允许切换
 
 ### `canToggleUrlContext`
 
@@ -320,4 +321,4 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 ## 6. 一句话总结
 
-`ChatInput` 的状态流已经从“单一文本输入框”升级为“主消息输入 + URL Context 输入 + 会话级控制按钮”的局部交互状态机：主数据仍由父层控制，本组件负责把这些状态组织成顺手、连续且可反馈的输入体验。
+`ChatInput` 的状态流已经从“单一文本输入框”升级为“主消息输入 + URL Context 输入 + 附件入口 + 会话级控制按钮”的局部交互状态机：主数据仍由父层控制，本组件负责把这些状态组织成顺手、连续且可反馈的输入体验。附件入口目前仍属于 `Phase 4.4` 首轮接入能力，需要继续真实文件回归。

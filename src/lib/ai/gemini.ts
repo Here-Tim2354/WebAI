@@ -1,12 +1,15 @@
 import { Content, GoogleGenAI } from "@google/genai";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { downloadAttachmentBuffer } from "@/lib/attachments";
 import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
-import { ChatMessage } from "@/lib/schemas/chat";
+import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
 import { getSystemInstruction } from "./system-instruction";
 
 type GenerateWithGeminiOptions = {
   conversationSystemPrompt?: string | null;
   webSearchEnabled?: boolean;
   urls?: string[];
+  supabase?: SupabaseClient;
   modelName?: string;
   abortSignal?: AbortSignal;
 };
@@ -52,17 +55,86 @@ function withUrlContextPrompt(messages: ChatMessage[], urls: string[]) {
 
 // Gemini SDK 的历史消息结构不是 role/content，而是 Content.parts。
 // 这里把统一消息模型转换成 Gemini 期望的 contents 格式。
-function toGeminiContents(messages: ChatMessage[]): Content[] {
-  return messages
+async function toGeminiAttachmentParts(
+  supabase: SupabaseClient | undefined,
+  attachments: MessageAttachment[] | undefined,
+) {
+  if (!supabase || !attachments || attachments.length === 0) {
+    return [];
+  }
+
+  const parts = [];
+
+  for (const attachment of attachments) {
+    const buffer = await downloadAttachmentBuffer(supabase, attachment);
+
+    if (
+      attachment.kind === "file" &&
+      (
+        attachment.mimeType === "text/plain" ||
+        attachment.mimeType === "text/markdown" ||
+        attachment.mimeType === "text/csv"
+      )
+    ) {
+      parts.push({
+        text: [
+          `附件：${attachment.fileName}`,
+          buffer.toString("utf8"),
+        ].join("\n\n"),
+      });
+      continue;
+    }
+
+    parts.push({
+      text: `附件：${attachment.fileName}`,
+    });
+    parts.push({
+      inlineData: {
+        mimeType: attachment.mimeType,
+        data: buffer.toString("base64"),
+      },
+    });
+  }
+
+  return parts;
+}
+
+async function toGeminiContents(
+  messages: ChatMessage[],
+  supabase?: SupabaseClient,
+): Promise<Content[]> {
+  const normalizedMessages = messages
     .filter(
       (message) =>
         (message.role === "user" || message.role === "assistant") &&
-        message.content.trim().length > 0,
-    )
-    .map((message) => ({
+        (
+          message.content.trim().length > 0 ||
+          (message.metadata.attachments?.length ?? 0) > 0
+        ),
+    );
+
+  const contents: Content[] = [];
+
+  for (const message of normalizedMessages) {
+    const attachmentParts = message.role === "user"
+      ? await toGeminiAttachmentParts(supabase, message.metadata.attachments)
+      : [];
+    const parts = [
+      ...attachmentParts,
+      ...(message.content.trim().length > 0 ? [{ text: message.content }] : []),
+    ];
+
+    if (parts.length === 0) {
+      continue;
+    }
+
+    contents.push({
       role: message.role === "assistant" ? "model" : "user",
-      parts: [{ text: message.content }],
-    }));
+      parts,
+    });
+  }
+
+  return contents;
 }
 
 /**
@@ -81,10 +153,16 @@ export async function* streamWithGemini(
   );
   const normalizedUrls = normalizeUrls(options?.urls);
   const messagesWithUrlContext = withUrlContextPrompt(messages, normalizedUrls);
+  const hasAttachments = messagesWithUrlContext.some(
+    (message) => (message.metadata.attachments?.length ?? 0) > 0,
+  );
   const systemInstruction = getSystemInstruction(messagesWithUrlContext, {
     conversationSystemPrompt: options?.conversationSystemPrompt,
   });
-  const contents = toGeminiContents(messagesWithUrlContext);
+  const contents = await toGeminiContents(
+    messagesWithUrlContext,
+    options?.supabase,
+  );
 
   if (contents.length === 0) {
     throw new Error("至少需要一条用户消息才能发起对话。");
@@ -110,7 +188,7 @@ export async function* streamWithGemini(
             systemInstruction,
           }
         : {}),
-      ...(options?.webSearchEnabled || normalizedUrls.length > 0
+      ...(!hasAttachments && (options?.webSearchEnabled || normalizedUrls.length > 0)
         ? {
             tools: [
               ...(options?.webSearchEnabled ? [{ googleSearch: {} }] : []),

@@ -22,6 +22,7 @@
 - [[doc/database/20_extension/favorites_extension|favorites_extension]]
 - [[doc/database/20_extension/search_records_extension|search_records_extension]]
 - [[doc/database/20_extension/model_registry_extension|model_registry_extension]]
+- [[doc/database/20_extension/message_attachments_extension|message_attachments_extension]]
 
 ## 映射
 

@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpIcon,
   GlobeIcon,
   Link2Icon,
+  LoaderCircleIcon,
+  PaperclipIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
@@ -14,8 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MessageAttachment } from "@/lib/schemas/chat";
 import { panelSpring, smoothEase } from "./motion-presets";
 import type { AddUrlContextResult } from "./use-chat-session";
+import {
+  AttachmentEditorDialog,
+  AttachmentPreviewList,
+} from "./message-attachments";
 
 const MotionTextarea = motion.create(Textarea);
 
@@ -23,15 +37,22 @@ type ChatInputProps = {
   webSearchEnabled: boolean;
   urlContextInputValue: string;
   urlContextUrls: string[];
+  attachments: MessageAttachment[];
   isUrlContextPanelOpen: boolean;
   supportsWebSearch: boolean;
   supportsUrlContext: boolean;
+  supportsImages: boolean;
+  supportsFiles: boolean;
+  isUploadingAttachments: boolean;
   onToggleWebSearch: () => void | Promise<void>;
   onUrlContextInputChange: (value: string) => void;
+  onUrlContextUrlsChange: (urls: string[]) => void;
+  onAttachmentsChange: Dispatch<SetStateAction<MessageAttachment[]>>;
   onToggleUrlContextPanel: () => void;
   onAddUrlContextUrl: () => AddUrlContextResult;
   onRemoveUrlContextUrl: (url: string) => void;
-  onSubmit: (content: string) => Promise<void>;
+  onUploadAttachments: (files: File[]) => Promise<MessageAttachment[]>;
+  onSubmit: (content: string, attachments?: MessageAttachment[]) => Promise<void>;
   onStop: () => void;
   isSubmitting: boolean;
   disabled?: boolean;
@@ -41,14 +62,21 @@ export function ChatInput({
   webSearchEnabled,
   urlContextInputValue,
   urlContextUrls,
+  attachments,
   isUrlContextPanelOpen,
   supportsWebSearch,
   supportsUrlContext,
+  supportsImages,
+  supportsFiles,
+  isUploadingAttachments,
   onToggleWebSearch,
   onUrlContextInputChange,
+  onUrlContextUrlsChange,
+  onAttachmentsChange,
   onToggleUrlContextPanel,
   onAddUrlContextUrl,
   onRemoveUrlContextUrl,
+  onUploadAttachments,
   onSubmit,
   onStop,
   isSubmitting,
@@ -56,12 +84,18 @@ export function ChatInput({
 }: ChatInputProps) {
   const shouldReduceMotion = Boolean(useReducedMotion());
   const [draftValue, setDraftValue] = useState("");
+  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [textareaHeight, setTextareaHeight] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const urlLimitWarningTimeoutRef = useRef<number | null>(null);
-  const canSend = draftValue.trim().length > 0 && !isSubmitting && !disabled;
+  const canSend =
+    (draftValue.trim().length > 0 || attachments.length > 0) &&
+    !isSubmitting &&
+    !disabled;
   const canStop = isSubmitting && !disabled;
   const hasUrlContext = urlContextUrls.length > 0;
+  const hasAttachments = attachments.length > 0;
   const canToggleWebSearch = !disabled && !isSubmitting;
   const canToggleUrlContext = !disabled && !isSubmitting;
   const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
@@ -72,6 +106,7 @@ export function ChatInput({
         : "当前模型暂不支持 URL Context";
   const webSearchTooltip = "联网";
   const urlContextTooltip = "添加URL";
+  const attachmentTooltip = "修改附加项";
 
   const showUrlLimitWarning = () => {
     setIsUrlLimitWarningVisible(true);
@@ -97,17 +132,41 @@ export function ChatInput({
   const handleSubmitDraft = async () => {
     const submittedValue = draftValue;
 
-    if (!submittedValue.trim() || isSubmitting || disabled) {
+    if (
+      (submittedValue.trim().length === 0 && attachments.length === 0) ||
+      isSubmitting ||
+      disabled
+    ) {
       return;
     }
 
     setDraftValue("");
 
     try {
-      await onSubmit(submittedValue);
+      await onSubmit(submittedValue, attachments);
     } catch {
       setDraftValue(submittedValue);
     }
+  };
+
+  const handleUploadFiles = async (files: File[]) => {
+    const uploaded = await onUploadAttachments(files);
+    return uploaded;
+  };
+
+  const handleInlineUploadFiles = (files: File[]) => {
+    void handleUploadFiles(files)
+      .then((uploaded) => {
+        onAttachmentsChange((current) => [...current, ...uploaded]);
+        setAttachmentError(null);
+      })
+      .catch((uploadError) => {
+        setAttachmentError(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "附件上传失败，请稍后再试。",
+        );
+      });
   };
 
   // 管理输入框高度自适应：只测量目标高度，实际高度交给 Motion 驱动。
@@ -267,6 +326,28 @@ export function ChatInput({
           rows={1}
           disabled={disabled}
           onChange={(event) => setDraftValue(event.target.value)}
+          onPaste={(event) => {
+            const files = Array.from(event.clipboardData.files);
+
+            if (files.length > 0) {
+              handleInlineUploadFiles(files);
+            }
+          }}
+          onDrop={(event) => {
+            const files = Array.from(event.dataTransfer.files);
+
+            if (files.length === 0) {
+              return;
+            }
+
+            event.preventDefault();
+            handleInlineUploadFiles(files);
+          }}
+          onDragOver={(event) => {
+            if (supportsImages || supportsFiles) {
+              event.preventDefault();
+            }
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !isSubmitting) {
               event.preventDefault();
@@ -274,6 +355,21 @@ export function ChatInput({
             }
           }}
         />
+
+        {hasAttachments ? (
+          <AttachmentPreviewList
+            attachments={attachments}
+            className="px-1 pt-1"
+            onRemove={(attachment) =>
+              onAttachmentsChange((current) =>
+                current.filter((item) => item.id !== attachment.id),
+              )
+            }
+          />
+        ) : null}
+        {attachmentError ? (
+          <p className="px-1 text-xs text-red-500">{attachmentError}</p>
+        ) : null}
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -321,6 +417,37 @@ export function ChatInput({
                 <span className="sr-only">已添加 {urlContextUrls.length} 条 URL</span>
               </Button>
             </Tooltip>
+
+            <Tooltip content={attachmentTooltip}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className={cn(
+                  "relative h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
+                  (isAttachmentDialogOpen || hasAttachments) &&
+                    "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
+                  !supportsImages && !supportsFiles && "opacity-80",
+                )}
+                type="button"
+                onClick={() => setIsAttachmentDialogOpen(true)}
+                disabled={disabled || isSubmitting}
+                aria-label="修改附加项"
+              >
+                {isUploadingAttachments ? (
+                  <LoaderCircleIcon className="size-4 animate-spin" />
+                ) : (
+                  <PaperclipIcon className="size-4" />
+                )}
+                {hasAttachments ? (
+                  <span
+                    className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-[7px] bg-sky-600 px-1 text-[0.65rem] font-medium leading-4 text-white shadow-[0_4px_10px_rgba(2,132,199,0.2)]"
+                    aria-hidden="true"
+                  >
+                    {attachments.length}
+                  </span>
+                ) : null}
+              </Button>
+            </Tooltip>
           </div>
 
           <Button
@@ -348,6 +475,20 @@ export function ChatInput({
           </Button>
         </div>
       </div>
+      <AttachmentEditorDialog
+        open={isAttachmentDialogOpen}
+        title="修改附加项"
+        urls={urlContextUrls}
+        attachments={attachments}
+        disabled={disabled || isSubmitting}
+        supportsFiles={supportsFiles}
+        supportsImages={supportsImages}
+        isUploading={isUploadingAttachments}
+        onOpenChange={setIsAttachmentDialogOpen}
+        onUrlsChange={onUrlContextUrlsChange}
+        onAttachmentsChange={onAttachmentsChange}
+        onUploadFiles={handleUploadFiles}
+      />
     </motion.div>
   );
 }

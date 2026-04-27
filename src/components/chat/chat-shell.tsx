@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { AuthUser } from "@/lib/schemas/auth";
+import { MessageAttachment } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
 import { AIModel } from "@/lib/schemas/model";
 import {
@@ -112,9 +113,13 @@ export function ChatShell({
   const {
     urlContextInputValue,
     urlContextUrls,
+    draftAttachments,
+    isUploadingAttachments,
     isUrlContextPanelOpen,
     isSubmitting,
     setUrlContextInputValue,
+    setUrlContextUrls,
+    setDraftAttachments,
     getMessages,
     handleSubmit,
     editMessageAndRegenerate,
@@ -123,6 +128,7 @@ export function ChatShell({
     addUrlContextUrl,
     removeUrlContextUrl,
     toggleUrlContextPanel,
+    uploadAttachments,
     syncConversationMessages,
     removeConversationMessages,
   } = useChatSession();
@@ -252,7 +258,10 @@ export function ChatShell({
     }
   }
 
-  const handleSendMessage = useCallback(async (content: string) => {
+  const handleSendMessage = useCallback(async (
+    content: string,
+    attachments?: MessageAttachment[],
+  ) => {
     setWorkspaceError(null);
 
     const conversationId = await ensureConversationId();
@@ -264,6 +273,7 @@ export function ChatShell({
     await handleSubmit({
       conversationId,
       content,
+      attachments,
       selectedModelId,
       // handleSubmit 只知道聊天接口返回了最新会话，
       // 具体怎么把它并回列表由 ChatShell 决定。
@@ -316,6 +326,7 @@ export function ChatShell({
         messageId: message.id,
         content: update.content,
         urls: update.urls,
+        attachments: update.attachments,
         selectedModelId,
         onConversationSynced(conversation) {
           upsertConversation(conversation);
@@ -509,8 +520,7 @@ export function ChatShell({
                             const capabilitySummary = [
                               model.capabilities.reasoning ? "推理" : null,
                               model.capabilities.image ? "图像" : null,
-                              model.capabilities.audio ? "音频" : null,
-                              model.capabilities.video ? "视频" : null,
+                              model.capabilities.files ? "文件" : null,
                               model.capabilities.webSearch ? "联网" : null,
                               model.capabilities.functionCalling ? "工具" : null,
                             ].filter(Boolean);
@@ -635,8 +645,12 @@ export function ChatShell({
               scrollContainerRef={scrollContainerRef}
               loadingHint={isLoadingConversation ? "请稍等，我们正在从数据库同步当前会话。" : null}
               actionsDisabled={isSubmitting || isLoadingConversation}
+              supportsImages={selectedModel?.capabilities.image ?? false}
+              supportsFiles={selectedModel?.capabilities.files ?? false}
+              isUploadingAttachments={isUploadingAttachments}
               onCopyMessage={handleCopyMessage}
               onEditMessage={handleEditMessage}
+              onUploadAttachments={uploadAttachments}
               onBranchFromMessage={handleBranchFromMessage}
               onRegenerateMessage={handleRegenerateMessage}
               onScroll={handleScroll}
@@ -652,14 +666,21 @@ export function ChatShell({
                   webSearchEnabled={currentWebSearchEnabled}
                   urlContextInputValue={urlContextInputValue}
                   urlContextUrls={urlContextUrls}
+                  attachments={draftAttachments}
                   isUrlContextPanelOpen={isUrlContextPanelOpen}
                   supportsWebSearch={selectedModel?.capabilities.webSearch ?? false}
                   supportsUrlContext={selectedModel?.capabilities.urlContext ?? false}
+                  supportsImages={selectedModel?.capabilities.image ?? false}
+                  supportsFiles={selectedModel?.capabilities.files ?? false}
+                  isUploadingAttachments={isUploadingAttachments}
                   onToggleWebSearch={toggleWebSearchEnabled}
                   onUrlContextInputChange={setUrlContextInputValue}
+                  onUrlContextUrlsChange={setUrlContextUrls}
+                  onAttachmentsChange={setDraftAttachments}
                   onToggleUrlContextPanel={toggleUrlContextPanel}
                   onAddUrlContextUrl={addUrlContextUrl}
                   onRemoveUrlContextUrl={removeUrlContextUrl}
+                  onUploadAttachments={uploadAttachments}
                   onSubmit={handleSendMessage}
                   onStop={stopStreaming}
                   isSubmitting={isSubmitting}

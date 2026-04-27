@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react";
-import { ChatMessage } from "@/lib/schemas/chat";
+import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
 import { motion, useReducedMotion } from "motion/react";
 import {
   BotIcon,
@@ -12,6 +12,7 @@ import {
   RefreshCwIcon,
   UserIcon,
   XIcon,
+  PaperclipIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,25 +21,31 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownMessage } from "./markdown-message";
 import {
+  AttachmentEditorDialog,
+  AttachmentPreviewList,
+} from "./message-attachments";
+import {
   areUrlListsEqual,
-  EditableMessageUrlContext,
-  MAX_EDIT_URL_CONTEXT_ITEMS,
   MessageUrlContextSummary,
-  normalizeUrlCandidate,
 } from "./message-url-context";
 import { softSpring, smoothEase } from "./motion-presets";
 
 export type EditMessageUpdate = {
   content: string;
   urls?: string[];
+  attachments?: MessageAttachment[];
 };
 
 type MessageBubbleProps = {
   message: ChatMessage;
   actionsDisabled?: boolean;
   canRegenerate?: boolean;
+  supportsImages: boolean;
+  supportsFiles: boolean;
+  isUploadingAttachments?: boolean;
   onCopy: (message: ChatMessage) => Promise<void> | void;
   onEdit: (message: ChatMessage, update: EditMessageUpdate) => Promise<void>;
+  onUploadAttachments: (files: File[]) => Promise<MessageAttachment[]>;
   onBranch: (message: ChatMessage) => Promise<void>;
   onRegenerate: (message: ChatMessage) => Promise<void>;
 };
@@ -346,8 +353,12 @@ export function MessageBubble({
   message,
   actionsDisabled = false,
   canRegenerate: canRegenerateMessage = false,
+  supportsImages,
+  supportsFiles,
+  isUploadingAttachments = false,
   onCopy,
   onEdit,
+  onUploadAttachments,
   onBranch,
   onRegenerate,
 }: MessageBubbleProps) {
@@ -355,9 +366,10 @@ export function MessageBubble({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
   const [editUrls, setEditUrls] = useState(message.metadata.urls ?? []);
-  const [editUrlValue, setEditUrlValue] = useState("");
-  const [editUrlError, setEditUrlError] = useState<string | null>(null);
-  const [isEditingUrlContext, setIsEditingUrlContext] = useState(false);
+  const [editAttachments, setEditAttachments] = useState(
+    message.metadata.attachments ?? [],
+  );
+  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isBranching, setIsBranching] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -369,6 +381,7 @@ export function MessageBubble({
   const isStreaming = message.status === "streaming";
   const messageMetadataUrls = message.metadata.urls;
   const metadataUrls = messageMetadataUrls ?? EMPTY_METADATA_URLS;
+  const metadataAttachments = message.metadata.attachments ?? [];
   const isActionLocked =
     actionsDisabled ||
     message.status === "pending" ||
@@ -404,11 +417,9 @@ export function MessageBubble({
     if (!isEditing) {
       setEditValue(message.content);
       setEditUrls(messageMetadataUrls ?? []);
-      setEditUrlValue("");
-      setEditUrlError(null);
-      setIsEditingUrlContext(false);
+      setEditAttachments(message.metadata.attachments ?? []);
     }
-  }, [isEditing, message.content, messageMetadataUrls]);
+  }, [isEditing, message.content, messageMetadataUrls, message.metadata.attachments]);
 
   const handleCopy = async () => {
     if (!canCopy) {
@@ -425,9 +436,7 @@ export function MessageBubble({
   const handleStartEdit = () => {
     setEditValue(message.content);
     setEditUrls(message.metadata.urls ?? []);
-    setEditUrlValue("");
-    setEditUrlError(null);
-    setIsEditingUrlContext(false);
+    setEditAttachments(message.metadata.attachments ?? []);
     setIsEditing(true);
   };
 
@@ -435,78 +444,26 @@ export function MessageBubble({
     setIsEditing(false);
     setEditValue(message.content);
     setEditUrls(message.metadata.urls ?? []);
-    setEditUrlValue("");
-    setEditUrlError(null);
-    setIsEditingUrlContext(false);
-  };
-
-  const getUrlsWithPendingInput = () => {
-    const pendingUrl = editUrlValue.trim();
-
-    if (!pendingUrl) {
-      return editUrls;
-    }
-
-    const normalizedUrl = normalizeUrlCandidate(pendingUrl);
-
-    if (!normalizedUrl) {
-      setEditUrlError("URL 格式不正确。");
-      return null;
-    }
-
-    if (editUrls.includes(normalizedUrl)) {
-      return editUrls;
-    }
-
-    if (editUrls.length >= MAX_EDIT_URL_CONTEXT_ITEMS) {
-      setEditUrlError(`最多保留 ${MAX_EDIT_URL_CONTEXT_ITEMS} 个 URL。`);
-      return null;
-    }
-
-    return [...editUrls, normalizedUrl];
-  };
-
-  const handleAddEditUrl = () => {
-    const normalizedUrl = normalizeUrlCandidate(editUrlValue);
-
-    if (!normalizedUrl) {
-      setEditUrlError("URL 格式不正确。");
-      return;
-    }
-
-    if (editUrls.includes(normalizedUrl)) {
-      setEditUrlValue("");
-      setEditUrlError(null);
-      return;
-    }
-
-    if (editUrls.length >= MAX_EDIT_URL_CONTEXT_ITEMS) {
-      setEditUrlError(`最多保留 ${MAX_EDIT_URL_CONTEXT_ITEMS} 个 URL。`);
-      return;
-    }
-
-    setEditUrls((current) => [...current, normalizedUrl]);
-    setEditUrlValue("");
-    setEditUrlError(null);
-  };
-
-  const handleRemoveEditUrl = (targetUrl: string) => {
-    setEditUrls((current) => current.filter((url) => url !== targetUrl));
-    setEditUrlError(null);
+    setEditAttachments(message.metadata.attachments ?? []);
   };
 
   const handleSaveEdit = async () => {
     const trimmedValue = editValue.trim();
-    const nextUrls = getUrlsWithPendingInput();
+    const nextUrls = editUrls;
 
-    if (!canEdit || !trimmedValue || !nextUrls) {
+    if (
+      !canEdit ||
+      (trimmedValue.length === 0 && editAttachments.length === 0)
+    ) {
       return;
     }
 
     const contentChanged = trimmedValue !== message.content;
     const urlsChanged = !areUrlListsEqual(nextUrls, metadataUrls);
+    const attachmentsChanged =
+      JSON.stringify(editAttachments) !== JSON.stringify(metadataAttachments);
 
-    if (!contentChanged && !urlsChanged) {
+    if (!contentChanged && !urlsChanged && !attachmentsChanged) {
       setIsEditing(false);
       return;
     }
@@ -517,11 +474,10 @@ export function MessageBubble({
       const editPromise = onEdit(message, {
         content: trimmedValue,
         urls: nextUrls,
+        attachments: editAttachments,
       });
 
       setIsEditing(false);
-      setEditUrlValue("");
-      setEditUrlError(null);
 
       await editPromise;
     } finally {
@@ -610,17 +566,21 @@ export function MessageBubble({
               disabled={isSubmittingEdit}
               autoFocus
             />
-            <EditableMessageUrlContext
-              urls={editUrls}
-              inputValue={editUrlValue}
-              error={editUrlError}
-              expanded={isEditingUrlContext}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-fit rounded-[9px] border-blue-100/85 bg-white/70 px-3 text-[0.82rem] text-slate-600 shadow-none"
+              onClick={() => setIsAttachmentDialogOpen(true)}
               disabled={isSubmittingEdit}
-              onExpandedChange={setIsEditingUrlContext}
-              onInputChange={setEditUrlValue}
-              onAddUrl={handleAddEditUrl}
-              onRemoveUrl={handleRemoveEditUrl}
-              onClearError={() => setEditUrlError(null)}
+            >
+              <PaperclipIcon className="size-3.5" />
+              修改附加项
+              {editAttachments.length > 0 ? ` · ${editAttachments.length}` : ""}
+            </Button>
+            <AttachmentPreviewList
+              attachments={editAttachments}
+              className="pt-1"
             />
             <div className="flex justify-end gap-2">
               <Tooltip content="取消">
@@ -642,7 +602,13 @@ export function MessageBubble({
                   className="h-8 w-12 rounded-[9px] shadow-none"
                   type="button"
                   onClick={() => void handleSaveEdit()}
-                  disabled={isSubmittingEdit || editValue.trim().length === 0}
+                  disabled={
+                    isSubmittingEdit ||
+                    (
+                      editValue.trim().length === 0 &&
+                      editAttachments.length === 0
+                    )
+                  }
                   aria-label="保存编辑"
                 >
                   {isSubmittingEdit ? (
@@ -684,7 +650,27 @@ export function MessageBubble({
             className="mt-2.5 border-t border-blue-100/80 pt-2"
           />
         ) : null}
+        {!isEditing && isUser && metadataAttachments.length > 0 ? (
+          <AttachmentPreviewList
+            attachments={metadataAttachments}
+            className="mt-2.5 border-t border-blue-100/80 pt-2.5"
+          />
+        ) : null}
       </div>
+      <AttachmentEditorDialog
+        open={isAttachmentDialogOpen}
+        title="修改附加项"
+        urls={editUrls}
+        attachments={editAttachments}
+        disabled={isSubmittingEdit}
+        supportsFiles={supportsFiles}
+        supportsImages={supportsImages}
+        isUploading={isUploadingAttachments}
+        onOpenChange={setIsAttachmentDialogOpen}
+        onUrlsChange={setEditUrls}
+        onAttachmentsChange={setEditAttachments}
+        onUploadFiles={onUploadAttachments}
+      />
       {canCopy || canEdit || canBranch || showRegenerate ? (
         <div
           className={cn(

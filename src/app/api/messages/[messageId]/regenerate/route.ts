@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { ServerEnvError } from "@/lib/env/server";
 import { regenerateAssistantMessageRequestSchema } from "@/lib/schemas/chat";
+import {
+  cleanupUnreferencedAttachments,
+  getAttachmentPaths,
+  normalizeMessageAttachments,
+} from "@/lib/attachments";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 import {
   ConversationAccessError,
@@ -123,7 +128,8 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, modelId, webSearchEnabled, urls } = parsed.data;
+    const { conversationId, modelId, webSearchEnabled, urls, attachments } =
+      parsed.data;
     let conversation = await getConversationById(
       supabase,
       user.id,
@@ -212,24 +218,16 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const effectiveUrls = urls ?? previousUserMessage.metadata.urls;
-
-    if (urls !== undefined) {
-      await updateConversationMessage(
-        supabase,
-        conversationId,
-        previousUserMessage.id,
-        {
-          metadata: {
+    const nextPreviousUserMetadata =
+      urls !== undefined || attachments !== undefined
+        ? {
             ...previousUserMessage.metadata,
-            urls,
-          },
-        },
-      );
-      previousUserMessage.metadata = {
-        ...previousUserMessage.metadata,
-        urls,
-      };
-    }
+            ...(urls !== undefined ? { urls } : {}),
+            ...(attachments !== undefined
+              ? { attachments: normalizeMessageAttachments(attachments) }
+              : {}),
+          }
+        : previousUserMessage.metadata;
 
     if (
       (modelId && conversation.modelId !== modelId) ||
@@ -249,12 +247,54 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    await deleteConversationMessagesById(supabase, conversationId, [messageId]);
-    conversation = await touchConversation(supabase, user.id, conversationId);
     const effectiveModelId = modelId ?? conversation.modelId;
     const selectedModel = effectiveModelId
       ? await getEnabledModelById(supabase, effectiveModelId)
       : null;
+    const effectiveAttachments = nextPreviousUserMetadata.attachments ?? [];
+
+    if (effectiveAttachments.length > 0 && selectedModel) {
+      const hasImageAttachment = effectiveAttachments.some(
+        (attachment) => attachment.kind === "image",
+      );
+      const hasFileAttachment = effectiveAttachments.some(
+        (attachment) => attachment.kind === "file",
+      );
+
+      if (hasImageAttachment && !selectedModel.capabilities.image) {
+        throw new ModelRegistryError("当前模型不支持图片输入。");
+      }
+
+      if (hasFileAttachment && !selectedModel.capabilities.files) {
+        throw new ModelRegistryError("当前模型不支持文件输入。");
+      }
+    }
+
+    if (urls !== undefined || attachments !== undefined) {
+      await updateConversationMessage(
+        supabase,
+        conversationId,
+        previousUserMessage.id,
+        {
+          metadata: nextPreviousUserMetadata,
+        },
+      );
+      const previousAttachments =
+        previousUserMessage.metadata.attachments ?? [];
+      previousUserMessage.metadata = {
+        ...nextPreviousUserMetadata,
+      };
+      void cleanupUnreferencedAttachments(
+        supabase,
+        previousAttachments.filter(
+          (attachment) =>
+            !getAttachmentPaths(nextPreviousUserMetadata).includes(attachment.storagePath),
+        ),
+      ).catch(() => null);
+    }
+
+    await deleteConversationMessagesById(supabase, conversationId, [messageId]);
+    conversation = await touchConversation(supabase, user.id, conversationId);
 
     return createAssistantStreamResponse({
       supabase,

@@ -5,7 +5,10 @@ import {
   registerConversationStream,
   unregisterConversationStream,
 } from "@/lib/ai/stream-control";
-import { type ChatMessage, type ChatStreamEvent } from "@/lib/schemas/chat";
+import {
+  type ChatMessage,
+  type ChatStreamEvent,
+} from "@/lib/schemas/chat";
 import { type Conversation } from "@/lib/schemas/conversation";
 import { type RuntimeAIModel } from "@/lib/supabase/model-registry";
 import {
@@ -108,6 +111,7 @@ export async function createAssistantStreamResponse({
             conversationSystemPrompt: nextConversation.systemPrompt,
             webSearchEnabled: nextConversation.webSearchEnabled,
             urls,
+            supabase,
             abortSignal: mergedAbortController.signal,
           })) {
             if (!delta) {

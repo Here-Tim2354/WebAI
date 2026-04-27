@@ -161,7 +161,7 @@
 | `supports_web_search` | `boolean` | 否 | 联网能力 |
 | `supports_function_calling` | `boolean` | 否 | 函数调用能力 |
 | `supports_tools` | `boolean` | 否 | 工具能力总开关 |
-| `supports_file_search` | `boolean` | 否 | 文件检索能力 |
+| `supports_files` | `boolean` | 否 | 文件输入能力 |
 | `supports_structured_outputs` | `boolean` | 否 | 结构化输出能力 |
 | `supports_streaming` | `boolean` | 否 | 流式能力 |
 | `supports_reasoning` | `boolean` | 否 | 推理能力 |
@@ -193,7 +193,7 @@
 | `supports_code_execution` | `boolean` | 否 | Code Execution |
 | `supports_function_calling` | `boolean` | 否 | 函数调用能力 |
 | `supports_tools` | `boolean` | 否 | 工具能力总开关 |
-| `supports_file_search` | `boolean` | 否 | 文件检索能力 |
+| `supports_files` | `boolean` | 否 | 文件输入能力 |
 | `supports_structured_outputs` | `boolean` | 否 | 结构化输出能力 |
 | `supports_streaming` | `boolean` | 否 | 流式能力 |
 | `supports_reasoning` | `boolean` | 否 | 推理能力 |
