@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  conversationStatusSchema,
   conversationListResponseSchema,
   conversationResponseSchema,
   createConversationRequestSchema,
@@ -7,6 +8,7 @@ import {
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 import {
   createConversation,
+  listFavoriteConversations,
   listConversations,
 } from "@/lib/supabase/conversations";
 import { getEnabledModelById, ModelRegistryError } from "@/lib/supabase/model-registry";
@@ -27,14 +29,22 @@ function unauthorizedResponse() {
  * 获取当前用户的会话列表。
  * 排序规则不在这里重复实现，而是交给 Supabase 查询层统一处理。
  */
-export async function GET() {
+export async function GET(request: Request) {
   const { supabase, user } = await getSupabaseAuthContext();
 
   if (!user) {
     return unauthorizedResponse();
   }
 
-  const conversations = await listConversations(supabase, user.id);
+  const url = new URL(request.url);
+  const status = conversationStatusSchema
+    .catch("active")
+    .parse(url.searchParams.get("status") ?? "active");
+  const favorite = url.searchParams.get("favorite") === "true";
+  const conversations = favorite
+    ? await listFavoriteConversations(supabase, user.id)
+    : await listConversations(supabase, user.id, status);
+
   return NextResponse.json(
     conversationListResponseSchema.parse({ conversations }),
   );

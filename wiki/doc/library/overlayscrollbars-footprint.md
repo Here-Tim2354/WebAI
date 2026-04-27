@@ -35,8 +35,9 @@ aliases:
 
 `globals.css` 中负责：
 - 引入 `overlayscrollbars/overlayscrollbars.css`
+- 定义项目级原生滚动条默认样式，作为不接滚动库区域的视觉 fallback
 - 定义 `os-theme-webai`
-- 给 textarea 原生滚动条做同风格主题化
+- 让 `os-theme-webai` 复用同一组滚动条颜色变量，保持原生 fallback 与增强层视觉接近
 
 ## 2. 当前明确不覆盖的区域
 
@@ -47,7 +48,7 @@ textarea 不直接接 OverlayScrollbars。
 原因：
 - 直接接管 textarea 后，原生滚动条和鼠标滚轮曾失效
 - textarea 的输入法、选区、滚动行为属于浏览器原生高敏感区域
-- 当前更稳的做法是保留原生滚动，只统一样式
+- 当前更稳的做法是保留原生滚动，并沿用全局原生滚动条默认样式
 
 ### Dropdown Portal
 

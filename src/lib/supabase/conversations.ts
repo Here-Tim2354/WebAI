@@ -8,12 +8,18 @@ type ConversationRow = {
   model_id: string | null;
   web_search_enabled: boolean;
   status: "active" | "archived";
+  archived_at: string | null;
+  favorites?: { created_at: string }[] | null;
+  is_favorite?: boolean;
+  favorited_at?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 // 数据库字段采用 snake_case，前端 schema 采用 camelCase，这里统一做一次映射转换。
 function mapConversation(row: ConversationRow): Conversation {
+  const favorite = row.favorites?.[0] ?? null;
+
   return {
     id: row.id,
     title: row.title,
@@ -21,13 +27,16 @@ function mapConversation(row: ConversationRow): Conversation {
     modelId: row.model_id,
     webSearchEnabled: row.web_search_enabled,
     status: row.status,
+    archivedAt: row.archived_at,
+    isFavorite: row.is_favorite ?? favorite !== null,
+    favoritedAt: row.favorited_at ?? favorite?.created_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 const conversationSelectFields =
-  "id, title, system_prompt, model_id, web_search_enabled, status, created_at, updated_at";
+  "id, title, system_prompt, model_id, web_search_enabled, status, archived_at, created_at, updated_at, favorites(created_at)";
 
 export class ConversationAccessError extends Error {
   constructor(message: string) {
@@ -52,11 +61,13 @@ export function createBranchConversationTitle(title: string) {
 export async function listConversations(
   supabase: SupabaseClient,
   userId: string,
+  status: "active" | "archived" = "active",
 ) {
   const { data, error } = await supabase
     .from("conversations")
     .select(conversationSelectFields)
     .eq("user_id", userId)
+    .eq("status", status)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -64,6 +75,30 @@ export async function listConversations(
   }
 
   return (data ?? []).map((row) => mapConversation(row as ConversationRow));
+}
+
+export async function listFavoriteConversations(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(
+      "id, title, system_prompt, model_id, web_search_enabled, status, archived_at, created_at, updated_at, favorites!inner(created_at)",
+    )
+    .eq("user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? [])
+    .map((row) => mapConversation(row as ConversationRow))
+    .sort((left, right) =>
+      (right.favoritedAt ?? right.updatedAt).localeCompare(
+        left.favoritedAt ?? left.updatedAt,
+      ),
+    );
 }
 
 /**
@@ -125,6 +160,7 @@ type UpdateConversationInput = {
   systemPrompt?: string;
   modelId?: string;
   webSearchEnabled?: boolean;
+  status?: "active" | "archived";
 };
 
 /**
@@ -142,6 +178,8 @@ export async function updateConversation(
     system_prompt?: string | null;
     model_id?: string | null;
     web_search_enabled?: boolean;
+    status?: "active" | "archived";
+    archived_at?: string | null;
   } = {};
 
   if (updates.title !== undefined) {
@@ -162,6 +200,12 @@ export async function updateConversation(
     nextConversationUpdate.web_search_enabled = updates.webSearchEnabled;
   }
 
+  if (updates.status !== undefined) {
+    nextConversationUpdate.status = updates.status;
+    nextConversationUpdate.archived_at =
+      updates.status === "archived" ? new Date().toISOString() : null;
+  }
+
   const { data, error } = await supabase
     .from("conversations")
     .update(nextConversationUpdate)
@@ -179,6 +223,59 @@ export async function updateConversation(
   }
 
   return mapConversation(data as ConversationRow);
+}
+
+export async function favoriteConversation(
+  supabase: SupabaseClient,
+  userId: string,
+  conversationId: string,
+) {
+  const conversation = await getConversationById(supabase, userId, conversationId);
+  const { error } = await supabase
+    .from("favorites")
+    .upsert(
+      {
+        user_id: userId,
+        conversation_id: conversationId,
+      },
+      {
+        onConflict: "user_id,conversation_id",
+        ignoreDuplicates: true,
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    ...conversation,
+    isFavorite: true,
+    favoritedAt: new Date().toISOString(),
+  };
+}
+
+export async function unfavoriteConversation(
+  supabase: SupabaseClient,
+  userId: string,
+  conversationId: string,
+) {
+  const conversation = await getConversationById(supabase, userId, conversationId);
+  const { error } = await supabase
+    .from("favorites")
+    .delete()
+    .eq("user_id", userId)
+    .eq("conversation_id", conversationId);
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    ...conversation,
+    isFavorite: false,
+    favoritedAt: null,
+  };
 }
 
 export async function deleteConversation(

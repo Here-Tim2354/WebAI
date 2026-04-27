@@ -1,27 +1,34 @@
-# Search Records 扩展设想
+# Search Records 扩展
 
 需求来源：
 
 - `phase_overview.md` 中 `Phase 4`
-- 搜索历史内容与搜索记录能力
+- `Phase 4.3` 曾短暂尝试会话搜索
 
 当前状态：
 
-- `planned`
-- 尚未进入当前已验证数据库主线
+- `withdrawn`
+- 搜索入口与 `/api/conversations/search` 已从产品代码撤回
+- `20260427083000_phase4_conversation_organization.sql` 曾创建该实验对象
+- `20260427091000_remove_conversation_search.sql` 已推送远端，用于清理远端函数与表
+- 已确认远端 `search_records` 与 `search_user_conversations` 均不存在
 
-建议实体：
+当前实体：
 
-- `search_records`
+- `search_records`（撤回）
 
-建议最小字段：
+当前字段：
 
 - `id`
 - `user_id`
-- `keyword`
+- `query`
+- `active_conversation_id`
+- `matched_conversation_ids`
+- `result_count`
 - `created_at`
 
 当前判断：
 
-- 搜索记录属于围绕会话和消息的扩展行为数据
-- 在搜索页面、接口和 migration 未统一落地前，不应写入已验证关系模式
+- 当前产品判断认为会话搜索暂不需要进入 Phase 4.3 主链路
+- 搜索记录不迁入 `10_verified/`
+- 后续如果重新启用搜索，应重新评估入口位置、排序规则和搜索记录是否真的服务课程设计主线

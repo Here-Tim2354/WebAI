@@ -56,7 +56,7 @@ export function Tooltip({
       : horizontalAlignClassName[align];
 
   return (
-    <span className="group/tooltip relative inline-flex">
+    <span className="group/tooltip relative z-[100] inline-flex">
       {children}
       <span
         role="tooltip"
@@ -65,9 +65,9 @@ export function Tooltip({
           transitionDuration: `${Math.max(closeDelay, 140)}ms`,
         }}
         className={cn(
-          "pointer-events-none absolute z-50 block w-max max-w-[18rem] rounded-[9px] border border-slate-200/80 bg-white/92 px-2.5 py-1.5 text-[0.72rem] leading-5 text-slate-600 opacity-0 shadow-[0_16px_34px_rgba(44,74,122,0.14)] backdrop-blur-xl",
-          "scale-95 blur-[1px] transition-[opacity,transform,filter] ease-[cubic-bezier(0.16,1,0.3,1)]",
-          "group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 group-hover/tooltip:blur-0 group-focus-within/tooltip:scale-100 group-focus-within/tooltip:opacity-100 group-focus-within/tooltip:blur-0",
+          "pointer-events-none absolute z-[120] block w-max max-w-[18rem] rounded-[9px] border border-slate-200 bg-white px-2.5 py-1.5 text-[0.72rem] leading-5 font-medium text-slate-700 opacity-0 shadow-[0_16px_34px_rgba(44,74,122,0.16)]",
+          "scale-95 transition-[opacity,transform] ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 group-focus-within/tooltip:scale-100 group-focus-within/tooltip:opacity-100",
           sideClassName[side],
           alignClassName,
           className,

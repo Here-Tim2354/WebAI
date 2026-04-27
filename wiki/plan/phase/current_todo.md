@@ -1,255 +1,116 @@
 # Current Todo
 
-更新时间：2026-04-27 00:17:20
+更新时间：2026-04-27 21:50:54
 
 ## 当前阶段
 
-- 当前项目已正式进入 `Phase 4`
-- `Phase 1`、`Phase 2` 已完成
-- `Phase 3.1`、`Phase 3.2`、`Phase 3.3`、`Phase 3.4`、`Phase 3.5` 已完成
-- 当前判断：
-  - `Phase 3` 的数据库驱动聊天主链路已经稳定，可作为后续迭代基线
-  - `Phase 3.6` 仍需继续完成验收与材料整理，但当前不再作为阶段主线
-  - `Phase 4` 已成为当前阶段主线，并已按 `4.1` 至 `4.5+` 形成阶段拆分
-  - `Phase 4.1`、`Phase 4.2` 已完成
-  - 当前即将进入 `Phase 4.3`，默认优先推进“会话管理增强与组织能力扩展”
+- 当前主线：`Phase 4.3` 会话管理增强与组织能力扩展
+- 已完成阶段：
+  - `Phase 1`、`Phase 2`
+  - `Phase 3.1` 至 `Phase 3.5`
+  - `Phase 4.1` 生成体验与会话控制基础升级
+  - `Phase 4.2` 消息侧增强与会话分支能力
+- 并行补做：`Phase 3.6` 课程材料、RLS 与数据库说明验收
 
-## 已完成的关键节点
+## 当前完成状态
 
-- 数据库主线已闭环：
+- 数据库主线已稳定：
   - `profiles`
   - `conversations`
   - `messages`
-- 已完成真实用户下的会话 CRUD：
-  - 新建
-  - 查询列表
-  - 打开历史会话
-  - 重命名
-  - 删除
-- 已完成消息持久化主链路：
-  - 首次发送自动创建会话
-  - 用户消息入库
-  - assistant 消息入库
-  - 历史消息恢复
-- 已完成前端迁移与视觉收口：
-  - `Tailwind CSS v4`
-  - `shadcn/ui`
-  - `Lucide React`
-  - `Motion`
-  - `Geist Sans / Geist Mono`
-  - 移动端侧栏改为 `Sheet`
-  - 删除确认改为正式 `Dialog`
-  - 侧栏、空状态、输入区、消息区已统一到当前浅色工作台视觉
-- 已完成 `system_prompt` 的主链路贯通：
-  - 会话 schema 已支持 `systemPrompt`
-  - 会话 API 已支持读写 `systemPrompt`
-  - AI 调用层已能接收会话级提示词
-- 已完成模型注册表首轮落地：
   - `ai_models`
-  - `openai_compatible_models`
   - `gemini_models`
-  - Supabase migration 已落地
-  - 模型能力字段已能服务前端展示
-- 已完成模型注册表远端重建：
-  - 远端 Supabase 已执行父表 + provider 子表最终态迁移
-  - `ai_models` 已成为统一模型入口
-  - `openai_compatible_models` / `gemini_models` 已改为 provider 专属子表
-  - 首个 `Gemini 3 Flash Preview` seed 已落库
-- 已完成 AI 层首轮拆分：
-  - 统一 AI 入口已建立
-  - `Gemini` 专属调用层已抽离
-  - `OpenAI compatible` 调用层已抽离
-  - 聊天接口已支持可选 `modelId`
-- 已完成模型列表接口与前端初步接入：
-  - `/api/models` 已可用
-  - 空会话首页头部已接入模型选择条
-  - 当前发送消息时已可带上所选模型
-  - 当前 `modelId` 已切换为注册表主键语义
-- 已完成 `Phase 4` 规划收口：
-  - `phase_overview.md` 已改为 `Phase 4` 总述 + 子阶段路线
-  - `phase_4.md` 已新增
-  - 当前已明确 `4.1`、`4.2`、`4.3`、`4.4` 与 `4.5+` 的边界
-  - 当前已明确会话级提示词、会话级模型选择、会话级联网开关、消息编辑、消息分支、多模态输入的产品语义
-- 已完成 `Phase 4.1.1` 第一轮主链路收口：
-  - 聊天接口已切换为纯流式返回
-  - assistant 回复已支持增量渲染
-  - 已支持显式中断生成
-  - 消息状态已细化为 `pending / streaming / complete / cancelled / error`
-  - 会话级 `system_prompt` 已形成正式编辑入口
-  - 当前会话模型选择已支持持久化记忆
-  - 会话头部控制区已形成第一轮统一入口
-  - 联网入口已保留统一位置，并按当前能力置灰
-- 已完成工作区编排层第一轮抽离：
-  - `ChatShell` 已收口为页面壳组件
-  - 会话列表、模型列表、草稿控制项与会话同步逻辑已抽到 `useChatWorkspace`
-  - 当前聊天工作区的页面层 / 工作区编排层 / 消息交互层边界已更清楚
-- 已完成 Markdown / 代码块体验细修：
-  - Markdown 已恢复浅色主题并重新对齐当前浅色工作台视觉
-  - 代码块复制按钮已改为图标按钮
-  - 复制逻辑已补 `Clipboard API + execCommand` 双通道兜底
-  - user 消息已增加 `markdown--compact` 紧凑文本约束，用于和 assistant 长文排版分离
-- 已完成 `Phase 4.1.1` 数据层配套：
-  - `conversations.model_id` 已落库
-  - `messages.status` 已落库
-  - 流式链路相关 migration 已应用到远端 Supabase
-  - assistant 中断后的数据库状态已验收到 `cancelled`
-- 已完成联网搜索与 `URL Context` 的后端第一轮接入：
-  - `conversations.web_search_enabled` 已落库，默认值为 `true`
-  - 远端 Supabase 已执行 `20260421120000_phase4_web_search_and_url_context.sql`
-  - `/api/conversations` 与 `/api/conversations/[conversationId]` 已支持读写 `webSearchEnabled`
-  - `/api/chat` 已支持可选 `urls`
-  - `Gemini` 调用层已能按条件注入 `googleSearch` 与 `urlContext`
-  - `OpenAI compatible` 当前未接入 `URL Context` 相关逻辑
-- 已完成 `Phase 4.1.2` 第一轮前端接线与控制区细修：
-  - 会话级联网搜索已接到前端真实开关，并支持草稿态默认值沿用到首条消息建会话
-  - `Gemini URL Context` 已形成前端常驻输入入口，支持输入、确认、删除、发送时传参
-  - URL 输入区已支持发送后自动清空并收起
-  - URL 上限反馈已改为输入区内联警示，而不再依赖浏览器原生弹窗
-  - 输入区、弹层、消息气泡、侧栏与认证面板已进一步统一到较小圆角约束
-- 已完成本地与远端 migration 历史修复：
-  - 旧 migration 文件已统一重命名为完整时间戳格式
-  - 已补 `20260325144640_phase3_history_placeholder.sql` 用于对齐远端已存在的历史版本
-- 已完成 `Phase 4.2` 消息侧增强与会话分支能力：
-  - assistant 与 user 消息已具备复制入口
-  - 复制逻辑已补 `Clipboard API` 失败后的 `execCommand` 降级通道，用于兼容 in-app browser 权限限制
-  - user 消息已支持覆盖式编辑，并由后端直接进入重新生成流
-  - 编辑消息与删除后续上下文已改为数据库 RPC 原子操作，避免半更新会话
-  - assistant 消息已支持从当前消息创建新会话分支
-  - 分支会话会沿用原会话的模型、提示词与联网开关
-  - 分支复制上下文已改为按完整消息列表定位目标消息后截断，避免单纯依赖 `created_at`
-  - 分支复制时会为克隆消息写入递增 `created_at`，保证新分支内消息读取顺序稳定
-  - 分支创建已接入顶部工作区通知，支持创建中、成功与失败三种状态
-  - 消息操作按钮已收口为更轻的图标按钮，悬停提示简化为“复制”“分支”
-- 已完成后端流式响应复用整理：
-  - 新增统一 assistant 流式响应 helper
-  - `/api/chat` 与消息编辑重新生成已复用同一套流式落库与 NDJSON 事件输出逻辑
-  - 独立 `/api/chat/regenerate` 入口已删除，前端编辑流程统一由消息 PATCH 接口直接进入重新生成流
-  - 已新增 assistant 消息专用重新生成入口：仅当前会话最后一条 assistant 可重新生成，失败状态也可重试
-- 已完成消息级 metadata 第一轮接入：
-  - `messages.metadata` 已新增，用于保存单条消息附带的上下文资源
-  - 当前首批落地 `metadata.urls`
-  - 带 URL Context 发送时，URL 会写入对应 user 消息
-  - assistant 重新生成时会默认复用前一条 user 消息保存的 URL Context
-  - 分支复制消息时会保留 metadata，为后续图片、文件、视频输入预留结构
-  - user 消息已增加 URL Context 的轻量展示，支持查看数量和打开链接
-  - user 消息进入编辑态后可展开 URL Context 修改区，并与正文共用保存按钮触发重新生成
-- 已完成前端交互与视觉一致性收口：
-  - 输入区按钮、顶部模型选择、侧栏与消息编辑态进一步统一到小圆角语言
-  - 输入框高度自适应已改为 Motion 驱动，并保留缓入缓出的展开体验
-  - 聊天输入框改为本地草稿态，避免长文本输入时把高频状态提升到工作区层导致轻微卡顿
-  - 自定义轻量 Tooltip 已替代浏览器原生 `title` 的主要悬停提示
-  - 常规滚动区域已接入 `OverlayScrollbars`，textarea 保留原生滚动并用 CSS 做主题化
-  - 已修复 OverlayScrollbars 手动初始化 React 子节点导致的 `removeChild` 运行时异常风险
+  - `openai_compatible_models`
+- 聊天主链路已完成：
+  - 流式输出
+  - 中断生成
+  - 消息状态细分
+  - 消息持久化与历史恢复
+  - 会话级模型、提示词、联网开关
+  - Gemini URL Context 请求级输入与消息级 metadata 保存
+- 消息侧能力已完成：
+  - 复制
+  - user 消息编辑并重新生成
+  - assistant 最新消息重新生成
+  - assistant 消息分支到新会话
+  - 分支继承模型、提示词、联网开关与消息 metadata
+- 会话管理增强已完成第一轮：
+  - 收藏 / 取消收藏
+  - 头像菜单中的收藏区
+  - 收藏会话点击跳转
+  - 归档 / 恢复
+  - 头像菜单中的归档区
+  - 会话列表二级菜单归档入口
+  - 头像菜单承接收藏、归档区与退出登录
+- 搜索功能已撤回：
+  - 顶部搜索入口已移除
+  - `/api/conversations/search` 已删除
+  - `search_records` 与 `search_user_conversations` 已从远端 Supabase 清理
 
-## 当前代码状态
+## 数据库与迁移
 
-- 工作区已经形成统一的浅色 AI 工作台方向
-- 左侧栏、主聊天区、输入区、弹层已基本统一到同一套视觉语言
-- 数据库主线、会话管理和消息持久化已经进入稳定态
-- AI 能力层不再直接硬绑定 Gemini，后续接模型选择和多模型扩展的摩擦已经明显降低
-- 模型选择的后端接口与前端入口都已具备，但仍处于第一版可用状态
-- 当前远端模型注册表已经切到父子表最终态
-- 当前前端头部已经存在模型选择入口与提示词图标入口，但仍属于第一版控制区
-- 当前聊天接口已完成流式化，生成链路已进入 `Phase 4.1` 的第一轮稳定态
-- 当前会话级控制语义已经落成第一版：
-  - 当前会话模型选择记忆已完成
-  - 会话级 `system_prompt` 的正式编辑交互已完成
-  - 会话级联网搜索已完成前后端贯通，并具备真实交互入口
-- 当前子表能力字段已进入前端模型对象，并已用于模型能力标签展示与控制区置灰，但尚未全面驱动更深的交互差异
-- 当前 `Gemini URL Context` 已完成前后端第一轮贯通：
-  - 当前 `sendMessage` 请求已具备 `urls` 参数契约
-  - 当前前端已提供 URL 输入、删除、上限提示与发送后重置交互
-  - 当前 UI 仍在持续细修排版、提示文案与桌面端/移动端的一致性
-- 当前本地 migration 历史已与远端 Supabase 对齐，可继续沿用 `supabase db push`
-- 当前流式展示链路已可用，但仍存在后续可继续优化的体验项：
-  - reveal 节奏与过渡动画仍可继续细修
-  - 提示词弹窗尺寸与通用弹层约束曾发生冲突，当前已在调用点覆盖
-  - `reduced motion` 分支的流式显示问题已修复，但仍建议后续补最小回归验证
-- 当前 `ChatShell` 的页面装配职责已经收窄：
-  - 工作区编排逻辑已不再全部堆在 `chat-shell.tsx`
-  - `useChatWorkspace` 已成为后续承接会话级控制项的第一落点
-- 当前 Markdown / 代码块链路已完成一轮可用性修正：
-  - 浅色主题已恢复
-  - 代码复制按钮在当前浏览器环境已具备真实复制能力
-  - 图标按钮已替代原文字按钮
-- 当前消息侧操作已进入第一版可用状态：
-  - 复制、编辑、分支已在消息气泡上形成统一操作入口
-  - 最新 assistant 消息已形成重新生成入口
-  - user 消息会展示已附加的 URL Context，并支持在编辑消息时同步修改 URL Context
-  - assistant 回复正文与操作按钮的垂直间距已收紧
-  - user 与 assistant 的 Markdown 排版节奏已分离，避免短消息和长文回复互相牵制
-- 当前前端基础 UI primitive 已形成新增约束：
-  - `ScrollArea` 使用 `OverlayScrollbarsComponent`，不再手动初始化已有 DOM
-  - `DropdownMenu` 暂不接 OverlayScrollbars，避免 Portal 弹层卸载时与滚动库争抢 DOM
-  - `Tooltip` 采用无 Portal 的 CSS-only 实现，优先保证稳定性；代价是可能被 `overflow-hidden` 容器裁切
-  - textarea 不直接接 OverlayScrollbars，避免破坏原生输入滚动与鼠标滚轮行为
-- 当前分支上下文问题已通过远端 Supabase 数据排查定位：
-  - 旧分支会话存在克隆消息 `created_at` 完全相同导致读取顺序退化为 UUID 排序的问题
-  - 当前代码已修复后续新建分支的消息顺序
-  - 既有旧分支数据尚未自动修复，如需修复应先预览 SQL 影响范围再手动执行
+- 已推送远端 Supabase：
+  - `20260427083000_phase4_conversation_organization.sql`
+  - `20260427091000_remove_conversation_search.sql`
+- 当前确认：
+  - `favorites` 已落到远端
+  - `conversations.archived_at` 已落到远端
+  - `search_records` 不存在
+  - `search_user_conversations(text, uuid, conversation_status)` 不存在
+- 当前查询与 API：
+  - `/api/conversations?status=active`
+  - `/api/conversations?status=archived`
+  - `/api/conversations?favorite=true`
+  - `/api/conversations/[conversationId]/favorite`
+  - `PATCH /api/conversations/[conversationId]` 支持 `status`
+
+## 验证结果
+
+- `npm run typecheck` 通过
+- `npm run lint` 通过
+  - 仅剩既有 `src/components/chat/model-icon.tsx` 的 `<img>` warning
+- `npm run build` 通过
+  - 沙箱内可能触发已知 `spawn EPERM`
+  - 越权运行可通过
+- browser-use 已验收：
+  - 顶部搜索入口已消失
+  - 收藏与提示词 tooltip 文案已更新
+  - 提示词弹窗说明已改为更小字号与两行排版
+  - 输入区联网 / URL 按钮 tooltip 已改为 `联网` / `添加URL`
+  - 头像菜单含收藏、归档区、退出登录
+  - 收藏区可打开并显示空态
+  - 浏览器控制台无 error/warning
 
 ## 当前待办
 
-- `Phase 4.3` 开工项：
-  - 会话归档
-  - 归档恢复
-  - 收藏
-  - 会话搜索
-  - 扩展对象逐步落库
-- `Phase 4.2` 后续观察项：
-  - 继续观察 Tooltip 在被 `overflow-hidden` 容器包裹时是否存在裁切；如出现，再设计安全的非 Base UI Portal 方案
-  - 继续观察 OverlayScrollbars 在消息列表、侧栏、代码块和 Markdown 表格中的滚动稳定性
-  - 视需要补旧分支会话的消息顺序修复 SQL
-  - 继续观察消息操作按钮在移动端和长回复下的可点击性与间距
-- `Phase 4.4` 预备项：
-  - 会话级联网开关
-  - 显式搜索能力接入
+- `Phase 4.3` 收尾：
+  - 继续用真实页面观察收藏、归档、恢复在多会话数据下的交互稳定性
+  - 检查移动端 Sheet 下收藏区、归档区和会话菜单弹层表现
+  - 观察 CSS-only Tooltip 是否仍会在特殊容器里被裁切
+- `Phase 4.4` 预备：
   - 图片输入首轮接入
   - 为文件、视频输入预留结构
-- 补做 `Phase 3.6` 需要的验收内容：
-  - `RLS` 验证
+  - 重新评估搜索是否真的需要回到产品主链路
+- `Phase 3.6` 补做：
+  - RLS 验证
   - 数据库说明补全
   - migration 与表设计说明整理
   - 页面功能与数据库操作映射关系整理
   - 答辩支撑材料整理
 
-## 切换会话前建议保留的接手点
+## 接手点
 
-- 下个会话默认从 `Phase 4.3` 会话管理增强开始，不再重复讨论 `4.1` / `4.2` 是否完成
-- 第一站建议优先阅读：
+- 默认先读：
   - `wiki/plan/phase/phase_4.md`
   - `wiki/plan/phase/current_todo.md`
   - `src/components/chat/chat-shell.tsx`
+  - `src/components/chat/conversation-sidebar.tsx`
   - `src/components/chat/use-chat-workspace.ts`
-  - `src/components/chat/use-chat-session.ts`
-  - `src/app/api/chat/route.ts`
-  - `src/app/api/messages/[messageId]/route.ts`
-  - `src/app/api/conversations/[conversationId]/branch/route.ts`
-  - `src/lib/ai/assistant-stream-response.ts`
-  - `src/lib/ai/gemini.ts`
   - `src/lib/supabase/conversations.ts`
-- 下个会话默认先设计 `Phase 4.3` 的会话归档 / 收藏 / 搜索数据边界，再决定第一批实现顺序
-- 当前不把“补 seed”当作阶段主线，它只作为后续配套工作存在
-
-## 当前提醒
-
-- 当前数据库主线稳定，但 `favorites` 与 `search_records` 仍只保留在整体设计中
-- `profiles` 相关用户侧增强暂未作为当前主线推进
-- 模型注册表最终态已在远端 Supabase 落库，但当前 provider 覆盖和 seed 规模都还不是主线优先级
-- 前端模型选择仍处于第一版，尚未完成会话级记忆策略
-- 深色模式还未正式进入实现
-- `npm run build` 在当前环境里仍可能遇到 `spawn EPERM`，暂不作为仓库缺陷判断依据
-- 当前邮箱登录链路是否完整跑通，仍依赖 Supabase 控制台配置
-- 当前 `Phase 4.1.1` 的主链路已经成立，但阶段文档仍需要继续保持与实现同步
-- 当前 `Phase 4.1.2` 的真正重点不再是“有没有流式能力”，而是“如何把流式体验、控制区语义和会话级能力开关继续收口”
-- 当前联网搜索已经不是“后端已通、前端待接”的状态，而是“前后端已通、前端仍需继续细修”
-- 当前 `URL Context` 已完成 Gemini 专属前后端第一轮接入，当前重点已转为排版、反馈和一致性收口
-- 当前 Markdown / 代码块视觉与复制体验已经过一轮细修，但 user 气泡的最终纵向节奏仍应继续用真实页面观察，而不是只看代码猜测
-- 当前 `.codex-dev.log` 在 git 状态中显示为删除，是否保留删除状态需要用户自行确认
-- 当前消息编辑 RPC、消息级 metadata migration 已执行到远端 Supabase
-- 当前 `npm run typecheck`、`npm run lint`、`npm run build` 已通过；`build` 在沙箱内仍可能因 `spawn EPERM` 失败，越权运行可通过
-- 当前 `Phase 4.2` 已标记为完成；后续只保留观察和历史数据修复项，不再作为主线推进
+- 当前不要再恢复搜索入口，除非重新做产品判断。
+- `.playwright-mcp/` 是浏览器验证工具生成的未跟踪目录，不属于功能代码。
+- 空目录 `src/app/api/conversations/search` 若仍存在，可由用户手动删除；当前已无 `route.ts`，不会形成 Next API 路由。
 
 ## 一句话结论
 
-- 当前项目已经完成 `Phase 4.1` 生成体验与会话控制基础升级、`Phase 4.2` 消息侧增强与会话分支能力；下一阶段即将进入 `Phase 4.3` 会话管理增强与组织能力扩展，同时继续把 `Phase 3.6` 验收整理作为并行补做项。
+`Phase 4.3` 第一轮实现已经完成并通过本地检查、远端迁移核对与浏览器验收；下一步主要是移动端与多数据场景观察，同时准备进入 `Phase 4.4` 的多模态输入方向。

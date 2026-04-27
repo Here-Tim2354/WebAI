@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   EllipsisIcon,
   LogOutIcon,
   MessageSquareTextIcon,
@@ -9,7 +11,9 @@ import {
   PanelLeftOpenIcon,
   PencilLineIcon,
   PlusIcon,
+  StarIcon,
   Trash2Icon,
+  UserRoundIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,9 +46,15 @@ import { Conversation } from "@/lib/schemas/conversation";
 
 type ConversationSidebarProps = {
   conversations: Conversation[];
+  archivedConversations: Conversation[];
+  favoriteConversations: Conversation[];
   activeConversationId: string | null;
   isCreating: boolean;
   isDeletingConversationId: string | null;
+  isArchivingConversationId: string | null;
+  isRestoringConversationId: string | null;
+  isLoadingArchivedConversations: boolean;
+  isLoadingFavoriteConversations: boolean;
   isSigningOut: boolean;
   currentUserEmail: string | null;
   mobileOpen: boolean;
@@ -53,6 +63,10 @@ type ConversationSidebarProps = {
   onSelectConversation: (conversationId: string) => void;
   onRenameConversation: (conversationId: string, title: string) => Promise<void>;
   onDeleteConversation: (conversationId: string) => Promise<void>;
+  onArchiveConversation: (conversationId: string) => Promise<void>;
+  onRestoreConversation: (conversationId: string) => Promise<void>;
+  onLoadArchivedConversations: () => Promise<void>;
+  onLoadFavoriteConversations: () => Promise<void>;
   onSignOut: () => Promise<void>;
 };
 
@@ -72,9 +86,15 @@ function formatUpdatedAt(value: string) {
  */
 export function ConversationSidebar({
   conversations,
+  archivedConversations,
+  favoriteConversations,
   activeConversationId,
   isCreating,
   isDeletingConversationId,
+  isArchivingConversationId,
+  isRestoringConversationId,
+  isLoadingArchivedConversations,
+  isLoadingFavoriteConversations,
   isSigningOut,
   currentUserEmail,
   mobileOpen,
@@ -83,6 +103,10 @@ export function ConversationSidebar({
   onSelectConversation,
   onRenameConversation,
   onDeleteConversation,
+  onArchiveConversation,
+  onRestoreConversation,
+  onLoadArchivedConversations,
+  onLoadFavoriteConversations,
   onSignOut,
 }: ConversationSidebarProps) {
   const collapsedTrackClass =
@@ -93,6 +117,8 @@ export function ConversationSidebar({
   );
   const [pendingDeleteConversation, setPendingDeleteConversation] =
     useState<Conversation | null>(null);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [isFavoriteDialogOpen, setIsFavoriteDialogOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
 
   // 重命名采用“局部编辑态 + 提交后调用父层 API”的模式，
@@ -147,6 +173,32 @@ export function ConversationSidebar({
       setPendingDeleteConversation(null);
     } catch {
       // 删除失败时保留确认弹窗，避免用户误判操作已完成。
+    }
+  }
+
+  async function handleArchiveConversationClick(conversationId: string) {
+    try {
+      await onArchiveConversation(conversationId);
+    } catch {
+      // 归档失败时保留当前列表状态，由父层错误提示说明原因。
+    }
+  }
+
+  async function handleOpenArchiveDialog() {
+    setIsArchiveDialogOpen(true);
+    await onLoadArchivedConversations();
+  }
+
+  async function handleOpenFavoriteDialog() {
+    setIsFavoriteDialogOpen(true);
+    await onLoadFavoriteConversations();
+  }
+
+  async function handleRestoreConversationClick(conversationId: string) {
+    try {
+      await onRestoreConversation(conversationId);
+    } catch {
+      // 恢复失败时保留归档区，方便重试。
     }
   }
 
@@ -290,6 +342,7 @@ export function ConversationSidebar({
               const isActive = conversation.id === activeConversationId;
               const isEditing = conversation.id === editingConversationId;
               const isDeleting = conversation.id === isDeletingConversationId;
+              const isArchiving = conversation.id === isArchivingConversationId;
 
               return (
                 <div
@@ -371,6 +424,15 @@ export function ConversationSidebar({
                               <PencilLineIcon />
                               重命名
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                void handleArchiveConversationClick(conversation.id)
+                              }
+                              disabled={isArchiving}
+                            >
+                              <ArchiveIcon />
+                              {isArchiving ? "归档中..." : "归档"}
+                            </DropdownMenuItem>
                           </DropdownMenuGroup>
                           <DropdownMenuSeparator />
                           <DropdownMenuGroup>
@@ -396,7 +458,7 @@ export function ConversationSidebar({
 
       <div
         className={cn(
-          "flex items-center justify-between gap-3 border-t border-border/60 pt-3 px-1",
+          "flex items-center justify-between gap-3 border-t border-border/60 px-1 pt-3",
           isCollapsed && "lg:flex-col lg:px-0",
         )}
       >
@@ -411,21 +473,48 @@ export function ConversationSidebar({
             当前工作区已连接 Supabase
           </span>
         </div>
-        <Button
-          variant="ghost"
-          className={cn(
-            "rounded-[8px] text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-            isCollapsed && "lg:mx-auto lg:size-10",
-          )}
-          type="button"
-          onClick={() => void handleSignOutClick()}
-          disabled={isSigningOut}
-        >
-          <LogOutIcon data-icon="inline-start" />
-          <span className={cn(isCollapsed && "lg:hidden")}>
-            {isSigningOut ? "退出中..." : "退出登录"}
-          </span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                className={cn(
+                  "h-10 rounded-[8px] px-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  isCollapsed && "lg:mx-auto lg:size-10 lg:px-0",
+                )}
+                type="button"
+                aria-label="用户菜单"
+              />
+            }
+          >
+            <span className="inline-flex size-7 items-center justify-center rounded-[8px] border border-border/70 bg-background/92 text-xs font-semibold text-foreground">
+              {currentUserEmail?.[0]?.toUpperCase() ?? <UserRoundIcon className="size-4" />}
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" className="w-44">
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => void handleOpenFavoriteDialog()}>
+                <StarIcon />
+                收藏
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleOpenArchiveDialog()}>
+                <ArchiveIcon />
+                归档区
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => void handleSignOutClick()}
+                disabled={isSigningOut}
+              >
+                <LogOutIcon />
+                {isSigningOut ? "退出中..." : "退出登录"}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -453,6 +542,134 @@ export function ConversationSidebar({
           <div className="flex h-full flex-col overflow-hidden">{sidebarContent}</div>
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={isFavoriteDialogOpen}
+        onOpenChange={(open) => {
+          setIsFavoriteDialogOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-[30rem] overflow-hidden rounded-[14px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle className="text-[1.1rem] leading-none tracking-[-0.02em] text-foreground">
+              收藏
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-7 text-muted-foreground">
+              查看你标记过的会话，点击后会直接跳转。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[22rem] overflow-y-auto border-t border-border/60 bg-slate-50/55 p-2">
+            {isLoadingFavoriteConversations ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                正在读取收藏会话...
+              </div>
+            ) : favoriteConversations.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                还没有收藏会话。
+              </div>
+            ) : (
+              favoriteConversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-white/80"
+                  onClick={() => {
+                    handleSelectConversation(conversation.id);
+                    setIsFavoriteDialogOpen(false);
+                  }}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {conversation.title}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {conversation.favoritedAt
+                        ? `收藏于 ${formatUpdatedAt(conversation.favoritedAt)}`
+                        : formatUpdatedAt(conversation.updatedAt)}
+                    </span>
+                  </span>
+                  <StarIcon
+                    className="size-4 shrink-0 text-amber-500"
+                    fill="currentColor"
+                  />
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isArchiveDialogOpen}
+        onOpenChange={(open) => {
+          setIsArchiveDialogOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-[30rem] overflow-hidden rounded-[14px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)]">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle className="text-[1.1rem] leading-none tracking-[-0.02em] text-foreground">
+              归档区
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-7 text-muted-foreground">
+              归档后的会话不会出现在最近对话中，可以在这里恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[22rem] overflow-y-auto border-t border-border/60 bg-slate-50/55 p-2">
+            {isLoadingArchivedConversations ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                正在读取归档会话...
+              </div>
+            ) : archivedConversations.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                还没有归档会话。
+              </div>
+            ) : (
+              archivedConversations.map((conversation) => {
+                const isRestoring =
+                  conversation.id === isRestoringConversationId;
+
+                return (
+                  <div
+                    key={conversation.id}
+                    className="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5"
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => {
+                        handleSelectConversation(conversation.id);
+                        setIsArchiveDialogOpen(false);
+                      }}
+                    >
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {conversation.title}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {conversation.archivedAt
+                          ? `归档于 ${formatUpdatedAt(conversation.archivedAt)}`
+                          : formatUpdatedAt(conversation.updatedAt)}
+                      </span>
+                    </button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-[10px] border-border/70 bg-white/75 px-3 shadow-none"
+                      type="button"
+                      onClick={() =>
+                        void handleRestoreConversationClick(conversation.id)
+                      }
+                      disabled={isRestoring}
+                    >
+                      <ArchiveRestoreIcon data-icon="inline-start" />
+                      {isRestoring ? "恢复中" : "恢复"}
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pendingDeleteConversation !== null}

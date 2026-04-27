@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { chatSessionResponseSchema, ChatMessage } from "@/lib/schemas/chat";
 import {
   Conversation,
+  conversationListResponseSchema,
   conversationResponseSchema,
 } from "@/lib/schemas/conversation";
 import { AIModel, aiModelListResponseSchema } from "@/lib/schemas/model";
@@ -58,6 +59,12 @@ export function useChatWorkspace({
   const [conversations, setConversations] = useState(
     sortConversations(initialConversations),
   );
+  const [archivedConversations, setArchivedConversations] = useState<Conversation[]>(
+    [],
+  );
+  const [favoriteConversations, setFavoriteConversations] = useState<Conversation[]>(
+    [],
+  );
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     initialConversations[0]?.id ?? null,
   );
@@ -65,6 +72,17 @@ export function useChatWorkspace({
   const [isDeletingConversationId, setIsDeletingConversationId] = useState<
     string | null
   >(null);
+  const [isArchivingConversationId, setIsArchivingConversationId] = useState<
+    string | null
+  >(null);
+  const [isRestoringConversationId, setIsRestoringConversationId] = useState<
+    string | null
+  >(null);
+  const [isLoadingArchivedConversations, setIsLoadingArchivedConversations] =
+    useState(false);
+  const [isLoadingFavoriteConversations, setIsLoadingFavoriteConversations] =
+    useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<AIModel[]>(initialModels);
@@ -75,6 +93,10 @@ export function useChatWorkspace({
   const [draftWebSearchEnabled, setDraftWebSearchEnabled] = useState(true);
 
   const activeConversation = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  ) ?? archivedConversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  ) ?? favoriteConversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
   const selectedModelId = activeConversation?.modelId ?? draftModelId;
@@ -113,6 +135,24 @@ export function useChatWorkspace({
       );
 
       return sortConversations([nextConversation, ...remaining]);
+    });
+  }, []);
+
+  const syncFavoriteConversation = useCallback((nextConversation: Conversation) => {
+    setFavoriteConversations((current) => {
+      const remaining = current.filter(
+        (conversation) => conversation.id !== nextConversation.id,
+      );
+
+      if (!nextConversation.isFavorite) {
+        return remaining;
+      }
+
+      return [...remaining, nextConversation].sort((left, right) =>
+        (right.favoritedAt ?? right.updatedAt).localeCompare(
+          left.favoritedAt ?? left.updatedAt,
+        ),
+      );
     });
   }, []);
 
@@ -464,6 +504,222 @@ export function useChatWorkspace({
     }
   }, [removeConversationMessages, resetDraftConversationControls]);
 
+  const loadArchivedConversations = useCallback(async () => {
+    setIsLoadingArchivedConversations(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/conversations?status=archived");
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "读取归档区失败。");
+      }
+
+      const parsed = conversationListResponseSchema.parse(payload);
+      setArchivedConversations(sortConversations(parsed.conversations));
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
+    } finally {
+      setIsLoadingArchivedConversations(false);
+    }
+  }, []);
+
+  const loadFavoriteConversations = useCallback(async () => {
+    setIsLoadingFavoriteConversations(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/conversations?favorite=true");
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "读取收藏失败。");
+      }
+
+      const parsed = conversationListResponseSchema.parse(payload);
+      setFavoriteConversations(parsed.conversations);
+    } catch (error) {
+      setWorkspaceError(getErrorMessage(error));
+    } finally {
+      setIsLoadingFavoriteConversations(false);
+    }
+  }, []);
+
+  const handleToggleFavoriteConversation = useCallback(async () => {
+    if (!activeConversationId || !activeConversation) {
+      return;
+    }
+
+    setIsTogglingFavorite(true);
+    setWorkspaceError(null);
+
+    const previousConversation = activeConversation;
+    const nextIsFavorite = !activeConversation.isFavorite;
+    const optimisticConversation = {
+      ...activeConversation,
+      isFavorite: nextIsFavorite,
+      favoritedAt: nextIsFavorite ? new Date().toISOString() : null,
+    };
+
+    if (activeConversation.status === "archived") {
+      setArchivedConversations((current) =>
+        sortConversations(
+          current.map((conversation) =>
+            conversation.id === activeConversationId
+              ? optimisticConversation
+              : conversation,
+          ),
+        ),
+      );
+    } else {
+      upsertConversation(optimisticConversation);
+    }
+    syncFavoriteConversation(optimisticConversation);
+
+    try {
+      const response = await fetch(
+        `/api/conversations/${activeConversationId}/favorite`,
+        {
+          method: nextIsFavorite ? "POST" : "DELETE",
+        },
+      );
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "收藏操作失败。");
+      }
+
+      const parsed = conversationResponseSchema.parse(payload);
+
+      if (parsed.conversation.status === "archived") {
+        setArchivedConversations((current) =>
+          sortConversations(
+            current.map((conversation) =>
+              conversation.id === parsed.conversation.id
+                ? parsed.conversation
+                : conversation,
+            ),
+          ),
+        );
+      } else {
+        upsertConversation(parsed.conversation);
+      }
+      syncFavoriteConversation(parsed.conversation);
+    } catch (error) {
+      if (previousConversation.status === "archived") {
+        setArchivedConversations((current) =>
+          sortConversations(
+            current.map((conversation) =>
+              conversation.id === previousConversation.id
+                ? previousConversation
+                : conversation,
+            ),
+          ),
+        );
+      } else {
+        upsertConversation(previousConversation);
+      }
+      syncFavoriteConversation(previousConversation);
+      setWorkspaceError(getErrorMessage(error));
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  }, [
+    activeConversation,
+    activeConversationId,
+    syncFavoriteConversation,
+    upsertConversation,
+  ]);
+
+  const handleArchiveConversation = useCallback(async (conversationId: string) => {
+    setIsArchivingConversationId(conversationId);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "archived" }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "归档失败。");
+      }
+
+      const parsed = conversationResponseSchema.parse(payload);
+      setConversations((current) => {
+        const remaining = current.filter(
+          (conversation) => conversation.id !== conversationId,
+        );
+
+        setActiveConversationId((activeId) => {
+          if (activeId !== conversationId) {
+            return activeId;
+          }
+
+          const nextActiveConversationId = remaining[0]?.id ?? null;
+
+          if (!nextActiveConversationId) {
+            resetDraftConversationControls();
+          }
+
+          return nextActiveConversationId;
+        });
+
+        return remaining;
+      });
+      setArchivedConversations((current) =>
+        sortConversations([parsed.conversation, ...current.filter(
+          (conversation) => conversation.id !== conversationId,
+        )]),
+      );
+      syncFavoriteConversation(parsed.conversation);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
+    } finally {
+      setIsArchivingConversationId(null);
+    }
+  }, [resetDraftConversationControls, syncFavoriteConversation]);
+
+  const handleRestoreConversation = useCallback(async (conversationId: string) => {
+    setIsRestoringConversationId(conversationId);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "active" }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "恢复归档失败。");
+      }
+
+      const parsed = conversationResponseSchema.parse(payload);
+      setArchivedConversations((current) =>
+        current.filter((conversation) => conversation.id !== conversationId),
+      );
+      upsertConversation(parsed.conversation);
+      syncFavoriteConversation(parsed.conversation);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
+    } finally {
+      setIsRestoringConversationId(null);
+    }
+  }, [syncFavoriteConversation, upsertConversation]);
+
   const handleBranchConversation = useCallback(async (
     conversationId: string,
     messageId: string,
@@ -527,6 +783,8 @@ export function useChatWorkspace({
 
   const resetAfterSignOut = useCallback(() => {
     setConversations([]);
+    setArchivedConversations([]);
+    setFavoriteConversations([]);
     setActiveConversationId(null);
     setAvailableModels(initialModels);
     resetDraftConversationControls(initialModels);
@@ -534,11 +792,19 @@ export function useChatWorkspace({
     setIsLoadingConversation(false);
     setIsCreatingConversation(false);
     setIsDeletingConversationId(null);
+    setIsArchivingConversationId(null);
+    setIsRestoringConversationId(null);
+    setIsLoadingArchivedConversations(false);
+    setIsLoadingFavoriteConversations(false);
+    setIsTogglingFavorite(false);
   }, [initialModels, resetDraftConversationControls]);
 
   return {
     conversations,
+    archivedConversations,
+    favoriteConversations,
     activeConversationId,
+    activeConversation,
     selectedModelId,
     selectedModel,
     currentSystemPrompt,
@@ -547,14 +813,24 @@ export function useChatWorkspace({
     workspaceError,
     isCreatingConversation,
     isDeletingConversationId,
+    isArchivingConversationId,
+    isRestoringConversationId,
+    isLoadingArchivedConversations,
+    isLoadingFavoriteConversations,
+    isTogglingFavorite,
     isLoadingConversation,
     setActiveConversationId,
     setWorkspaceError,
     handleCreateConversation,
     handleRenameConversation,
     handleDeleteConversation,
+    handleArchiveConversation,
+    handleRestoreConversation,
     handleBranchConversation,
     handleSelectModel,
+    handleToggleFavoriteConversation,
+    loadArchivedConversations,
+    loadFavoriteConversations,
     saveSystemPrompt,
     toggleWebSearchEnabled,
     ensureConversationId,

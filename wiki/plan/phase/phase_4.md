@@ -200,11 +200,31 @@
   - 归档恢复
   - 归档区管理
   - 收藏能力
-  - 会话搜索
+  - 会话搜索评估
   - 相关扩展对象的逐步落库
 - 产出：
   - 会话管理能力从“可演示”提升到“更接近真实可持续使用”
   - 数据库侧的扩展对象开始形成更丰富的课程展示价值
+
+#### 4.3 当前实现状态
+- 已完成第一轮本地实现：
+  - 会话收藏 / 取消收藏
+  - 会话归档 / 恢复
+  - 归档区入口
+  - 收藏区入口与收藏会话跳转
+  - 用户头像二级菜单承接收藏、归档区与退出登录
+- 已新增本地 migration：
+  - `20260427083000_phase4_conversation_organization.sql`
+  - 包含 `favorites`、`conversations.archived_at`、RLS 与索引
+  - `20260427091000_remove_conversation_search.sql`
+  - 用于撤回搜索实验对象 `search_records` 与 `search_user_conversations`
+- 当前注意：
+  - 首轮 migration 已推送远端 Supabase
+  - 清理 migration `20260427091000_remove_conversation_search.sql` 已推送远端 Supabase
+  - 搜索功能已从产品入口和代码接线中撤回
+  - 远端 `search_records` 与 `search_user_conversations` 已确认移除
+  - browser-use 已完成首轮验收：搜索入口消失、收藏区可打开、头像菜单入口正确、控制台无错误
+  - 下一步仅保留移动端与多数据场景观察
 
 ### 4.4 联网、搜索与多模态输入扩展
 - 目标：

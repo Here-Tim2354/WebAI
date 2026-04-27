@@ -52,13 +52,20 @@ aliases:
 - Markdown 表格横向滚动
 - 代码块横向滚动
 
+项目同时在 `globals.css` 中定义了原生滚动条默认样式：
+- `scrollbar-width: thin`
+- `scrollbar-color: var(--scrollbar-thumb) transparent`
+- `::-webkit-scrollbar` 兼容层
+
+这层样式用于普通原生滚动区域的视觉 fallback。`ScrollArea` 仍是当前普通内容滚动区的增强层，二者共用相近的颜色变量，避免 fallback 和增强层看起来割裂。
+
 ## 3. Textarea
 
 `Textarea` 保留原生 textarea 行为。
 
 当前不把 OverlayScrollbars 直接套到 textarea 上，原因是 textarea 的滚动、选区、输入法和鼠标滚轮都依赖浏览器原生行为。
 
-项目只在 `globals.css` 里给 textarea 原生滚动条做主题化，保持视觉统一但不接管滚动逻辑。
+项目只让 textarea 沿用 `globals.css` 中的原生滚动条默认样式，保持视觉统一但不接管滚动逻辑。
 
 ## 4. DropdownMenu
 

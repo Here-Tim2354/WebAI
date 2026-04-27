@@ -70,14 +70,8 @@ export function ChatInput({
       : supportsUrlContext
         ? "Gemini将检索输入的URL"
         : "当前模型暂不支持 URL Context";
-  const webSearchTooltip = supportsWebSearch
-    ? webSearchEnabled
-      ? "当前会话已开启联网搜索。"
-      : "当前会话已关闭联网搜索。"
-    : "当前模型不支持联网搜索，但你仍可以提前调整这个会话级开关。";
-  const urlContextTooltip = supportsUrlContext
-    ? `为当前这次发送补充 URL Context。已添加 ${urlContextUrls.length} 条 URL。`
-    : "当前模型不支持 URL Context，但你仍可以先查看或整理待发送的 URL。";
+  const webSearchTooltip = "联网";
+  const urlContextTooltip = "添加URL";
 
   const showUrlLimitWarning = () => {
     setIsUrlLimitWarningVisible(true);

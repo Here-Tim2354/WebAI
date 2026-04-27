@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   NotebookPenIcon,
   PanelLeftOpenIcon,
+  StarIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -127,6 +128,9 @@ export function ChatShell({
   } = useChatSession();
   const {
     conversations,
+    archivedConversations,
+    favoriteConversations,
+    activeConversation,
     activeConversationId,
     selectedModelId,
     selectedModel,
@@ -136,14 +140,24 @@ export function ChatShell({
     workspaceError,
     isCreatingConversation,
     isDeletingConversationId,
+    isArchivingConversationId,
+    isRestoringConversationId,
+    isLoadingArchivedConversations,
+    isLoadingFavoriteConversations,
+    isTogglingFavorite,
     isLoadingConversation,
     setActiveConversationId,
     setWorkspaceError,
     handleCreateConversation,
     handleRenameConversation,
     handleDeleteConversation,
+    handleArchiveConversation,
+    handleRestoreConversation,
     handleBranchConversation,
     handleSelectModel,
+    handleToggleFavoriteConversation,
+    loadArchivedConversations,
+    loadFavoriteConversations,
     saveSystemPrompt,
     toggleWebSearchEnabled,
     ensureConversationId,
@@ -407,9 +421,15 @@ export function ChatShell({
       <div className="flex h-[100dvh] overflow-hidden bg-background lg:flex-row">
         <ConversationSidebar
           conversations={conversations}
+          archivedConversations={archivedConversations}
+          favoriteConversations={favoriteConversations}
           activeConversationId={activeConversationId}
           isCreating={isCreatingConversation}
           isDeletingConversationId={isDeletingConversationId}
+          isArchivingConversationId={isArchivingConversationId}
+          isRestoringConversationId={isRestoringConversationId}
+          isLoadingArchivedConversations={isLoadingArchivedConversations}
+          isLoadingFavoriteConversations={isLoadingFavoriteConversations}
           isSigningOut={isSigningOut}
           currentUserEmail={user.email}
           mobileOpen={isMobileSidebarOpen}
@@ -418,6 +438,10 @@ export function ChatShell({
           onSelectConversation={setActiveConversationId}
           onRenameConversation={handleRenameConversation}
           onDeleteConversation={handleDeleteConversation}
+          onArchiveConversation={handleArchiveConversation}
+          onRestoreConversation={handleRestoreConversation}
+          onLoadArchivedConversations={loadArchivedConversations}
+          onLoadFavoriteConversations={loadFavoriteConversations}
           onSignOut={handleSignOut}
         />
 
@@ -425,7 +449,7 @@ export function ChatShell({
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(193,225,255,0.54),transparent_24%),radial-gradient(circle_at_top_center,rgba(158,204,255,0.2),transparent_28%),linear-gradient(180deg,rgba(238,247,255,0.96),rgba(244,249,255,0.98)_32%,rgba(244,249,255,0.98))]" />
 
           <header className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">
-            <div className="grid min-h-9 grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div className="mx-auto grid min-h-9 w-full max-w-4xl grid-cols-[auto_1fr_auto] items-center gap-3">
               <div className="flex items-center justify-start">
                 <Button
                   variant="outline"
@@ -439,106 +463,130 @@ export function ChatShell({
                 </Button>
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-[min(72vw,15rem)] items-center justify-between gap-2.5 rounded-[13px] border border-slate-300/70 bg-white/26 px-3 text-left text-[0.8rem] font-medium text-slate-600 transition-colors hover:border-slate-400/80 hover:bg-white/42 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
-                      aria-label="选择模型"
-                    />
-                  }
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    {selectedModel ? (
-                      <ModelIcon
-                        model={selectedModel}
-                        className="size-4 shrink-0 text-slate-500"
+              <div className="flex min-w-0 justify-start">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-[min(62vw,15rem)] items-center justify-between gap-2.5 rounded-[13px] border border-slate-300/70 bg-white/26 px-3 text-left text-[0.8rem] font-medium text-slate-600 transition-colors hover:border-slate-400/80 hover:bg-white/42 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+                        aria-label="选择模型"
                       />
-                    ) : (
-                      <BotIcon className="size-4 shrink-0 text-slate-400" />
-                    )}
-                    <span className="truncate text-[0.84rem]">
-                      {selectedModel?.label ?? "默认模型"}
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {selectedModel ? (
+                        <ModelIcon
+                          model={selectedModel}
+                          className="size-4 shrink-0 text-slate-500"
+                        />
+                      ) : (
+                        <BotIcon className="size-4 shrink-0 text-slate-400" />
+                      )}
+                      <span className="truncate text-[0.84rem]">
+                        {selectedModel?.label ?? "默认模型"}
+                      </span>
                     </span>
-                  </span>
-                  <ChevronDownIcon className="size-3.5 shrink-0 text-slate-400" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="bottom"
-                  align="center"
-                  sideOffset={9}
-                  className="w-[22rem] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
-                >
-                  {Object.entries(groupedModels).map(([groupName, models], index) => (
-                    <div key={groupName}>
-                      {index > 0 ? (
-                        <DropdownMenuSeparator className="mx-2 my-1.5" />
-                      ) : null}
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
-                          {groupName}
-                        </DropdownMenuLabel>
-                        {models.map((model) => {
-                          const isActive = model.id === selectedModelId;
-                          const capabilitySummary = [
-                            model.capabilities.reasoning ? "推理" : null,
-                            model.capabilities.image ? "图像" : null,
-                            model.capabilities.audio ? "音频" : null,
-                            model.capabilities.video ? "视频" : null,
-                            model.capabilities.webSearch ? "联网" : null,
-                            model.capabilities.functionCalling ? "工具" : null,
-                          ].filter(Boolean);
+                    <ChevronDownIcon className="size-3.5 shrink-0 text-slate-400" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="bottom"
+                    align="start"
+                    sideOffset={9}
+                    className="w-[22rem] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
+                  >
+                    {Object.entries(groupedModels).map(([groupName, models], index) => (
+                      <div key={groupName}>
+                        {index > 0 ? (
+                          <DropdownMenuSeparator className="mx-2 my-1.5" />
+                        ) : null}
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
+                            {groupName}
+                          </DropdownMenuLabel>
+                          {models.map((model) => {
+                            const isActive = model.id === selectedModelId;
+                            const capabilitySummary = [
+                              model.capabilities.reasoning ? "推理" : null,
+                              model.capabilities.image ? "图像" : null,
+                              model.capabilities.audio ? "音频" : null,
+                              model.capabilities.video ? "视频" : null,
+                              model.capabilities.webSearch ? "联网" : null,
+                              model.capabilities.functionCalling ? "工具" : null,
+                            ].filter(Boolean);
 
-                          return (
-                            <DropdownMenuItem
-                              key={model.id}
-                              className="items-start rounded-xl px-3 py-2.5"
-                              onClick={() => {
-                                void handleSelectModel(model.id);
-                              }}
-                            >
-                              <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                                <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                                  <ModelIcon
-                                    model={model}
-                                    className="mt-0.5 size-5 shrink-0 text-slate-500"
-                                  />
-                                  <div className="min-w-0 space-y-1">
-                                    <div className="truncate text-sm font-medium text-foreground">
-                                      {model.label}
-                                    </div>
-                                    <div className="text-xs leading-5 text-muted-foreground">
-                                      {capabilitySummary.length > 0
-                                        ? capabilitySummary.join(" · ")
-                                        : model.provider === "gemini"
-                                          ? "Gemini 原生模型"
-                                          : "OpenAI 兼容模型"}
+                            return (
+                              <DropdownMenuItem
+                                key={model.id}
+                                className="items-start rounded-xl px-3 py-2.5"
+                                onClick={() => {
+                                  void handleSelectModel(model.id);
+                                }}
+                              >
+                                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                                    <ModelIcon
+                                      model={model}
+                                      className="mt-0.5 size-5 shrink-0 text-slate-500"
+                                    />
+                                    <div className="min-w-0 space-y-1">
+                                      <div className="truncate text-sm font-medium text-foreground">
+                                        {model.label}
+                                      </div>
+                                      <div className="text-xs leading-5 text-muted-foreground">
+                                        {capabilitySummary.length > 0
+                                          ? capabilitySummary.join(" · ")
+                                          : model.provider === "gemini"
+                                            ? "Gemini 原生模型"
+                                            : "OpenAI 兼容模型"}
+                                      </div>
                                     </div>
                                   </div>
+                                  {isActive ? (
+                                    <span className="inline-flex size-5 items-center justify-center rounded-[10px] bg-slate-900 text-white">
+                                      <CheckIcon className="size-3.5" />
+                                    </span>
+                                  ) : null}
                                 </div>
-                                {isActive ? (
-                                  <span className="inline-flex size-5 items-center justify-center rounded-[10px] bg-slate-900 text-white">
-                                    <CheckIcon className="size-3.5" />
-                                  </span>
-                                ) : null}
-                              </div>
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuGroup>
-                    </div>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuGroup>
+                      </div>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
               <div className="flex items-center justify-end gap-2">
                 <Tooltip
-                  content={
-                    currentSystemPrompt?.trim()
-                      ? "当前会话已设置提示词。"
-                      : "为当前会话设置提示词。"
-                  }
+                  side="bottom"
+                  content="收藏"
+                >
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className={`h-9 w-10 rounded-[12px] shadow-none ${
+                      activeConversation?.isFavorite
+                        ? "border-amber-200/90 bg-amber-50/88 text-amber-600 hover:bg-amber-100/82"
+                        : "border-border/70 bg-background/82 text-muted-foreground"
+                    }`}
+                    type="button"
+                    onClick={() => void handleToggleFavoriteConversation()}
+                    disabled={!activeConversationId || isTogglingFavorite}
+                    aria-label={
+                      activeConversation?.isFavorite ? "取消收藏会话" : "收藏会话"
+                    }
+                  >
+                    <StarIcon
+                      className="size-4"
+                      fill={activeConversation?.isFavorite ? "currentColor" : "none"}
+                    />
+                  </Button>
+                </Tooltip>
+                <Tooltip
+                  side="bottom"
+                  content="修改提示词"
                 >
                   <Button
                     variant="outline"
@@ -578,6 +626,9 @@ export function ChatShell({
               hasMessages ? "px-3 pb-5 sm:px-5 lg:px-8" : "px-4 pb-8 sm:px-6 lg:px-8"
             }`}
           >
+            {hasMessages ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-9 bg-gradient-to-b from-background/54 to-transparent" />
+            ) : null}
             <MessageList
               messages={messages}
               messageEndRef={messageEndRef}
@@ -633,8 +684,11 @@ export function ChatShell({
             <DialogTitle className="pt-1 text-[1.18rem] leading-none tracking-[-0.02em] text-foreground">
               会话级提示词
             </DialogTitle>
-            <DialogDescription className="text-sm leading-7 text-muted-foreground">
-              它只作用于当前这次对话。若当前还是空白首页，则会先保存在本页草稿里，直到你真正发送第一条消息。
+            <DialogDescription className="space-y-1 text-[0.8rem] leading-5 text-muted-foreground">
+              <span className="block">它只作用于当前这次对话。</span>
+              <span className="block">
+                若当前还是空白首页，则会先保存在本页草稿里，直到你真正发送第一条消息。
+              </span>
             </DialogDescription>
           </DialogHeader>
 

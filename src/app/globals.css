@@ -113,6 +113,16 @@
     oklch(0.968 0.01 230 / 86%);
   --panel-glow: oklch(0.78 0.078 232 / 24%);
   --surface-soft: oklch(0.995 0.004 228 / 84%);
+  --scrollbar-thumb: color-mix(
+    in oklch,
+    var(--foreground) 28%,
+    transparent 72%
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in oklch,
+    var(--primary) 46%,
+    transparent 54%
+  );
   --radius:
     0.72rem;
   --shadow-soft: 0 22px 60px rgb(52 91 153 / 0.08);
@@ -145,6 +155,27 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb) padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover) padding-box;
 }
 
 html {
@@ -196,8 +227,8 @@ a {
   --os-track-bg: transparent;
   --os-track-bg-hover: transparent;
   --os-track-bg-active: transparent;
-  --os-handle-bg: color-mix(in oklch, var(--foreground) 28%, transparent 72%);
-  --os-handle-bg-hover: color-mix(in oklch, var(--primary) 46%, transparent 54%);
+  --os-handle-bg: var(--scrollbar-thumb);
+  --os-handle-bg-hover: var(--scrollbar-thumb-hover);
   --os-handle-bg-active: color-mix(in oklch, var(--primary) 58%, transparent 42%);
   --os-handle-border-radius: 5px;
   --os-handle-min-size: 36px;
@@ -205,36 +236,6 @@ a {
   --os-handle-perpendicular-size: 5px;
   --os-handle-perpendicular-size-hover: 6px;
   --os-handle-perpendicular-size-active: 6px;
-}
-
-textarea[data-slot="textarea"] {
-  scrollbar-width: thin;
-  scrollbar-color:
-    color-mix(in oklch, var(--foreground) 28%, transparent 72%)
-    transparent;
-}
-
-textarea[data-slot="textarea"]::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-textarea[data-slot="textarea"]::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-textarea[data-slot="textarea"]::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 5px;
-  background:
-    color-mix(in oklch, var(--foreground) 28%, transparent 72%)
-    padding-box;
-}
-
-textarea[data-slot="textarea"]::-webkit-scrollbar-thumb:hover {
-  background:
-    color-mix(in oklch, var(--primary) 46%, transparent 54%)
-    padding-box;
 }
 
 .markdown {

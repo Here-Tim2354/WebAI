@@ -156,6 +156,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         systemPrompt: parsed.data.systemPrompt,
         modelId: parsed.data.modelId,
         webSearchEnabled: parsed.data.webSearchEnabled,
+        status: parsed.data.status,
       },
     );
 

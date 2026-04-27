@@ -7,6 +7,9 @@ export const conversationSchema = z.object({
   modelId: z.string().uuid().nullable(),
   webSearchEnabled: z.boolean(),
   status: z.enum(["active", "archived"]),
+  archivedAt: z.string().nullable(),
+  isFavorite: z.boolean(),
+  favoritedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -18,6 +21,8 @@ export const conversationListResponseSchema = z.object({
 export const conversationResponseSchema = z.object({
   conversation: conversationSchema,
 });
+
+export const conversationStatusSchema = z.enum(["active", "archived"]);
 
 export const createConversationRequestSchema = z.object({
   title: z
@@ -49,16 +54,22 @@ export const updateConversationRequestSchema = z.object({
     .optional(),
   modelId: z.string().uuid("模型标识不正确。").optional(),
   webSearchEnabled: z.boolean().optional(),
+  status: conversationStatusSchema.optional(),
 }).refine(
   (value) =>
     value.title !== undefined ||
     value.systemPrompt !== undefined ||
     value.modelId !== undefined ||
-    value.webSearchEnabled !== undefined,
+    value.webSearchEnabled !== undefined ||
+    value.status !== undefined,
   {
     message: "至少需要提供一个可更新字段。",
   },
 );
+
+export const conversationSearchResponseSchema = z.object({
+  conversations: z.array(conversationSchema),
+});
 
 export const branchConversationRequestSchema = z.object({
   messageId: z.string().uuid("消息标识不正确。"),
