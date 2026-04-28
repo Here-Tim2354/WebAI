@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-28 12:20:00
+更新时间：2026-04-28 23:51:39
 
 ## 当前阶段
 
@@ -58,8 +58,10 @@
   - 发送、编辑、重新生成接口已校验附件 `storagePath` 必须属于当前用户目录
   - user 消息已支持“正文为空但保留附件”的数据库约束
   - Office 三件套按“`libreoffice-convert` 调用 LibreOffice / soffice 转 PDF 后保存 PDF”处理；pandoc fallback 已移除
+  - Excel `.xlsx` 已改为通过 `read-excel-file` 转换为 CSV 后保存到云端；UI 会显示转换后的 `.csv` 文件名，并提示原 `.xlsx` 已转换
   - 重新生成与分支继续沿用消息 metadata 上下文
-  - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示
+  - 附件下载和主要 API 已补 Supabase 网络错误语义；偶发 `fetch failed` / TLS reset 不再直接裸露给 assistant 消息
+  - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示，并对“中文自然语言被单美元符号误吞进公式”的场景做窄范围兜底
   - 当前只应视为“首轮接入完成”，不是稳定收口；真实文件选择、上传反馈、编辑保存、历史恢复、移动端预览和部署环境转换链路仍需要继续打磨
 - 会话管理增强已完成第一轮：
   - 收藏 / 取消收藏
@@ -102,6 +104,16 @@
 - `npm run build` 通过
   - 沙箱内可能触发已知 `spawn EPERM`
   - 越权运行可通过
+- `npm audit --audit-level=moderate` 通过，当前 0 vulnerabilities
+- Excel `.xlsx` 转 CSV 已用浏览器验证：
+  - 上传后前端显示转换后的 `.csv`
+  - 原 `.xlsx` 作为 `originalFileName` 展示为“已转换”
+  - 云端保存对象扩展名和 MIME 均为 CSV 语义
+- LaTeX / Markdown 已用浏览器验证：
+  - `katexCount = 27`
+  - `katexErrorCount = 0`
+  - `redishCount = 0`
+  - 正常公式仍可渲染，中文段落误触发红色 KaTeX 错误的场景已回归
 - browser-use 最新 smoke test 通过：
   - 页面可正常加载
   - 浏览器控制台无 error/warning
@@ -119,13 +131,14 @@
 - `Phase 4.4` 大量调整与端到端验收：
   - 立即复测编辑带附件 user 消息：只改正文、只改附件、正文和附件都改，确认 fallback 后不再出现泛化“消息操作失败”
   - 复测 LaTeX 渲染：行内 `$...$`、块级 `$$...$$`、中文段落混排、流式输出期间的展示稳定性
+  - 继续用真实 `.xlsx` 文件回归：多 sheet、空表、日期/数字/中文单元格、较大表格和历史恢复后的附件展示
   - 复测大文件提示：图片超过 5MB、普通文件超过 10MB、总附件超过 20MB 时文案是否清楚
   - 用真实图片、PDF、文本文件反复验证“选择文件 -> 上传 -> UI 反馈 -> 发送 -> AI 识别 -> 历史恢复”完整链路
   - 重点复测“修改附加项”窗口中的添加、删除、保存、取消、错误提示和按钮禁用状态
   - 重点复测编辑带附件 user 消息后的 metadata 保存、后续消息截断、重新生成和失败回滚表现
   - 重点复测 assistant 重新生成、分支会话是否稳定继承原 user 消息附件上下文
   - 用真实图片、PDF、文本文件验证上传、历史恢复、重新生成、分支
-  - 在部署环境确认 Office 转 PDF 工具链是否可用；当前本机 `pandoc` 存在于 `D:\Anaconda\Scripts\pandoc.exe`，但 `soffice` / `LibreOffice` / `pdflatex` 未确认可用，本轮 winget 安装已按用户要求中断
+  - 在部署环境确认 Office 转 PDF 工具链是否可用；`.xlsx` 当前不再依赖 LibreOffice，而是直接转 CSV；Word / PPT 仍依赖 `soffice` / LibreOffice
   - 观察私有 Storage 图片预览在移动端下的加载与放大表现
   - 评估未引用附件自动清理失败时是否需要后台补偿任务
 - `Phase 4.3` 观察：
@@ -142,4 +155,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 渲染入口和 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、LaTeX 输出和 Office 转 PDF 本地/部署工具链。
+`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、Excel 转 CSV 云端保存、Supabase 网络错误提示和 LaTeX 单美元误识别边界；typecheck、lint、越权 build、npm audit 与浏览器验证通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown/XLSX 文件、LaTeX 流式输出和 Word/PPT 转 PDF 部署工具链。

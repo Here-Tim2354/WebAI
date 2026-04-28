@@ -243,13 +243,15 @@
   - 发送、编辑、重新生成、分支均沿用消息级 metadata 上下文
   - Gemini 输入组装已支持图片、PDF 与文本类文件
   - Storage object key 已改为安全路径，原始文件名只保留在 metadata 中展示，避免中文/空格文件名触发 Storage `Invalid key`
-  - Office 三件套采用服务端临时转 PDF、云端只保存 PDF 的策略；转换依赖 LibreOffice / soffice，pandoc fallback 已移除
-  - Markdown 正文渲染已支持基础 LaTeX 公式
+  - Excel `.xlsx` 采用服务端转 CSV 后保存 CSV 的策略，并在 UI 中提示原 `.xlsx` 已自动转换
+  - Word / PPT 仍采用服务端临时转 PDF、云端只保存 PDF 的策略；转换依赖 LibreOffice / soffice，pandoc fallback 已移除
+  - 附件下载与主要 API 已补 Supabase 网络错误语义，避免 `fetch failed` 直接暴露到 assistant 消息
+  - Markdown 正文渲染已支持基础 LaTeX 公式，并对中文自然语言被单美元符号误识别为公式的场景做窄范围兜底
   - 编辑带附件消息优先走数据库 RPC，当前代码已补直接 update + delete fallback，降低 RPC 单点失败风险
 - 当前判断：
   - 这轮只表示多模态附件链路已经接入，不表示产品体验已经稳定
   - 文件选择、上传反馈、弹窗保存、编辑带附件消息、重新生成、分支、历史恢复、LaTeX 渲染和移动端图片预览都需要继续用真实数据深度回归
-  - Office 转 PDF 依赖部署环境中的 LibreOffice / soffice 能力，不能仅用本地 typecheck 或浏览器 smoke test 视为完成
+  - `.xlsx` 转 CSV 不再依赖 LibreOffice；Word / PPT 转 PDF 仍依赖部署环境中的 LibreOffice / soffice 能力，不能仅用本地 typecheck 或浏览器 smoke test 视为完成
 - 当前边界：
   - 视频与音频明确不作为当前产品方向
   - 正文和附加项只要存在其一即可发送
@@ -259,9 +261,9 @@
   - 真实附件上传后的 UI 反馈和失败恢复
   - 编辑带附件 user 消息时的数据库原子更新 / fallback 与前端状态同步
   - assistant 重新生成和分支对附件 metadata 的继承稳定性
-  - LaTeX 渲染在流式输出、中文段落和代码块附近的边界表现
+  - LaTeX 渲染在流式输出、中文段落、单美元符号和代码块附近的边界表现
   - 移动端图片缩略图、页面级预览和私有 Storage 代理加载体验
-  - 部署环境是否具备 Office 转 PDF 工具链
+  - 部署环境是否具备 Word / PPT 转 PDF 工具链
   - 自动清理失败时是否需要后台补偿任务
 
 ### 4.5+ 预留扩展阶段

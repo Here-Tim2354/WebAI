@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { assertAttachmentsOwnedByUser } from "@/lib/attachments";
 import { ServerEnvError } from "@/lib/env/server";
+import { getNetworkErrorMessage } from "@/lib/network-errors";
 import { sendMessageRequestSchema } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 import {
@@ -70,9 +71,13 @@ function handleChatError(error: unknown) {
   }
 
   const message =
-    error instanceof Error
+    getNetworkErrorMessage(
+      error,
+      "云端连接暂时不稳定，请稍后重试。",
+    ) ??
+    (error instanceof Error
       ? error.message
-      : "模型暂时不可用，请稍后重试。";
+      : "模型暂时不可用，请稍后重试。");
 
   return NextResponse.json(
     {

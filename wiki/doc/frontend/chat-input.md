@@ -186,6 +186,8 @@ URL 输入位使用的是 `Input`，而不是 `Textarea`。
 - 打开统一的 `AttachmentEditorDialog`
 - 管理 URL、图片和文件
 - 上传、粘贴、拖拽得到的文件会写入 `metadata.attachments`
+- `.xlsx` 上传后会在服务端自动转换为 `.csv`，弹窗中会提示“.xlsx 会自动转换为 .csv 后保存”
+- 已转换的 Excel 附件会展示转换后的 `.csv` 文件名，并用原始 `.xlsx` 文件名提示“已转换”
 - 图片预览通过 Portal 挂到 `document.body`，避免被输入区动画容器或 textarea 限制显示范围
 - 当前模型不支持图片或文件时，相关入口会置灰
 

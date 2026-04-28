@@ -29,6 +29,7 @@ import type { AddUrlContextResult } from "./use-chat-session";
 import {
   AttachmentEditorDialog,
   AttachmentPreviewList,
+  getAttachmentFileValidationError,
 } from "./message-attachments";
 
 const MotionTextarea = motion.create(Textarea);
@@ -155,6 +156,18 @@ export function ChatInput({
   };
 
   const handleInlineUploadFiles = (files: File[]) => {
+    const validationError = getAttachmentFileValidationError(files, {
+      currentAttachmentCount: attachments.length,
+      currentAttachmentSizes: attachments.map((attachment) => attachment.size),
+      supportsFiles,
+      supportsImages,
+    });
+
+    if (validationError) {
+      setAttachmentError(validationError);
+      return;
+    }
+
     void handleUploadFiles(files)
       .then((uploaded) => {
         onAttachmentsChange((current) => [...current, ...uploaded]);

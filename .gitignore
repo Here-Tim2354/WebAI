@@ -32,3 +32,6 @@ next-env.d.ts
 # wiki
 wiki/.obsidian/*
 wiki/submissions/WebAI需求分析文档.docx
+
+# playwright
+.playwright-mcp/*

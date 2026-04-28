@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { MESSAGE_ATTACHMENTS_BUCKET } from "@/lib/attachments";
+import {
+  isAttachmentStoragePathOwnedByUser,
+  MESSAGE_ATTACHMENTS_BUCKET,
+} from "@/lib/attachments";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 
 export const runtime = "nodejs";
@@ -24,7 +27,10 @@ export async function GET(request: Request) {
     return unauthorizedResponse();
   }
 
-  if (!storagePath || !storagePath.startsWith(`${user.id}/`)) {
+  if (
+    !storagePath ||
+    !isAttachmentStoragePathOwnedByUser(user.id, storagePath)
+  ) {
     return NextResponse.json(
       {
         error: {

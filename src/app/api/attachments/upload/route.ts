@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import {
+  AttachmentValidationError,
   MAX_MESSAGE_ATTACHMENTS,
   MAX_MESSAGE_ATTACHMENTS_SIZE,
   formatAttachmentSizeLimit,
   MESSAGE_ATTACHMENTS_BUCKET,
   uploadMessageAttachment,
 } from "@/lib/attachments";
+import { getNetworkErrorMessage } from "@/lib/network-errors";
 import { type MessageAttachment } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
 
@@ -90,8 +92,23 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ attachments });
   } catch (error) {
+    if (error instanceof AttachmentValidationError) {
+      return NextResponse.json(
+        {
+          error: {
+            message: error.message,
+          },
+        },
+        { status: 400 },
+      );
+    }
+
     const message =
-      error instanceof Error ? error.message : "附件上传失败，请稍后再试。";
+      getNetworkErrorMessage(
+        error,
+        "云端连接暂时不稳定，附件上传失败。请稍后重试。",
+      ) ??
+      (error instanceof Error ? error.message : "附件上传失败，请稍后再试。");
 
     return NextResponse.json(
       {

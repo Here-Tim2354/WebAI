@@ -15,6 +15,71 @@ type MarkdownMessageProps = {
   className?: string;
 };
 
+function isEscaped(content: string, index: number) {
+  let backslashCount = 0;
+
+  for (
+    let cursor = index - 1;
+    cursor >= 0 && content[cursor] === "\\";
+    cursor -= 1
+  ) {
+    backslashCount += 1;
+  }
+
+  return backslashCount % 2 === 1;
+}
+
+function isSingleDollarDelimiter(content: string, index: number) {
+  return (
+    content[index] === "$" &&
+    content[index - 1] !== "$" &&
+    content[index + 1] !== "$" &&
+    !isEscaped(content, index)
+  );
+}
+
+function containsCjkNaturalLanguage(content: string) {
+  return /[\p{Script=Han}，。！？、；：]/u.test(content);
+}
+
+function escapeCjkContaminatedSingleDollarMath(content: string) {
+  let nextContent = "";
+
+  for (let index = 0; index < content.length; index += 1) {
+    if (!isSingleDollarDelimiter(content, index)) {
+      nextContent += content[index];
+      continue;
+    }
+
+    let closingIndex = -1;
+
+    for (let cursor = index + 1; cursor < content.length; cursor += 1) {
+      if (isSingleDollarDelimiter(content, cursor)) {
+        closingIndex = cursor;
+        break;
+      }
+    }
+
+    if (closingIndex === -1) {
+      nextContent += content[index];
+      continue;
+    }
+
+    const mathCandidate = content.slice(index + 1, closingIndex);
+
+    if (containsCjkNaturalLanguage(mathCandidate)) {
+      nextContent += `\\$${mathCandidate}\\$`;
+      index = closingIndex;
+      continue;
+    }
+
+    nextContent += content.slice(index, closingIndex + 1);
+    index = closingIndex;
+  }
+
+  return nextContent;
+}
+
 // ReactMarkdown 的 code/pre 回调拿到的是 ReactNode。
 // 这里先递归抽出纯文本，后面才能交给自定义 CodeBlock 处理。
 function extractTextContent(node: ReactNode): string {
@@ -105,7 +170,7 @@ export function MarkdownMessage({
           },
         }}
       >
-        {content}
+        {escapeCjkContaminatedSingleDollarMath(content)}
       </ReactMarkdown>
     </div>
   );

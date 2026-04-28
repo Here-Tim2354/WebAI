@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
 import { ServerEnvError } from "@/lib/env/server";
+import { getNetworkErrorMessage } from "@/lib/network-errors";
 import { regenerateAssistantMessageRequestSchema } from "@/lib/schemas/chat";
 import {
   assertAttachmentsOwnedByUser,
@@ -77,9 +78,13 @@ function handleRegenerateError(error: unknown) {
   }
 
   const message =
-    error instanceof Error
+    getNetworkErrorMessage(
+      error,
+      "云端连接暂时不稳定，重新生成失败。请稍后重试。",
+    ) ??
+    (error instanceof Error
       ? error.message
-      : "重新生成失败，请稍后再试。";
+      : "重新生成失败，请稍后再试。");
 
   return NextResponse.json(
     {

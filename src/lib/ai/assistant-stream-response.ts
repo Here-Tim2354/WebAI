@@ -17,6 +17,7 @@ import {
   updateConversationMessage,
 } from "@/lib/supabase/messages";
 import { touchConversation } from "@/lib/supabase/conversations";
+import { getNetworkErrorMessage } from "@/lib/network-errors";
 
 const STREAM_PERSIST_INTERVAL_MS = 120;
 
@@ -50,6 +51,18 @@ function createStreamResponse(stream: ReadableStream<Uint8Array>) {
       Connection: "keep-alive",
     },
   });
+}
+
+function getAssistantFailureContent(error: unknown) {
+  return (
+    getNetworkErrorMessage(
+      error,
+      "云端连接暂时不稳定，附件内容或模型响应读取失败。请稍后重试，或重新发送这条消息。",
+    ) ??
+    (error instanceof Error
+      ? error.message
+      : "模型暂时不可用，请稍后重试。")
+  );
 }
 
 /**
@@ -215,9 +228,7 @@ export async function createAssistantStreamResponse({
               ? streamedContent
               : isCancelled
                 ? ""
-                : error instanceof Error
-                  ? error.message
-                  : "模型暂时不可用，请稍后重试。";
+                : getAssistantFailureContent(error);
 
           nextAssistantMessage = await updateConversationMessage(
             supabase,

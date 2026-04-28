@@ -1,18 +1,29 @@
 import { randomUUID } from "crypto";
 import { extname } from "path";
 import { convertWithOptions } from "libreoffice-convert";
+import readXlsxFile from "read-excel-file/universal";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
   type ChatMessageMetadata,
   type MessageAttachment,
   messageAttachmentsSchema,
 } from "@/lib/schemas/chat";
+import { isFetchNetworkError } from "@/lib/network-errors";
 
 export const MESSAGE_ATTACHMENTS_BUCKET = "message_attachments";
 export const MAX_MESSAGE_ATTACHMENTS = 5;
 export const MAX_IMAGE_ATTACHMENT_SIZE = 5 * 1024 * 1024;
 export const MAX_FILE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 export const MAX_MESSAGE_ATTACHMENTS_SIZE = 20 * 1024 * 1024;
+
+export class AttachmentValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AttachmentValidationError";
+  }
+}
+
+const ATTACHMENT_DOWNLOAD_RETRY_DELAYS_MS = [300, 900];
 
 const imageMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
 const storedFileMimeTypes = new Set([
@@ -24,10 +35,11 @@ const storedFileMimeTypes = new Set([
 const officeMimeTypes = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+const spreadsheetMimeTypes = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 const extensionMimeTypeMap = new Map([
   [".png", "image/png"],
@@ -67,11 +79,16 @@ export function isSupportedOfficeMimeType(mimeType: string) {
   return officeMimeTypes.has(mimeType);
 }
 
+export function isSupportedSpreadsheetMimeType(mimeType: string) {
+  return spreadsheetMimeTypes.has(mimeType);
+}
+
 export function isSupportedAttachmentMimeType(mimeType: string) {
   return (
     isSupportedImageMimeType(mimeType) ||
     isSupportedStoredFileMimeType(mimeType) ||
-    isSupportedOfficeMimeType(mimeType)
+    isSupportedOfficeMimeType(mimeType) ||
+    isSupportedSpreadsheetMimeType(mimeType)
   );
 }
 
@@ -148,20 +165,93 @@ async function convertOfficeBufferToPdf(
   }
 }
 
+function getCsvCellValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return String(value);
+}
+
+function escapeCsvCell(value: unknown) {
+  const text = getCsvCellValue(value);
+
+  if (!/[",\r\n]/.test(text)) {
+    return text;
+  }
+
+  return `"${text.replaceAll("\"", "\"\"")}"`;
+}
+
+async function convertXlsxBufferToCsv(buffer: Buffer) {
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(arrayBuffer).set(buffer);
+  const sheets = await readXlsxFile(arrayBuffer);
+  const sheetCsvBlocks = sheets
+    .map((sheet) => ({
+      name: sheet.sheet,
+      rows: sheet.data.filter((row) =>
+        row.some((cell) => getCsvCellValue(cell).trim().length > 0),
+      ),
+    }))
+    .filter((sheet) => sheet.rows.length > 0)
+    .map((sheet, index) => {
+      const rows = sheet.rows.map((row) =>
+        row.map((cell) => escapeCsvCell(cell)).join(","),
+      );
+
+      if (sheets.length <= 1) {
+        return rows.join("\r\n");
+      }
+
+      return [
+        `# Sheet: ${sheet.name || `Sheet${index + 1}`}`,
+        ...rows,
+      ].join("\r\n");
+    });
+  const csv = sheetCsvBlocks.join("\r\n\r\n");
+
+  if (csv.trim().length === 0) {
+    throw new AttachmentValidationError(
+      "Excel 转 CSV 失败：没有读取到有效单元格。请确认表格不是空表，或先另存为 CSV 后上传。",
+    );
+  }
+
+  return Buffer.from(csv, "utf8");
+}
+
 export async function prepareAttachmentUpload(file: File) {
   const sourceMimeType = getSupportedMimeType(file);
 
   if (!isSupportedAttachmentMimeType(sourceMimeType)) {
-    throw new Error("当前文件类型暂不支持。");
+    throw new AttachmentValidationError("当前文件类型暂不支持。");
   }
 
   if (file.size > getAttachmentSizeLimit(sourceMimeType)) {
-    throw new Error(
+    throw new AttachmentValidationError(
       `文件大小超过限制：图片不得超过 ${formatAttachmentSizeLimit(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatAttachmentSizeLimit(MAX_FILE_ATTACHMENT_SIZE)}。`,
     );
   }
 
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
+
+  if (isSupportedSpreadsheetMimeType(sourceMimeType)) {
+    const csvBuffer = await convertXlsxBufferToCsv(sourceBuffer);
+    const csvFileName = `${sanitizeFileName(file.name).replace(/\.[^.]+$/, "")}.csv`;
+
+    return {
+      buffer: csvBuffer,
+      fileName: csvFileName,
+      mimeType: "text/csv",
+      kind: "file" as const,
+      originalFileName: file.name,
+      originalMimeType: sourceMimeType,
+    };
+  }
 
   if (isSupportedOfficeMimeType(sourceMimeType)) {
     const pdfBuffer = await convertOfficeBufferToPdf(sourceBuffer, file.name);
@@ -230,13 +320,21 @@ export function assertAttachmentsOwnedByUser(
   userId: string,
   attachments: MessageAttachment[],
 ) {
-  const expectedPrefix = `${userId}/drafts/`;
-
   for (const attachment of attachments) {
-    if (!attachment.storagePath.startsWith(expectedPrefix)) {
+    if (!isAttachmentStoragePathOwnedByUser(userId, attachment.storagePath)) {
       throw new Error("附件不属于当前用户，无法继续操作。");
     }
   }
+}
+
+export function isAttachmentStoragePathOwnedByUser(
+  userId: string,
+  storagePath: string,
+) {
+  return (
+    storagePath.startsWith(`${userId}/drafts/`) &&
+    !storagePath.split("/").includes("..")
+  );
 }
 
 export function getAttachmentPaths(metadata: ChatMessageMetadata | undefined) {
@@ -294,15 +392,27 @@ export async function downloadAttachmentBuffer(
   supabase: SupabaseClient,
   attachment: MessageAttachment,
 ) {
-  const { data, error } = await supabase.storage
-    .from(MESSAGE_ATTACHMENTS_BUCKET)
-    .download(attachment.storagePath);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(MESSAGE_ATTACHMENTS_BUCKET)
+        .download(attachment.storagePath);
 
-  if (error) {
-    throw error;
+      if (error) {
+        throw error;
+      }
+
+      return Buffer.from(await data.arrayBuffer());
+    } catch (error) {
+      const retryDelay = ATTACHMENT_DOWNLOAD_RETRY_DELAYS_MS[attempt];
+
+      if (!isFetchNetworkError(error) || retryDelay === undefined) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+    }
   }
-
-  return Buffer.from(await data.arrayBuffer());
 }
 
 export function getFileExtension(fileName: string) {

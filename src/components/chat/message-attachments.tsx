@@ -46,6 +46,8 @@ const MAX_MESSAGE_ATTACHMENTS = 5;
 const MAX_IMAGE_ATTACHMENT_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const MAX_MESSAGE_ATTACHMENTS_SIZE = 20 * 1024 * 1024;
+const XLSX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -64,8 +66,7 @@ const SUPPORTED_FILE_MIME_TYPES = new Set([
   "text/csv",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  XLSX_MIME_TYPE,
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
@@ -76,7 +77,6 @@ const SUPPORTED_FILE_EXTENSIONS = new Set([
   ".csv",
   ".doc",
   ".docx",
-  ".xls",
   ".xlsx",
   ".ppt",
   ".pptx",
@@ -107,7 +107,6 @@ function getAcceptMimeTypes({
           ".csv",
           ".doc",
           ".docx",
-          ".xls",
           ".xlsx",
           ".ppt",
           ".pptx",
@@ -145,6 +144,49 @@ function isSupportedByCurrentModel(
   return false;
 }
 
+export function getAttachmentFileValidationError(
+  files: File[],
+  {
+    currentAttachmentCount,
+    currentAttachmentSizes = [],
+    supportsFiles,
+    supportsImages,
+  }: {
+    currentAttachmentCount: number;
+    currentAttachmentSizes?: number[];
+    supportsFiles: boolean;
+    supportsImages: boolean;
+  },
+) {
+  if (
+    files.some(
+      (file) =>
+        !isSupportedByCurrentModel(file, { supportsFiles, supportsImages }),
+    )
+  ) {
+    return "当前模型不支持所选文件类型。";
+  }
+
+  if (currentAttachmentCount + files.length > MAX_MESSAGE_ATTACHMENTS) {
+    return `每条消息最多添加 ${MAX_MESSAGE_ATTACHMENTS} 个附加项。`;
+  }
+
+  if (files.some((file) => file.size > getFileSizeLimit(file))) {
+    return `文件大小超过限制：图片不得超过 ${formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatFileSize(MAX_FILE_ATTACHMENT_SIZE)}。`;
+  }
+
+  const totalSize = [
+    ...currentAttachmentSizes,
+    ...files.map((file) => file.size),
+  ].reduce((sum, size) => sum + size, 0);
+
+  if (totalSize > MAX_MESSAGE_ATTACHMENTS_SIZE) {
+    return "单条消息附加项总大小不能超过 20MB。";
+  }
+
+  return null;
+}
+
 function formatFileSize(size: number) {
   if (size < 1024) {
     return `${size} B`;
@@ -167,7 +209,22 @@ function getFileSizeLimit(file: File) {
 }
 
 function getAttachmentLabel(attachment: MessageAttachment) {
-  return attachment.originalFileName ?? attachment.fileName;
+  return attachment.fileName;
+}
+
+function getAttachmentDescription(attachment: MessageAttachment) {
+  if (
+    attachment.originalFileName &&
+    attachment.originalFileName !== attachment.fileName
+  ) {
+    return `${attachment.originalFileName} 已转换`;
+  }
+
+  return null;
+}
+
+function isConvertedXlsxAttachment(attachment: MessageAttachment) {
+  return attachment.originalMimeType === XLSX_MIME_TYPE;
 }
 
 function buildAttachmentObjectUrl(storagePath: string) {
@@ -254,8 +311,19 @@ export function AttachmentPreviewList({
                   {getAttachmentLabel(attachment)}
                 </div>
                 <div className="text-[0.68rem] text-slate-400">
-                  {formatFileSize(attachment.size)}
+                  {getAttachmentDescription(attachment) ??
+                    formatFileSize(attachment.size)}
                 </div>
+                {getAttachmentDescription(attachment) ? (
+                  <div className="text-[0.68rem] text-slate-400">
+                    {formatFileSize(attachment.size)}
+                  </div>
+                ) : null}
+                {isConvertedXlsxAttachment(attachment) ? (
+                  <div className="text-[0.68rem] text-sky-600">
+                    XLSX 已自动转为 CSV
+                  </div>
+                ) : null}
               </div>
               {onRemove ? (
                 <button
@@ -363,39 +431,15 @@ export function AttachmentEditorDialog({
       return;
     }
 
-    if (
-      files.some(
-        (file) =>
-          !isSupportedByCurrentModel(file, { supportsFiles, supportsImages }),
-      )
-    ) {
-      setAttachmentError("当前模型不支持所选文件类型。");
-      return;
-    }
+    const validationError = getAttachmentFileValidationError(files, {
+      currentAttachmentCount: attachments.length,
+      currentAttachmentSizes: attachments.map((attachment) => attachment.size),
+      supportsFiles,
+      supportsImages,
+    });
 
-    if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
-      setAttachmentError(`每条消息最多添加 ${MAX_MESSAGE_ATTACHMENTS} 个附加项。`);
-      return;
-    }
-
-    const oversizedFile = files.find(
-      (file) => file.size > getFileSizeLimit(file),
-    );
-
-    if (oversizedFile) {
-      setAttachmentError(
-        `文件大小超过限制：图片不得超过 ${formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatFileSize(MAX_FILE_ATTACHMENT_SIZE)}。`,
-      );
-      return;
-    }
-
-    const totalSize = [
-      ...attachments.map((attachment) => attachment.size),
-      ...files.map((file) => file.size),
-    ].reduce((sum, size) => sum + size, 0);
-
-    if (totalSize > MAX_MESSAGE_ATTACHMENTS_SIZE) {
-      setAttachmentError("单条消息附加项总大小不能超过 20MB。");
+    if (validationError) {
+      setAttachmentError(validationError);
       return;
     }
 
@@ -479,7 +523,12 @@ export function AttachmentEditorDialog({
 
           <section className="space-y-2.5">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-medium text-slate-500">文件和图片</div>
+              <div className="space-y-0.5">
+                <div className="text-xs font-medium text-slate-500">文件和图片</div>
+                <div className="text-[0.7rem] text-slate-400">
+                  .xlsx 会自动转换为 .csv 后保存
+                </div>
+              </div>
               <label
                 className={cn(
                   "relative inline-flex h-8 cursor-pointer items-center gap-1 overflow-hidden rounded-[9px] border border-border/80 bg-white px-3 text-xs font-medium text-slate-600 shadow-none transition-colors hover:bg-muted hover:text-foreground",
@@ -552,8 +601,19 @@ export function AttachmentEditorDialog({
                             {getAttachmentLabel(attachment)}
                           </div>
                           <div className="text-xs text-slate-400">
-                            {formatFileSize(attachment.size)}
+                            {getAttachmentDescription(attachment) ??
+                              formatFileSize(attachment.size)}
                           </div>
+                          {getAttachmentDescription(attachment) ? (
+                            <div className="text-xs text-slate-400">
+                              {formatFileSize(attachment.size)}
+                            </div>
+                          ) : null}
+                          {isConvertedXlsxAttachment(attachment) ? (
+                            <div className="text-xs text-sky-600">
+                              XLSX 已自动转为 CSV
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <Tooltip content="移除">
