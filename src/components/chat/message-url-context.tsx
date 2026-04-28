@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export const MAX_EDIT_URL_CONTEXT_ITEMS = 20;
+export const MAX_EDIT_URL_CONTEXT_ITEMS = 4;
 
 export function getUrlDisplayText(url: string) {
   try {

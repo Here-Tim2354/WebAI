@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-28 02:07:42
+更新时间：2026-04-28 12:20:00
 
 ## 当前阶段
 
@@ -46,16 +46,20 @@
   - 附加项弹窗的“添加”入口已改为原生 file input 透明覆盖按钮区域，避免程序化 click 被弹窗/浏览器吞掉
   - 文件选择后已先拷贝为普通 `File[]` 再清空 input，避免 live `FileList` 被清空导致上传静默跳过
   - 附件上传会按当前模型能力过滤图片 / 文件，并提前校验单条消息最多 5 个、总大小 20MB
+  - 附件大小提示已细化：图片单个最多 5MB，普通文件单个最多 10MB，单条消息总计最多 20MB
   - Windows / Office 常见空 MIME 场景已按扩展名兜底识别
+  - Storage object key 已改为 `userId/drafts/attachmentId/attachment.ext`，避免中文、空格、书名号等原始文件名导致 Supabase Storage `Invalid key`
   - 批量附件上传如果中途失败，会清理本批次已写入 Storage 但未返回前端的对象
   - 粘贴 / 拖拽上传失败会在输入区显示错误，不再静默失败
   - 图片 / PDF / 文本文件已接入 Gemini 输入组装
   - 普通发送、编辑与重新生成均已确认会把附件 metadata 传给服务端
   - Gemini 请求组装已改为从私有 Storage 下载附件，并以 `inlineData` 传入图片 / PDF
-  - 编辑带附件消息时，正文、metadata 与删除后续消息已合并为数据库 RPC 原子操作
+  - 编辑带附件消息时，正文、metadata 与删除后续消息优先走数据库 RPC；当前代码已补直接 update + delete fallback，避免 RPC 单点失败阻断编辑链路
+  - 发送、编辑、重新生成接口已校验附件 `storagePath` 必须属于当前用户目录
   - user 消息已支持“正文为空但保留附件”的数据库约束
-  - Office 三件套按“`libreoffice-convert` 转 PDF 后保存 PDF”处理
+  - Office 三件套按“`libreoffice-convert` 调用 LibreOffice / soffice 转 PDF 后保存 PDF”处理；pandoc fallback 已移除
   - 重新生成与分支继续沿用消息 metadata 上下文
+  - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示
   - 当前只应视为“首轮接入完成”，不是稳定收口；真实文件选择、上传反馈、编辑保存、历史恢复、移动端预览和部署环境转换链路仍需要继续打磨
 - 会话管理增强已完成第一轮：
   - 收藏 / 取消收藏
@@ -88,6 +92,7 @@
   - `PATCH /api/conversations/[conversationId]` 支持 `status`
   - `POST /api/attachments/upload`
   - `GET /api/attachments/object?path=...`
+  - `PATCH /api/messages/[messageId]` 编辑带附件消息时支持 RPC fallback
 
 ## 验证结果
 
@@ -97,6 +102,10 @@
 - `npm run build` 通过
   - 沙箱内可能触发已知 `spawn EPERM`
   - 越权运行可通过
+- browser-use 最新 smoke test 通过：
+  - 页面可正常加载
+  - 浏览器控制台无 error/warning
+  - “修改附加项”入口可见
 - browser-use 已验收：
   - 页面可正常加载
   - 输入区可见“修改附加项”入口
@@ -108,12 +117,15 @@
 ## 当前待办
 
 - `Phase 4.4` 大量调整与端到端验收：
+  - 立即复测编辑带附件 user 消息：只改正文、只改附件、正文和附件都改，确认 fallback 后不再出现泛化“消息操作失败”
+  - 复测 LaTeX 渲染：行内 `$...$`、块级 `$$...$$`、中文段落混排、流式输出期间的展示稳定性
+  - 复测大文件提示：图片超过 5MB、普通文件超过 10MB、总附件超过 20MB 时文案是否清楚
   - 用真实图片、PDF、文本文件反复验证“选择文件 -> 上传 -> UI 反馈 -> 发送 -> AI 识别 -> 历史恢复”完整链路
   - 重点复测“修改附加项”窗口中的添加、删除、保存、取消、错误提示和按钮禁用状态
   - 重点复测编辑带附件 user 消息后的 metadata 保存、后续消息截断、重新生成和失败回滚表现
   - 重点复测 assistant 重新生成、分支会话是否稳定继承原 user 消息附件上下文
   - 用真实图片、PDF、文本文件验证上传、历史恢复、重新生成、分支
-  - 在部署环境确认 Office 转 PDF 工具链是否可用
+  - 在部署环境确认 Office 转 PDF 工具链是否可用；当前本机 `pandoc` 存在于 `D:\Anaconda\Scripts\pandoc.exe`，但 `soffice` / `LibreOffice` / `pdflatex` 未确认可用，本轮 winget 安装已按用户要求中断
   - 观察私有 Storage 图片预览在移动端下的加载与放大表现
   - 评估未引用附件自动清理失败时是否需要后台补偿任务
 - `Phase 4.3` 观察：
@@ -130,4 +142,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 文件与图片输入第一轮已经落地并完成远端 migration、typecheck、lint、build 与浏览器 smoke test，但当前阶段仍处于高风险调试期，需要用真实附件数据继续做端到端验收，并对上传反馈、编辑保存、历史恢复、移动端预览和 Office 转 PDF 部署链路做大量调整。
+`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 渲染入口和 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、LaTeX 输出和 Office 转 PDF 本地/部署工具链。

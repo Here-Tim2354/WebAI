@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/stream-control";
 import {
   type ChatMessage,
+  type MessageAttachment,
   type ChatStreamEvent,
 } from "@/lib/schemas/chat";
 import { type Conversation } from "@/lib/schemas/conversation";
@@ -26,6 +27,7 @@ type CreateAssistantStreamResponseOptions = {
   messagesForModel: ChatMessage[];
   model: RuntimeAIModel | null;
   urls?: string[];
+  attachments?: MessageAttachment[];
   requestSignal: AbortSignal;
 };
 
@@ -61,6 +63,7 @@ export async function createAssistantStreamResponse({
   messagesForModel,
   model,
   urls,
+  attachments,
   requestSignal,
 }: CreateAssistantStreamResponseOptions) {
   const assistantMessage = await createConversationMessage(
@@ -106,14 +109,33 @@ export async function createAssistantStreamResponse({
         });
 
         try {
-          for await (const delta of streamAssistantReply(messagesForModel, {
-            model,
-            conversationSystemPrompt: nextConversation.systemPrompt,
-            webSearchEnabled: nextConversation.webSearchEnabled,
-            urls,
-            supabase,
-            abortSignal: mergedAbortController.signal,
-          })) {
+          const messagesWithRequestAttachments =
+            attachments && attachments.length > 0
+              ? messagesForModel.map((message, index) =>
+                  index === messagesForModel.length - 1 &&
+                  message.role === "user"
+                    ? {
+                        ...message,
+                        metadata: {
+                          ...message.metadata,
+                          attachments,
+                        },
+                      }
+                    : message,
+                )
+              : messagesForModel;
+
+          for await (const delta of streamAssistantReply(
+            messagesWithRequestAttachments,
+            {
+              model,
+              conversationSystemPrompt: nextConversation.systemPrompt,
+              webSearchEnabled: nextConversation.webSearchEnabled,
+              urls,
+              supabase,
+              abortSignal: mergedAbortController.signal,
+            },
+          )) {
             if (!delta) {
               continue;
             }

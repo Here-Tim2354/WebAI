@@ -23,6 +23,7 @@ aliases:
 
 - Markdown 渲染
 - GFM 支持
+- LaTeX 公式渲染
 - 中文 Markdown 兼容
 - 表格包装
 - 行内代码渲染
@@ -35,17 +36,24 @@ aliases:
 当前已启用：
 
 - `remark-gfm`
+- `remark-math`
 - `remark-cjk-friendly`
 - `remark-cjk-friendly-gfm-strikethrough`
+
+当前已启用：
+
+- `rehype-katex`
+- `katex/dist/katex.min.css`
 
 这意味着它除了常规 Markdown，还兼顾：
 
 - 表格、任务列表、删除线等 GFM 能力
+- 行内 `$...$` 与块级 `$$...$$` 的基础 LaTeX 公式展示
 - 中文段落里更自然的 Markdown 行为
 
 ---
 
-## 3. 表格与代码块的处理
+## 3. 表格、公式与代码块的处理
 
 ### 表格
 
@@ -70,6 +78,16 @@ aliases:
 - 头部语言标签
 - 复制按钮
 
+### 公式
+
+公式由 `remark-math` 解析，再交给 `rehype-katex` 输出 KaTeX HTML。
+
+样式来自全局 CSS 中的：
+
+- `katex/dist/katex.min.css`
+
+当前只是基础展示支持，后续仍需要继续观察流式输出时半截公式的临时渲染表现。
+
 ---
 
 ## 4. 行内代码与紧凑样式
@@ -93,4 +111,4 @@ aliases:
 
 ## 5. 一句话理解
 
-`MarkdownMessage` 是消息正文的富文本分发器：它负责把普通正文、表格、行内代码和块级代码分别送进正确的展示通道。
+`MarkdownMessage` 是消息正文的富文本分发器：它负责把普通正文、表格、公式、行内代码和块级代码分别送进正确的展示通道。

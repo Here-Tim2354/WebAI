@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   MAX_MESSAGE_ATTACHMENTS,
   MAX_MESSAGE_ATTACHMENTS_SIZE,
+  formatAttachmentSizeLimit,
   MESSAGE_ATTACHMENTS_BUCKET,
   uploadMessageAttachment,
 } from "@/lib/attachments";
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: {
-            message: "单条消息附加项总大小不能超过 20MB。",
+            message: `单条消息附加项总大小不能超过 ${formatAttachmentSizeLimit(MAX_MESSAGE_ATTACHMENTS_SIZE)}。`,
           },
         },
         { status: 400 },

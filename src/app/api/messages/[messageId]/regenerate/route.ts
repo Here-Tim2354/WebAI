@@ -3,6 +3,7 @@ import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-respons
 import { ServerEnvError } from "@/lib/env/server";
 import { regenerateAssistantMessageRequestSchema } from "@/lib/schemas/chat";
 import {
+  assertAttachmentsOwnedByUser,
   cleanupUnreferencedAttachments,
   getAttachmentPaths,
   normalizeMessageAttachments,
@@ -253,6 +254,10 @@ export async function POST(request: Request, context: RouteContext) {
       : null;
     const effectiveAttachments = nextPreviousUserMetadata.attachments ?? [];
 
+    if (effectiveAttachments.length > 0) {
+      assertAttachmentsOwnedByUser(user.id, effectiveAttachments);
+    }
+
     if (effectiveAttachments.length > 0 && selectedModel) {
       const hasImageAttachment = effectiveAttachments.some(
         (attachment) => attachment.kind === "image",
@@ -303,6 +308,7 @@ export async function POST(request: Request, context: RouteContext) {
       messagesForModel,
       model: selectedModel,
       urls: effectiveUrls,
+      attachments: effectiveAttachments,
       requestSignal: request.signal,
     });
   } catch (error) {

@@ -30,9 +30,15 @@
 
 Office 三件套不直接保存原文件。服务端会先通过 `libreoffice-convert` 封装的 LibreOffice 转换链路临时转成 PDF，再把 PDF 存入 bucket。
 
-如果当前运行环境缺少 LibreOffice，服务端会尝试使用 `pandoc` 作为兜底转换器；如果转换工具不可用，则上传接口返回明确错误，不会保存原始 Office 文件。
+如果当前运行环境缺少 LibreOffice / soffice，上传接口会返回明确错误，并提示用户先导出为 PDF 后上传。旧的 `pandoc` 兜底已移除，因为 `pandoc` 转 PDF 仍可能继续依赖 `pdflatex`，会让错误链路变得不清晰。
 
 部署到真实环境前，需要单独确认运行时是否存在 `soffice` / LibreOffice 可执行能力；仅依赖本地构建通过不能证明 Office 转 PDF 链路可用。
+
+当前本机状态：
+
+- `pandoc` 存在于 `D:\Anaconda\Scripts\pandoc.exe`
+- `soffice` / `LibreOffice` / `pdflatex` 暂未确认可用
+- 本轮本地工具安装已按用户要求暂停
 
 ## metadata 语义
 
@@ -44,6 +50,12 @@ Office 三件套不直接保存原文件。服务端会先通过 `libreoffice-co
 - `mimeType`
 - `size`
 - `storagePath`
+
+当前 `storagePath` 不再拼接原始文件名，而是使用类似：
+
+- `userId/drafts/attachmentId/attachment.ext`
+
+这样可以避免中文、空格、书名号等原始文件名触发 Supabase Storage `Invalid key`。真实展示名由 `fileName` / `originalFileName` 承担。
 
 如果来自 Office 原文件，还会保留：
 
@@ -57,6 +69,8 @@ Office 三件套不直接保存原文件。服务端会先通过 `libreoffice-co
 如果没有任何消息继续引用该对象，就尝试删除 Storage 对象。
 
 当前清理失败不会阻断消息保存；后续如果真实使用中出现残留，可再补后台清理任务。
+
+编辑带附件 user 消息时，当前代码优先调用数据库 RPC 完成“更新目标消息 + 删除后续消息”。如果 RPC 调用失败，会 fallback 到普通 update + delete 路径，避免编辑链路被 RPC 单点阻断。后续仍建议继续复测 RPC 与 fallback 的一致性。
 
 ## 模型能力
 

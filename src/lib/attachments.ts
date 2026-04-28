@@ -1,9 +1,5 @@
 import { randomUUID } from "crypto";
-import { execFile } from "child_process";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { extname, join } from "path";
-import { promisify } from "util";
+import { extname } from "path";
 import { convertWithOptions } from "libreoffice-convert";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -11,9 +7,6 @@ import {
   type MessageAttachment,
   messageAttachmentsSchema,
 } from "@/lib/schemas/chat";
-
-const execFileAsync = promisify(execFile);
-const convertOfficeWithLibreOffice = promisify(convertWithOptions);
 
 export const MESSAGE_ATTACHMENTS_BUCKET = "message_attachments";
 export const MAX_MESSAGE_ATTACHMENTS = 5;
@@ -88,6 +81,18 @@ export function getAttachmentSizeLimit(mimeType: string) {
     : MAX_FILE_ATTACHMENT_SIZE;
 }
 
+export function formatAttachmentSizeLimit(size: number) {
+  if (size % (1024 * 1024) === 0) {
+    return `${size / 1024 / 1024}MB`;
+  }
+
+  if (size % 1024 === 0) {
+    return `${size / 1024}KB`;
+  }
+
+  return `${size}B`;
+}
+
 function getSupportedMimeType(file: File) {
   if (file.type && isSupportedAttachmentMimeType(file.type)) {
     return file.type;
@@ -107,26 +112,12 @@ function sanitizeFileName(fileName: string) {
 
 function createStoragePath(userId: string, fileName: string) {
   const attachmentId = randomUUID();
-  const safeFileName = sanitizeFileName(fileName);
+  const extension = extname(fileName).toLowerCase();
+
   return {
     attachmentId,
-    storagePath: `${userId}/drafts/${attachmentId}/${safeFileName}`,
+    storagePath: `${userId}/drafts/${attachmentId}/attachment${extension}`,
   };
-}
-
-async function findExecutable(candidates: string[]) {
-  for (const candidate of candidates) {
-    try {
-      await execFileAsync(process.platform === "win32" ? "where.exe" : "which", [
-        candidate,
-      ]);
-      return candidate;
-    } catch {
-      // Try next candidate.
-    }
-  }
-
-  return null;
 }
 
 async function convertOfficeBufferToPdf(
@@ -134,44 +125,26 @@ async function convertOfficeBufferToPdf(
   fileName: string,
 ): Promise<Buffer> {
   try {
-    return await convertOfficeWithLibreOffice(buffer, "pdf", undefined, {
-      fileName: sanitizeFileName(fileName),
-      asyncOptions: {
-        times: 4,
-        interval: 250,
-      },
+    return await new Promise<Buffer>((resolve, reject) => {
+      convertWithOptions(buffer, "pdf", undefined, {
+        fileName: sanitizeFileName(fileName),
+        asyncOptions: {
+          times: 4,
+          interval: 250,
+        },
+      }, (error, data) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(data);
+      });
     });
-  } catch (conversionError) {
-    const pandoc = await findExecutable(["pandoc"]);
-
-    if (!pandoc) {
-      throw new Error(
-        conversionError instanceof Error
-          ? `Office 转 PDF 失败：${conversionError.message}`
-          : "Office 转 PDF 失败，且服务器缺少可用转换工具。",
-      );
-    }
-  }
-
-  const workingDir = await mkdtemp(join(tmpdir(), "webai-attachment-"));
-  const sourcePath = join(workingDir, sanitizeFileName(fileName));
-
-  try {
-    await writeFile(sourcePath, buffer);
-    const pandoc = await findExecutable(["pandoc"]);
-
-    if (!pandoc) {
-      throw new Error("服务器缺少 Office 转 PDF 工具。");
-    }
-
-    const pdfPath = join(
-      workingDir,
-      `${sanitizeFileName(fileName).replace(/\.[^.]+$/, "")}.pdf`,
+  } catch {
+    throw new Error(
+      "Office 转 PDF 失败：当前运行环境缺少 LibreOffice/soffice 或转换失败。请先导出为 PDF 后上传。",
     );
-    await execFileAsync(pandoc, [sourcePath, "-o", pdfPath]);
-    return await readFile(pdfPath);
-  } finally {
-    await rm(workingDir, { recursive: true, force: true });
   }
 }
 
@@ -183,7 +156,9 @@ export async function prepareAttachmentUpload(file: File) {
   }
 
   if (file.size > getAttachmentSizeLimit(sourceMimeType)) {
-    throw new Error("文件大小超过限制。");
+    throw new Error(
+      `文件大小超过限制：图片不得超过 ${formatAttachmentSizeLimit(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatAttachmentSizeLimit(MAX_FILE_ATTACHMENT_SIZE)}。`,
+    );
   }
 
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
@@ -249,6 +224,19 @@ export function normalizeMessageAttachments(
   attachments: MessageAttachment[] | undefined,
 ) {
   return messageAttachmentsSchema.parse(attachments ?? []);
+}
+
+export function assertAttachmentsOwnedByUser(
+  userId: string,
+  attachments: MessageAttachment[],
+) {
+  const expectedPrefix = `${userId}/drafts/`;
+
+  for (const attachment of attachments) {
+    if (!attachment.storagePath.startsWith(expectedPrefix)) {
+      throw new Error("附件不属于当前用户，无法继续操作。");
+    }
+  }
 }
 
 export function getAttachmentPaths(metadata: ChatMessageMetadata | undefined) {

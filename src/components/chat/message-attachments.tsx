@@ -1,6 +1,6 @@
 "use client";
 
-import { type Dispatch, type SetStateAction, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FileTextIcon,
@@ -43,6 +43,8 @@ type AttachmentEditorDialogProps = {
 };
 
 const MAX_MESSAGE_ATTACHMENTS = 5;
+const MAX_IMAGE_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const MAX_MESSAGE_ATTACHMENTS_SIZE = 20 * 1024 * 1024;
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/png",
@@ -155,6 +157,15 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function getFileSizeLimit(file: File) {
+  return (
+    SUPPORTED_IMAGE_MIME_TYPES.has(file.type) ||
+    SUPPORTED_IMAGE_EXTENSIONS.has(getFileExtension(file.name))
+  )
+    ? MAX_IMAGE_ATTACHMENT_SIZE
+    : MAX_FILE_ATTACHMENT_SIZE;
+}
+
 function getAttachmentLabel(attachment: MessageAttachment) {
   return attachment.originalFileName ?? attachment.fileName;
 }
@@ -174,6 +185,24 @@ export function AttachmentPreviewList({
 }) {
   const [previewAttachment, setPreviewAttachment] =
     useState<MessageAttachment | null>(null);
+
+  useEffect(() => {
+    if (!previewAttachment) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPreviewAttachment(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewAttachment]);
 
   if (attachments.length === 0) {
     return null;
@@ -244,18 +273,39 @@ export function AttachmentPreviewList({
       </div>
 
       {previewAttachment && typeof document !== "undefined" ? createPortal(
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-slate-950/68 p-4"
-          onClick={() => setPreviewAttachment(null)}
-          aria-label="关闭图片预览"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={getAttachmentLabel(previewAttachment)}
         >
-          <img
-            src={buildAttachmentObjectUrl(previewAttachment.storagePath)}
-            alt={getAttachmentLabel(previewAttachment)}
-            className="max-h-full max-w-full rounded-[12px] object-contain shadow-[0_24px_80px_rgba(15,23,42,0.32)]"
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            onClick={() => setPreviewAttachment(null)}
+            aria-label="关闭图片预览"
           />
-        </button>,
+          <div className="relative flex max-h-full max-w-full flex-col gap-3">
+            <button
+              type="button"
+              className="absolute -top-3 -right-3 z-10 inline-flex size-9 items-center justify-center rounded-full border border-white/18 bg-slate-950/78 text-white shadow-[0_14px_32px_rgba(15,23,42,0.35)] transition-colors hover:bg-slate-900"
+              onClick={() => setPreviewAttachment(null)}
+              aria-label="关闭图片预览"
+            >
+              <XIcon className="size-4" />
+            </button>
+            <div className="overflow-hidden rounded-[16px] border border-white/14 bg-white/8 p-2 shadow-[0_28px_90px_rgba(15,23,42,0.42)]">
+              <img
+                src={buildAttachmentObjectUrl(previewAttachment.storagePath)}
+                alt={getAttachmentLabel(previewAttachment)}
+                className="max-h-[calc(100dvh-8rem)] max-w-[calc(100vw-3rem)] rounded-[10px] object-contain"
+              />
+            </div>
+            <div className="mx-auto max-w-[min(34rem,calc(100vw-3rem))] truncate rounded-full border border-white/12 bg-slate-950/58 px-3 py-1.5 text-center text-xs text-white/82 shadow-[0_12px_30px_rgba(15,23,42,0.25)]">
+              {getAttachmentLabel(previewAttachment)}
+            </div>
+          </div>
+        </div>,
         document.body,
       ) : null}
     </>
@@ -325,6 +375,17 @@ export function AttachmentEditorDialog({
 
     if (attachments.length + files.length > MAX_MESSAGE_ATTACHMENTS) {
       setAttachmentError(`每条消息最多添加 ${MAX_MESSAGE_ATTACHMENTS} 个附加项。`);
+      return;
+    }
+
+    const oversizedFile = files.find(
+      (file) => file.size > getFileSizeLimit(file),
+    );
+
+    if (oversizedFile) {
+      setAttachmentError(
+        `文件大小超过限制：图片不得超过 ${formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatFileSize(MAX_FILE_ATTACHMENT_SIZE)}。`,
+      );
       return;
     }
 

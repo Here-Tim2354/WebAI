@@ -17,14 +17,17 @@ import {
   ModelRegistryError,
 } from "@/lib/supabase/model-registry";
 import {
+  assertAttachmentsOwnedByUser,
   cleanupUnreferencedAttachments,
   getAttachmentPaths,
   normalizeMessageAttachments,
 } from "@/lib/attachments";
 import {
+  deleteConversationMessagesById,
   editUserMessageAndDeleteFollowing,
   getConversationMessage,
   listConversationMessages,
+  updateConversationMessage,
 } from "@/lib/supabase/messages";
 
 type RouteContext = {
@@ -42,6 +45,24 @@ function unauthorizedResponse() {
     },
     { status: 401 },
   );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim().length > 0
+  ) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 function handleMessageError(error: unknown) {
@@ -78,8 +99,7 @@ function handleMessageError(error: unknown) {
     );
   }
 
-  const message =
-    error instanceof Error ? error.message : "消息操作失败，请稍后再试。";
+  const message = getErrorMessage(error, "消息操作失败，请稍后再试。");
 
   return NextResponse.json(
     {
@@ -186,6 +206,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       ? await getEnabledModelById(supabase, effectiveModelId)
       : null;
 
+    if (nextMetadata.attachments && nextMetadata.attachments.length > 0) {
+      assertAttachmentsOwnedByUser(user.id, nextMetadata.attachments);
+    }
+
     if (nextMetadata.attachments && nextMetadata.attachments.length > 0 && selectedModel) {
       const hasImageAttachment = nextMetadata.attachments.some(
         (attachment) => attachment.kind === "image",
@@ -203,19 +227,43 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    await editUserMessageAndDeleteFollowing(
-      supabase,
-      conversationId,
-      messageId,
-      content,
-      nextMetadata,
-    );
+    if (targetMessageIndex === -1) {
+      throw new Error("消息不存在，或你没有访问权限。");
+    }
+
+    const followingMessageIds = previousMessages
+      .slice(targetMessageIndex + 1)
+      .map((message) => message.id);
+
+    try {
+      await editUserMessageAndDeleteFollowing(
+        supabase,
+        conversationId,
+        messageId,
+        content,
+        nextMetadata,
+      );
+    } catch {
+      await updateConversationMessage(
+        supabase,
+        conversationId,
+        messageId,
+        {
+          content,
+          metadata: nextMetadata,
+          status: "complete",
+        },
+      );
+      await deleteConversationMessagesById(
+        supabase,
+        conversationId,
+        followingMessageIds,
+      );
+    }
     const previousAttachments =
-      targetMessageIndex === -1
-        ? currentMetadata.attachments ?? []
-        : previousMessages
-            .slice(targetMessageIndex)
-            .flatMap((message) => message.metadata.attachments ?? []);
+      previousMessages
+        .slice(targetMessageIndex)
+        .flatMap((message) => message.metadata.attachments ?? []);
     void cleanupUnreferencedAttachments(
       supabase,
       previousAttachments.filter(
@@ -240,6 +288,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       messagesForModel,
       model: selectedModel,
       urls: nextMetadata.urls,
+      attachments: nextMetadata.attachments,
       requestSignal: request.signal,
     });
   } catch (error) {

@@ -224,7 +224,7 @@ export async function deleteConversationMessagesById(
     .in("id", messageIds);
 
   if (error) {
-    throw error;
+    throw new Error(error.message);
   }
 }
 
@@ -246,6 +246,6 @@ export async function editUserMessageAndDeleteFollowing(
   );
 
   if (error) {
-    throw error;
+    throw new Error(error.message);
   }
 }

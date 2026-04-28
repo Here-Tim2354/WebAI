@@ -23,7 +23,7 @@ export const chatMessagePartSchema = z.object({
 
 export const urlContextUrlsSchema = z
   .array(z.string().trim().url("URL 格式不正确。"))
-  .max(20);
+  .max(4, "最多保留 4 个 URL。");
 
 export const messageAttachmentKindSchema = z.enum(["image", "file"]);
 

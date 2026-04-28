@@ -2,9 +2,11 @@
 
 import { Children, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkCjkFriendlyGfmStrikethrough from "remark-cjk-friendly-gfm-strikethrough";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CodeBlock } from "./code-block";
 
@@ -43,10 +45,12 @@ export function MarkdownMessage({
     <div className={["markdown", className].filter(Boolean).join(" ")}>
       <ReactMarkdown
         remarkPlugins={[
+          remarkMath,
           remarkGfm,
           remarkCjkFriendly,
           remarkCjkFriendlyGfmStrikethrough,
         ]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           table({ children }) {
             return (

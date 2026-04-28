@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
+import { assertAttachmentsOwnedByUser } from "@/lib/attachments";
 import { ServerEnvError } from "@/lib/env/server";
 import { sendMessageRequestSchema } from "@/lib/schemas/chat";
 import { getSupabaseAuthContext } from "@/lib/supabase/auth";
@@ -145,6 +146,10 @@ export async function POST(request: Request) {
       ? await getEnabledModelById(supabase, effectiveModelId)
       : null;
 
+    if (attachments && attachments.length > 0) {
+      assertAttachmentsOwnedByUser(user.id, attachments);
+    }
+
     if (attachments && attachments.length > 0 && selectedModel) {
       const hasImageAttachment = attachments.some(
         (attachment) => attachment.kind === "image",
@@ -185,6 +190,7 @@ export async function POST(request: Request) {
       messagesForModel,
       model: selectedModel,
       urls,
+      attachments,
       requestSignal: request.signal,
     });
   } catch (error) {
