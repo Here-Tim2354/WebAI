@@ -32,7 +32,11 @@ export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(
 
     useImperativeHandle(
       forwardedRef,
-      () => scrollRef.current?.getElement() as HTMLDivElement,
+      () =>
+        (
+          scrollRef.current?.osInstance()?.elements().viewport ??
+          scrollRef.current?.getElement()
+        ) as HTMLDivElement,
       [],
     );
 

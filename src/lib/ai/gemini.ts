@@ -112,13 +112,17 @@ async function toGeminiContents(
           (message.metadata.attachments?.length ?? 0) > 0
         ),
     );
+  const latestUserMessageId = [...normalizedMessages]
+    .reverse()
+    .find((message) => message.role === "user")?.id;
 
   const contents: Content[] = [];
 
   for (const message of normalizedMessages) {
-    const attachmentParts = message.role === "user"
-      ? await toGeminiAttachmentParts(supabase, message.metadata.attachments)
-      : [];
+    const attachmentParts =
+      message.role === "user" && message.id === latestUserMessageId
+        ? await toGeminiAttachmentParts(supabase, message.metadata.attachments)
+        : [];
     const parts = [
       ...attachmentParts,
       ...(message.content.trim().length > 0 ? [{ text: message.content }] : []),
@@ -153,9 +157,6 @@ export async function* streamWithGemini(
   );
   const normalizedUrls = normalizeUrls(options?.urls);
   const messagesWithUrlContext = withUrlContextPrompt(messages, normalizedUrls);
-  const hasAttachments = messagesWithUrlContext.some(
-    (message) => (message.metadata.attachments?.length ?? 0) > 0,
-  );
   const systemInstruction = getSystemInstruction(messagesWithUrlContext, {
     conversationSystemPrompt: options?.conversationSystemPrompt,
   });
@@ -188,7 +189,7 @@ export async function* streamWithGemini(
             systemInstruction,
           }
         : {}),
-      ...(!hasAttachments && (options?.webSearchEnabled || normalizedUrls.length > 0)
+      ...(options?.webSearchEnabled || normalizedUrls.length > 0
         ? {
             tools: [
               ...(options?.webSearchEnabled ? [{ googleSearch: {} }] : []),

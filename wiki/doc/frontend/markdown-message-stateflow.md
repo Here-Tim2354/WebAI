@@ -26,6 +26,7 @@ aliases:
 它的状态流重点不在内部状态，而在：
 
 - 不同 Markdown 节点被分派到哪里
+- 原始正文进入 ReactMarkdown 前的公式规范化
 
 ---
 
@@ -69,6 +70,14 @@ LaTeX 公式先由 `remark-math` 从 Markdown 文本中识别，再由 `rehype-k
 - 行内 `$...$`
 - 块级 `$$...$$`
 
+在送入 `ReactMarkdown` 前，组件会先把正文交给 `normalizeBlockMath()`：
+
+- 如果用户或模型在同一行写出 `$$latex content$$`
+- 且这段内容不在 fenced code 内
+- 就会被转成独立的三行块级公式
+
+这样 `remark-math` 可以稳定把它识别为 display math，而不是普通行内文本。
+
 注意：流式输出期间，如果公式还没有闭合，渲染结果可能会临时回退为普通文本或出现短暂重排，后续需要真实对话继续观察。
 
 ---
@@ -107,4 +116,4 @@ LaTeX 公式先由 `remark-math` 从 Markdown 文本中识别，再由 `rehype-k
 
 ## 5. 一句话总结
 
-`MarkdownMessage` 的状态流本质上是一个分发过程：把 `content` 解析后，根据节点类型把正文、表格、公式、行内代码和块级代码送进不同的渲染通道。
+`MarkdownMessage` 的状态流本质上是一个分发过程：先对块级公式写法做轻量规范化，再把 `content` 解析后，根据节点类型把正文、表格、公式、行内代码和块级代码送进不同的渲染通道。

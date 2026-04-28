@@ -245,10 +245,14 @@
   - Storage object key 已改为安全路径，原始文件名只保留在 metadata 中展示，避免中文/空格文件名触发 Storage `Invalid key`
   - Office 三件套采用服务端临时转 PDF、云端只保存 PDF 的策略；转换依赖 LibreOffice / soffice，pandoc fallback 已移除
   - Markdown 正文渲染已支持基础 LaTeX 公式
+  - Markdown 正文渲染已补 `$$...$$` 同行写法到块级公式的规范化，保证这类主流 display math 写法可以独立换行并居中展示
+  - 流式输出期间的消息滚动已尊重用户阅读位置：用户主动上滑离开底部后，不再被增量内容强制拉回最新回复
+  - Gemini 普通附件输入与 `googleSearch` / `urlContext` 现在按官方兼容语义处理；当前项目没有接 Gemini File Search，因此不再用附件存在与否禁用联网工具
+  - Gemini 请求只把最新 user 消息的附件转成输入 parts，历史 user 附件不再反复上传，避免编辑和重新生成时请求体被旧附件污染
   - 编辑带附件消息优先走数据库 RPC，当前代码已补直接 update + delete fallback，降低 RPC 单点失败风险
 - 当前判断：
   - 这轮只表示多模态附件链路已经接入，不表示产品体验已经稳定
-  - 文件选择、上传反馈、弹窗保存、编辑带附件消息、重新生成、分支、历史恢复、LaTeX 渲染和移动端图片预览都需要继续用真实数据深度回归
+  - 文件选择、上传反馈、弹窗保存、编辑带附件消息、重新生成、分支、历史恢复、流式半截公式表现和移动端图片预览都需要继续用真实数据深度回归
   - Office 转 PDF 依赖部署环境中的 LibreOffice / soffice 能力，不能仅用本地 typecheck 或浏览器 smoke test 视为完成
 - 当前边界：
   - 视频与音频明确不作为当前产品方向
@@ -259,7 +263,7 @@
   - 真实附件上传后的 UI 反馈和失败恢复
   - 编辑带附件 user 消息时的数据库原子更新 / fallback 与前端状态同步
   - assistant 重新生成和分支对附件 metadata 的继承稳定性
-  - LaTeX 渲染在流式输出、中文段落和代码块附近的边界表现
+  - LaTeX 渲染在流式半截公式、中文段落和代码块附近的边界表现
   - 移动端图片缩略图、页面级预览和私有 Storage 代理加载体验
   - 部署环境是否具备 Office 转 PDF 工具链
   - 自动清理失败时是否需要后台补偿任务

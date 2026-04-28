@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-28 12:20:00
+更新时间：2026-04-28 20:12:39
 
 ## 当前阶段
 
@@ -60,6 +60,10 @@
   - Office 三件套按“`libreoffice-convert` 调用 LibreOffice / soffice 转 PDF 后保存 PDF”处理；pandoc fallback 已移除
   - 重新生成与分支继续沿用消息 metadata 上下文
   - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示
+  - Markdown 消息渲染已补 `$$...$$` 同行写法的块级公式规范化：渲染前会转成独立块并居中展示，同时跳过 fenced code
+  - 消息滚动容器已修正为把 `ScrollArea` ref 暴露到实际 viewport，用户上滑阅读时不会被流式增量强行拉回底部
+  - Gemini 普通附件输入不再屏蔽 `googleSearch` / `urlContext`；当前项目未接 Gemini File Search，因此不再沿用 File Search 的工具组合限制
+  - Gemini 请求组装只上传最新 user 消息的附件，历史附件仅保留文字上下文，避免编辑 / 重新生成时反复把旧附件塞进请求
   - 当前只应视为“首轮接入完成”，不是稳定收口；真实文件选择、上传反馈、编辑保存、历史恢复、移动端预览和部署环境转换链路仍需要继续打磨
 - 会话管理增强已完成第一轮：
   - 收藏 / 取消收藏
@@ -113,12 +117,17 @@
   - 页面级图片预览与草稿缩略图快捷移除入口已接入
   - 发送入口可见
   - 浏览器控制台无 error/warning
+- 本轮修复后已验收：
+  - `npm run typecheck` 通过
+  - `npm run lint` 通过，仍只剩既有 3 个 `<img>` warning
+  - 编辑消息后重新生成不再复现 `Cannot coerce the result to a single JSON object`
+  - 会话中存在历史附件时，纯文本联网问题仍可触发 Gemini 搜索工具
 
 ## 当前待办
 
 - `Phase 4.4` 大量调整与端到端验收：
   - 立即复测编辑带附件 user 消息：只改正文、只改附件、正文和附件都改，确认 fallback 后不再出现泛化“消息操作失败”
-  - 复测 LaTeX 渲染：行内 `$...$`、块级 `$$...$$`、中文段落混排、流式输出期间的展示稳定性
+  - 继续观察 LaTeX 渲染：行内 `$...$`、块级 `$$...$$`、中文段落混排、流式半截公式的临时展示稳定性
   - 复测大文件提示：图片超过 5MB、普通文件超过 10MB、总附件超过 20MB 时文案是否清楚
   - 用真实图片、PDF、文本文件反复验证“选择文件 -> 上传 -> UI 反馈 -> 发送 -> AI 识别 -> 历史恢复”完整链路
   - 重点复测“修改附加项”窗口中的添加、删除、保存、取消、错误提示和按钮禁用状态
@@ -142,4 +151,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 渲染入口和 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、LaTeX 输出和 Office 转 PDF 本地/部署工具链。
+`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 块级公式、流式滚动跟随、Gemini 联网工具与普通附件兼容性，以及 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、流式半截公式表现和 Office 转 PDF 本地/部署工具链。

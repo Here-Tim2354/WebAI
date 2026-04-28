@@ -52,6 +52,16 @@ aliases:
 - Markdown 表格横向滚动
 - 代码块横向滚动
 
+`ScrollArea` 对外暴露的 ref 应指向 OverlayScrollbars 的实际 viewport，而不是 wrapper root。
+
+原因是消息区滚动策略会通过这个 ref 判断：
+
+- 当前是否接近底部
+- 是否应该继续跟随流式输出
+- 是否应该显示“最新”按钮
+
+如果 ref 指到 root，流式回答期间就可能误判滚动位置，导致用户上滑阅读时仍被自动拉回底部。
+
 项目同时在 `globals.css` 中定义了原生滚动条默认样式：
 - `scrollbar-width: thin`
 - `scrollbar-color: var(--scrollbar-thumb) transparent`
