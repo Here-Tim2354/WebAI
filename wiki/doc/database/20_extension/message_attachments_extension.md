@@ -84,3 +84,12 @@ Word / PPT 不直接保存原文件。服务端会先通过 `libreoffice-convert
 模型注册表中，文件输入能力使用 `supports_files` 表达。
 
 该字段替代旧的 `supports_file_search`，避免把“普通文件输入”误解为 provider 的 File Search / RAG 能力。
+
+当前项目没有接入 Gemini File Search 工具，因此普通图片 / 文件输入不应沿用 File Search 的工具组合限制。
+
+Gemini 请求层当前语义是：
+
+- 最新 user 消息的附件会作为普通多模态输入 parts 进入请求
+- 历史 user 消息的附件不再反复上传，只保留对应文字上下文
+- `googleSearch` 与 `urlContext` 是否启用，只取决于会话联网开关和本次 URL Context 输入
+- 附件存在本身不会禁用联网工具

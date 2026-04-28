@@ -98,6 +98,30 @@ function extractTextContent(node: ReactNode): string {
   return "";
 }
 
+function normalizeBlockMath(content: string) {
+  const lines = content.split("\n");
+  let isInFencedCode = false;
+
+  return lines
+    .map((line) => {
+      if (/^\s*```/.test(line) || /^\s*~~~/.test(line)) {
+        isInFencedCode = !isInFencedCode;
+        return line;
+      }
+
+      if (isInFencedCode) {
+        return line;
+      }
+
+      return line.replace(
+        /(^|[^$])\$\$([^$\n]+)\$\$(?!\$)/g,
+        (_, prefix: string, formula: string) =>
+          `${prefix}\n\n$$\n${formula.trim()}\n$$\n\n`,
+      );
+    })
+    .join("\n");
+}
+
 /**
  * MarkdownMessage 是消息内容的统一渲染入口。
  * 这里集中处理 GFM、中文排版兼容，以及代码块替换逻辑。

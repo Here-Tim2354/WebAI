@@ -33,6 +33,8 @@ aliases:
 - Markdown 表格横向滚动
 - 代码块横向滚动
 
+其中消息列表依赖 `ScrollArea` 暴露的实际 viewport 计算滚动位置。这个 ref 不能停留在 wrapper root，否则 `useMessageScroll` 会误判用户是否仍在底部，流式输出时可能把正在上滑阅读的用户强行拉回最新消息。
+
 `globals.css` 中负责：
 - 引入 `overlayscrollbars/overlayscrollbars.css`
 - 定义项目级原生滚动条默认样式，作为不接滚动库区域的视觉 fallback
@@ -69,6 +71,14 @@ Dropdown Popup 不接 OverlayScrollbars。
 ```
 
 不要再把 `useOverlayScrollbars` 手动初始化到包含 React children 的节点上。
+
+同时，`ScrollArea` 通过 `useImperativeHandle` 暴露 ref 时，应优先返回：
+
+```tsx
+scrollRef.current?.osInstance()?.elements().viewport
+```
+
+如果实例还未 ready，再 fallback 到 wrapper element。
 
 原因是手动初始化会让外部库改写 React 已经接管的 DOM 子树，后续 React 删除子节点时可能找不到原父节点。
 

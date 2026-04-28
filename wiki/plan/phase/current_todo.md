@@ -60,8 +60,7 @@
   - Office 三件套按“`libreoffice-convert` 调用 LibreOffice / soffice 转 PDF 后保存 PDF”处理；pandoc fallback 已移除
   - Excel `.xlsx` 已改为通过 `read-excel-file` 转换为 CSV 后保存到云端；UI 会显示转换后的 `.csv` 文件名，并提示原 `.xlsx` 已转换
   - 重新生成与分支继续沿用消息 metadata 上下文
-  - 附件下载和主要 API 已补 Supabase 网络错误语义；偶发 `fetch failed` / TLS reset 不再直接裸露给 assistant 消息
-  - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示，并对“中文自然语言被单美元符号误吞进公式”的场景做窄范围兜底
+  - Markdown 消息渲染已接入 `remark-math`、`rehype-katex`、`katex`，支持基础 LaTeX 公式展示
   - 当前只应视为“首轮接入完成”，不是稳定收口；真实文件选择、上传反馈、编辑保存、历史恢复、移动端预览和部署环境转换链路仍需要继续打磨
 - 会话管理增强已完成第一轮：
   - 收藏 / 取消收藏
@@ -125,13 +124,17 @@
   - 页面级图片预览与草稿缩略图快捷移除入口已接入
   - 发送入口可见
   - 浏览器控制台无 error/warning
+- 本轮修复后已验收：
+  - `npm run typecheck` 通过
+  - `npm run lint` 通过，仍只剩既有 3 个 `<img>` warning
+  - 编辑消息后重新生成不再复现 `Cannot coerce the result to a single JSON object`
+  - 会话中存在历史附件时，纯文本联网问题仍可触发 Gemini 搜索工具
 
 ## 当前待办
 
 - `Phase 4.4` 大量调整与端到端验收：
   - 立即复测编辑带附件 user 消息：只改正文、只改附件、正文和附件都改，确认 fallback 后不再出现泛化“消息操作失败”
   - 复测 LaTeX 渲染：行内 `$...$`、块级 `$$...$$`、中文段落混排、流式输出期间的展示稳定性
-  - 继续用真实 `.xlsx` 文件回归：多 sheet、空表、日期/数字/中文单元格、较大表格和历史恢复后的附件展示
   - 复测大文件提示：图片超过 5MB、普通文件超过 10MB、总附件超过 20MB 时文案是否清楚
   - 用真实图片、PDF、文本文件反复验证“选择文件 -> 上传 -> UI 反馈 -> 发送 -> AI 识别 -> 历史恢复”完整链路
   - 重点复测“修改附加项”窗口中的添加、删除、保存、取消、错误提示和按钮禁用状态
@@ -155,4 +158,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、Excel 转 CSV 云端保存、Supabase 网络错误提示和 LaTeX 单美元误识别边界；typecheck、lint、越权 build、npm audit 与浏览器验证通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown/XLSX 文件、LaTeX 流式输出和 Word/PPT 转 PDF 部署工具链。
+`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 渲染入口和 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、LaTeX 输出和 Office 转 PDF 本地/部署工具链。
