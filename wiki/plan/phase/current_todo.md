@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-04-28 23:51:39
+更新时间：2026-04-29 00:33:22
 
 ## 当前阶段
 
@@ -127,6 +127,8 @@
 - 本轮修复后已验收：
   - `npm run typecheck` 通过
   - `npm run lint` 通过，仍只剩既有 3 个 `<img>` warning
+  - `npm run build` 通过
+  - 冲突处理残留的 `normalizeBlockMath()` 已从 `MarkdownMessage` 移除，关联状态流文档已同步
   - 编辑消息后重新生成不再复现 `Cannot coerce the result to a single JSON object`
   - 会话中存在历史附件时，纯文本联网问题仍可触发 Gemini 搜索工具
 
@@ -158,4 +160,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、LaTeX 渲染入口和 Office 转换错误语义；typecheck、lint、越权 build 与浏览器 smoke test 通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown 文件、LaTeX 输出和 Office 转 PDF 本地/部署工具链。
+`Phase 4.4` 文件与图片输入第一轮已经落地，并已修复 URL 上限、Storage key、附件大小提示、编辑带附件 fallback、Excel 转 CSV 云端保存、Supabase 网络错误提示和 LaTeX 单美元误识别边界；typecheck、lint、越权 build、npm audit 与浏览器验证通过。当前仍需优先复测编辑带附件消息、真实 PDF/Markdown/XLSX 文件、LaTeX 流式输出和 Word/PPT 转 PDF 部署工具链。
