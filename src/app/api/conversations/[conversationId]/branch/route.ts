@@ -101,6 +101,8 @@ export async function POST(request: Request, context: RouteContext) {
       user.id,
       conversationId,
     );
+    // 这里按消息列表位置截断上下文，而不是用 created_at <= target.created_at。
+    // 这样即使历史数据存在同一时间戳，也不会把目标之后的消息误复制进分支。
     const { targetMessage, messages } = await listConversationMessagesThrough(
       supabase,
       conversationId,
@@ -136,7 +138,10 @@ export async function POST(request: Request, context: RouteContext) {
       sourceConversation.systemPrompt ?? undefined,
       sourceConversation.modelId ?? undefined,
       sourceConversation.webSearchEnabled,
+      sourceConversation.thinkingLevel,
     );
+    // 分支继承的是消息内容与 metadata 引用；Storage 对象本身仍在原用户目录下，
+    // 因为同一用户的新会话读取这些附件是合法的。
     const nextMessages = await cloneConversationMessages(
       supabase,
       nextConversation.id,

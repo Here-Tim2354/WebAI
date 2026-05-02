@@ -230,10 +230,7 @@ export function ConversationSidebar({
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[8px] border border-border/70 bg-background/92 text-sm font-semibold shadow-none">
             W
           </div>
-          <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
-            <span className="block text-[0.68rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
-              Workspace
-            </span>
+          <div className={cn("min-w-0 self-center", isCollapsed && "lg:hidden")}>
             <strong className="block truncate text-sm font-medium text-foreground">
               WebAI
             </strong>

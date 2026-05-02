@@ -6,7 +6,7 @@ aliases:
 
 # ConversationSidebar 页面结构说明
 
-本文档用于快速理解 `ConversationSidebar` 组件在页面中的职责，以及它在页面左侧栏里具体展示什么。
+这篇笔记帮助我们快速理解 `ConversationSidebar` 组件在页面中的职责，以及它在页面左侧栏里具体展示什么。
 
 代码入口：
 - `src/components/chat/conversation-sidebar.tsx`

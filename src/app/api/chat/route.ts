@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
-import { assertAttachmentsOwnedByUser } from "@/lib/attachments";
+import { assertAttachmentInputAllowed } from "@/lib/attachment-capabilities";
 import { ServerEnvError } from "@/lib/env/server";
 import { getNetworkErrorMessage } from "@/lib/network-errors";
 import { sendMessageRequestSchema } from "@/lib/schemas/chat";
@@ -134,15 +134,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const { conversationId, content, modelId, urls, attachments } =
+    const { conversationId, content, modelId, thinkingLevel, urls, attachments } =
       parsedRequest.data;
 
     // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
     let conversation = await getConversationById(supabase, user.id, conversationId);
 
-    if (modelId && conversation.modelId !== modelId) {
+    if (
+      (modelId && conversation.modelId !== modelId) ||
+      (
+        thinkingLevel !== undefined &&
+        conversation.thinkingLevel !== thinkingLevel
+      )
+    ) {
       conversation = await updateConversation(supabase, user.id, conversationId, {
         modelId,
+        thinkingLevel,
       });
     }
 
@@ -151,26 +158,13 @@ export async function POST(request: Request) {
       ? await getEnabledModelById(supabase, effectiveModelId)
       : null;
 
-    if (attachments && attachments.length > 0) {
-      assertAttachmentsOwnedByUser(user.id, attachments);
-    }
-
-    if (attachments && attachments.length > 0 && selectedModel) {
-      const hasImageAttachment = attachments.some(
-        (attachment) => attachment.kind === "image",
-      );
-      const hasFileAttachment = attachments.some(
-        (attachment) => attachment.kind === "file",
-      );
-
-      if (hasImageAttachment && !selectedModel.capabilities.image) {
-        throw new ModelRegistryError("当前模型不支持图片输入。");
-      }
-
-      if (hasFileAttachment && !selectedModel.capabilities.files) {
-        throw new ModelRegistryError("当前模型不支持文件输入。");
-      }
-    }
+    // 附件 metadata 由前端传入，但对象本身已经在私有 Storage 中。
+    // 这里统一确认路径归属和模型能力，避免用户伪造其它用户的 storagePath。
+    assertAttachmentInputAllowed({
+      userId: user.id,
+      attachments: attachments ?? [],
+      model: selectedModel,
+    });
 
     await createConversationMessage(
       supabase,
@@ -194,6 +188,7 @@ export async function POST(request: Request) {
       conversation,
       messagesForModel,
       model: selectedModel,
+      thinkingLevel: conversation.thinkingLevel,
       urls,
       attachments,
       requestSignal: request.signal,

@@ -5,7 +5,7 @@ aliases:
 
 # AuthPanel 前端状态流说明
 
-本文档用于理解 `AuthPanel` 的前端运行机制，而不是页面展示结构。
+这篇笔记帮助我们理解 `AuthPanel` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
 - `src/components/chat/auth-panel.tsx`
@@ -69,7 +69,7 @@ aliases:
 
 - 登录页初始化恢复
 
-当前实现：
+运行方式：
 
 1. 从 `localStorage` 读取上次输入过的邮箱
 2. 调用 `parseAuthFeedbackFromLocation()`

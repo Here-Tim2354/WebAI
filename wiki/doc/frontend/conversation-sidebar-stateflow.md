@@ -5,7 +5,7 @@ aliases:
 
 # ConversationSidebar 前端状态流说明
 
-本文档用于理解 `ConversationSidebar` 的前端运行机制，而不是页面展示结构。
+这篇笔记帮助我们理解 `ConversationSidebar` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
 - `src/components/chat/conversation-sidebar.tsx`
@@ -131,7 +131,7 @@ const [titleDraft, setTitleDraft] = useState("");
 3. 内部调用父层传入的 `onCreateConversation()`
 4. 成功后自动关闭移动端抽屉
 
-当前实现特点：
+运行特点：
 
 - 创建逻辑本身不在侧栏内部
 - 侧栏只负责触发和 UI 收口

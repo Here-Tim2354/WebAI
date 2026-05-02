@@ -6,7 +6,7 @@ aliases:
 
 # read-excel-file 外部库痕迹
 
-本文档记录 `read-excel-file` 在 WebAI 中的实际用途。
+这篇笔记整理 `read-excel-file` 在 WebAI 中的实际用途。
 
 ## 落点
 
@@ -42,8 +42,8 @@ aliases:
 
 ## 与其他附件转换的关系
 
-- `.xlsx`：`read-excel-file` -> CSV -> 云端保存 CSV
-- Word / PPT：`libreoffice-convert` -> PDF -> 云端保存 PDF
+- `.xlsx`：`read-excel-file` -> CSV -> Storage 保存 CSV
+- Word / PPT：`libreoffice-convert` -> PDF -> Storage 保存 PDF
 - PDF / 文本 / Markdown / CSV：直接保存原文件内容
 
 ## 后续需要回归

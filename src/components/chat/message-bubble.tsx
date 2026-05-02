@@ -1,9 +1,10 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   BotIcon,
   CheckIcon,
+  ChevronDownIcon,
   CircleAlertIcon,
   CopyIcon,
   GitBranchIcon,
@@ -13,6 +14,7 @@ import {
   UserIcon,
   XIcon,
   PaperclipIcon,
+  LightbulbIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,6 +106,7 @@ function splitStreamingUnits(text: string) {
     }
 
     if (isCjkCharacter(character)) {
+      // 中文等 CJK 文本按单字揭示，读起来更接近真实输入节奏。
       units.push(character);
       index += 1;
       continue;
@@ -115,11 +118,12 @@ function splitStreamingUnits(text: string) {
       while (
         end < characters.length &&
         isWordCharacter(characters[end]) &&
-        end - index < 3
+          end - index < 3
       ) {
         end += 1;
       }
 
+      // 英文按很短的词片段揭示，避免长单词一次性跳出造成闪动。
       units.push(characters.slice(index, end).join(""));
       index = end;
       continue;
@@ -137,6 +141,7 @@ function getQueuedContent(baseContent: string, queuedUnits: string[]) {
 }
 
 function getRevealBatchSize(backlog: number) {
+  // 队列积压越多，单次揭示越大；这样长回复能追上真实模型输出速度。
   if (backlog > 160) {
     return 12;
   }
@@ -206,6 +211,7 @@ function StreamingMarkdownMessage({
 
   useEffect(() => {
     if (shouldReduceMotion) {
+      // reduced motion 模式下不做逐字动画，直接同步完整内容。
       queuedUnitsRef.current = [];
       displayContentRef.current = content;
 
@@ -226,6 +232,8 @@ function StreamingMarkdownMessage({
     }
 
     if (!content.startsWith(queuedContent)) {
+      // 内容不是单调增长时，通常表示重新生成、错误恢复或服务端回写了完整快照。
+      // 这时不能继续消费旧队列，必须直接重置显示内容。
       queuedUnitsRef.current = [];
       displayContentRef.current = content;
 
@@ -265,6 +273,8 @@ function StreamingMarkdownMessage({
       const batchSize = getRevealBatchSize(backlog);
       const nextChunk = queuedUnitsRef.current.splice(0, batchSize).join("");
 
+      // startTransition 把 Markdown 重渲染标记为非紧急更新，
+      // 避免长回复流式输出时卡住输入和滚动。
       startTransition(() => {
         setDisplayContent((current) => {
           const nextContent = current + nextChunk;
@@ -345,6 +355,70 @@ function StreamingMarkdownMessage({
   );
 }
 
+function ThinkingSummary({
+  thinking,
+  isStreaming,
+}: {
+  thinking: NonNullable<ChatMessage["metadata"]["thinking"]>;
+  isStreaming: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const title =
+    thinking.status === "streaming" || isStreaming ? "思考中" : "已思考";
+
+  return (
+    <motion.div
+      layout
+      className="mb-2.5 max-w-[min(100%,44rem)] overflow-hidden rounded-[10px] border border-slate-200/80 bg-slate-50/55 text-slate-500"
+      transition={{ duration: 0.22, ease: smoothEase }}
+    >
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[0.78rem] leading-none hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+      >
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <LightbulbIcon className="size-3.5 shrink-0" />
+          <span className="text-[0.78rem]">{title}</span>
+          <span className="text-[0.78rem] text-slate-400">
+            {thinking.level}
+          </span>
+        </span>
+        <ChevronDownIcon
+          className={cn(
+            "size-3.5 shrink-0 transition-transform",
+            isOpen && "rotate-180",
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen ? (
+          <motion.div
+            key="thinking-content"
+            layout
+            className="border-t border-slate-200/70 px-3 py-2 text-[0.78rem] leading-6 text-slate-500"
+            initial={{ height: 0, opacity: 0, y: -3 }}
+            animate={{ height: "auto", opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -3 }}
+            transition={{ duration: 0.22, ease: smoothEase }}
+          >
+            <motion.div
+              key={thinking.content.length}
+              className="whitespace-pre-wrap break-words"
+              initial={{ opacity: 0.58, y: 2 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, ease: smoothEase }}
+            >
+              {thinking.content}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 /**
  * MessageBubble 只关心单条消息的视觉语义：
  * 谁发的、是否报错、是否仍在生成，最终都映射成统一气泡样式。
@@ -382,6 +456,9 @@ export function MessageBubble({
   const messageMetadataUrls = message.metadata.urls;
   const metadataUrls = messageMetadataUrls ?? EMPTY_METADATA_URLS;
   const metadataAttachments = message.metadata.attachments ?? [];
+  const thinking = message.metadata.thinking;
+  const showCancelledMarker =
+    !isEditing && message.role === "assistant" && message.status === "cancelled";
   const isActionLocked =
     actionsDisabled ||
     message.status === "pending" ||
@@ -557,6 +634,12 @@ export function MessageBubble({
             "rounded-[16px] border border-red-200/90 bg-red-50/90 py-3 text-red-700 shadow-[0_10px_20px_rgba(172,60,60,0.07)]",
         )}
       >
+        {!isEditing && message.role === "assistant" && thinking?.content ? (
+          <ThinkingSummary
+            thinking={thinking}
+            isStreaming={isStreaming}
+          />
+        ) : null}
         {isEditing ? (
           <div className="w-[min(72vw,32rem)] space-y-2">
             <Textarea
@@ -628,9 +711,7 @@ export function MessageBubble({
             {message.status === "pending" ? "正在思考" : "生成中"}
           </span>
         ) : message.status === "cancelled" && message.content.length === 0 ? (
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            已停止
-          </span>
+          null
         ) : isStreaming && message.role === "assistant" ? (
           <StreamingMarkdownMessage
             content={message.content}
@@ -644,6 +725,11 @@ export function MessageBubble({
             className={isUser ? "markdown--compact" : "markdown--chat"}
           />
         )}
+        {showCancelledMarker ? (
+          <div className="mt-3 max-w-[min(100%,40rem)] border-t border-slate-200/75 pt-2 text-[0.8rem] leading-none text-slate-400">
+            已停止
+          </div>
+        ) : null}
         {!isEditing && isUser && metadataUrls.length > 0 ? (
           <MessageUrlContextSummary
             urls={metadataUrls}

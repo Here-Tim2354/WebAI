@@ -5,7 +5,7 @@ aliases:
 
 # CodeBlock 状态流说明
 
-本文档用于理解 `CodeBlock` 当前唯一真正的交互状态：复制按钮状态。
+这篇笔记帮助我们理解 `CodeBlock` 当前唯一真正的交互状态：复制按钮状态。
 
 代码入口：
 - `src/components/chat/code-block.tsx`

@@ -1,8 +1,21 @@
 import { randomUUID } from "crypto";
-import { extname } from "path";
 import { convertWithOptions } from "libreoffice-convert";
 import readXlsxFile from "read-excel-file/universal";
 import { type SupabaseClient } from "@supabase/supabase-js";
+import {
+  ATTACHMENT_EXTENSION_MIME_TYPE_MAP,
+  MAX_FILE_ATTACHMENT_SIZE,
+  MAX_IMAGE_ATTACHMENT_SIZE,
+  MAX_MESSAGE_ATTACHMENTS,
+  MAX_MESSAGE_ATTACHMENTS_SIZE,
+  MESSAGE_ATTACHMENTS_BUCKET,
+  SUPPORTED_IMAGE_MIME_TYPE_SET,
+  SUPPORTED_OFFICE_MIME_TYPE_SET,
+  SUPPORTED_SPREADSHEET_MIME_TYPE_SET,
+  SUPPORTED_STORED_FILE_MIME_TYPE_SET,
+  formatAttachmentSize,
+  getAttachmentFileExtension,
+} from "@/lib/attachment-config";
 import {
   type ChatMessageMetadata,
   type MessageAttachment,
@@ -10,11 +23,11 @@ import {
 } from "@/lib/schemas/chat";
 import { isFetchNetworkError } from "@/lib/network-errors";
 
-export const MESSAGE_ATTACHMENTS_BUCKET = "message_attachments";
-export const MAX_MESSAGE_ATTACHMENTS = 5;
-export const MAX_IMAGE_ATTACHMENT_SIZE = 5 * 1024 * 1024;
-export const MAX_FILE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-export const MAX_MESSAGE_ATTACHMENTS_SIZE = 20 * 1024 * 1024;
+export {
+  MAX_MESSAGE_ATTACHMENTS,
+  MAX_MESSAGE_ATTACHMENTS_SIZE,
+  MESSAGE_ATTACHMENTS_BUCKET,
+};
 
 export class AttachmentValidationError extends Error {
   constructor(message: string) {
@@ -25,62 +38,20 @@ export class AttachmentValidationError extends Error {
 
 const ATTACHMENT_DOWNLOAD_RETRY_DELAYS_MS = [300, 900];
 
-const imageMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
-const storedFileMimeTypes = new Set([
-  "application/pdf",
-  "text/plain",
-  "text/markdown",
-  "text/csv",
-]);
-const officeMimeTypes = new Set([
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-]);
-const spreadsheetMimeTypes = new Set([
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
-const extensionMimeTypeMap = new Map([
-  [".png", "image/png"],
-  [".jpg", "image/jpeg"],
-  [".jpeg", "image/jpeg"],
-  [".webp", "image/webp"],
-  [".pdf", "application/pdf"],
-  [".txt", "text/plain"],
-  [".md", "text/markdown"],
-  [".csv", "text/csv"],
-  [".doc", "application/msword"],
-  [
-    ".docx",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ],
-  [".xls", "application/vnd.ms-excel"],
-  [
-    ".xlsx",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ],
-  [".ppt", "application/vnd.ms-powerpoint"],
-  [
-    ".pptx",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ],
-]);
-
 export function isSupportedImageMimeType(mimeType: string) {
-  return imageMimeTypes.has(mimeType);
+  return SUPPORTED_IMAGE_MIME_TYPE_SET.has(mimeType);
 }
 
 export function isSupportedStoredFileMimeType(mimeType: string) {
-  return storedFileMimeTypes.has(mimeType);
+  return SUPPORTED_STORED_FILE_MIME_TYPE_SET.has(mimeType);
 }
 
 export function isSupportedOfficeMimeType(mimeType: string) {
-  return officeMimeTypes.has(mimeType);
+  return SUPPORTED_OFFICE_MIME_TYPE_SET.has(mimeType);
 }
 
 export function isSupportedSpreadsheetMimeType(mimeType: string) {
-  return spreadsheetMimeTypes.has(mimeType);
+  return SUPPORTED_SPREADSHEET_MIME_TYPE_SET.has(mimeType);
 }
 
 export function isSupportedAttachmentMimeType(mimeType: string) {
@@ -99,15 +70,7 @@ export function getAttachmentSizeLimit(mimeType: string) {
 }
 
 export function formatAttachmentSizeLimit(size: number) {
-  if (size % (1024 * 1024) === 0) {
-    return `${size / 1024 / 1024}MB`;
-  }
-
-  if (size % 1024 === 0) {
-    return `${size / 1024}KB`;
-  }
-
-  return `${size}B`;
+  return formatAttachmentSize(size);
 }
 
 function getSupportedMimeType(file: File) {
@@ -115,24 +78,26 @@ function getSupportedMimeType(file: File) {
     return file.type;
   }
 
-  const mimeTypeFromExtension = extensionMimeTypeMap.get(
-    extname(file.name).toLowerCase(),
+  const mimeTypeFromExtension = ATTACHMENT_EXTENSION_MIME_TYPE_MAP.get(
+    getAttachmentFileExtension(file.name),
   );
 
   return mimeTypeFromExtension ?? file.type ?? "application/octet-stream";
 }
 
 function sanitizeFileName(fileName: string) {
+  // 原始文件名只用于展示；真正的 Storage key 不再直接拼中文、空格或特殊符号。
   const normalized = fileName.trim().replace(/[\\/:*?"<>|]+/g, "-");
   return normalized.length > 0 ? normalized : "attachment";
 }
 
 function createStoragePath(userId: string, fileName: string) {
   const attachmentId = randomUUID();
-  const extension = extname(fileName).toLowerCase();
+  const extension = getAttachmentFileExtension(fileName);
 
   return {
     attachmentId,
+    // 目录前缀必须是 userId，后续 RLS / Storage policy 都依赖这个路径隔离用户文件。
     storagePath: `${userId}/drafts/${attachmentId}/attachment${extension}`,
   };
 }
@@ -143,6 +108,8 @@ async function convertOfficeBufferToPdf(
 ): Promise<Buffer> {
   try {
     return await new Promise<Buffer>((resolve, reject) => {
+      // libreoffice-convert 会委托本机 LibreOffice/soffice。
+      // asyncOptions 用来等待 soffice 进程启动，减少首次转换时的偶发失败。
       convertWithOptions(buffer, "pdf", undefined, {
         fileName: sanitizeFileName(fileName),
         asyncOptions: {
@@ -188,10 +155,12 @@ function escapeCsvCell(value: unknown) {
 }
 
 async function convertXlsxBufferToCsv(buffer: Buffer) {
+  // read-excel-file 接收 ArrayBuffer；Buffer 不能直接共用底层切片，否则可能带入多余字节。
   const arrayBuffer = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(arrayBuffer).set(buffer);
   const sheets = await readXlsxFile(arrayBuffer);
   const sheetCsvBlocks = sheets
+    // 空行不写入 CSV，避免模型看到大量无意义的逗号。
     .map((sheet) => ({
       name: sheet.sheet,
       rows: sheet.data.filter((row) =>
@@ -208,6 +177,7 @@ async function convertXlsxBufferToCsv(buffer: Buffer) {
         return rows.join("\r\n");
       }
 
+      // 多 sheet 文件合成一个文本附件时保留 sheet 名，方便模型理解块之间的来源。
       return [
         `# Sheet: ${sheet.name || `Sheet${index + 1}`}`,
         ...rows,
@@ -240,6 +210,7 @@ export async function prepareAttachmentUpload(file: File) {
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
 
   if (isSupportedSpreadsheetMimeType(sourceMimeType)) {
+    // xlsx 不走 LibreOffice，直接转 CSV：更稳定，也更适合传给文本模型理解表格内容。
     const csvBuffer = await convertXlsxBufferToCsv(sourceBuffer);
     const csvFileName = `${sanitizeFileName(file.name).replace(/\.[^.]+$/, "")}.csv`;
 
@@ -254,6 +225,7 @@ export async function prepareAttachmentUpload(file: File) {
   }
 
   if (isSupportedOfficeMimeType(sourceMimeType)) {
+    // Word / PPT 云端只保存转换后的 PDF，避免后续模型输入阶段重复转换同一份文件。
     const pdfBuffer = await convertOfficeBufferToPdf(sourceBuffer, file.name);
     const pdfFileName = `${sanitizeFileName(file.name).replace(/\.[^.]+$/, "")}.pdf`;
 
@@ -313,6 +285,7 @@ export async function uploadMessageAttachment(
 export function normalizeMessageAttachments(
   attachments: MessageAttachment[] | undefined,
 ) {
+  // metadata 可能来自历史消息或浏览器请求，进入业务逻辑前统一过 schema。
   return messageAttachmentsSchema.parse(attachments ?? []);
 }
 
@@ -332,6 +305,7 @@ export function isAttachmentStoragePathOwnedByUser(
   storagePath: string,
 ) {
   return (
+    // 只允许当前用户 draft 目录；禁止用 ../ 这类片段越过目录边界。
     storagePath.startsWith(`${userId}/drafts/`) &&
     !storagePath.split("/").includes("..")
   );
@@ -339,10 +313,6 @@ export function isAttachmentStoragePathOwnedByUser(
 
 export function getAttachmentPaths(metadata: ChatMessageMetadata | undefined) {
   return (metadata?.attachments ?? []).map((attachment) => attachment.storagePath);
-}
-
-export function buildAttachmentObjectUrl(storagePath: string) {
-  return `/api/attachments/object?path=${encodeURIComponent(storagePath)}`;
 }
 
 async function listReferencedAttachmentPaths(supabase: SupabaseClient) {
@@ -385,6 +355,7 @@ export async function cleanupUnreferencedAttachments(
     return;
   }
 
+  // 清理失败不应阻断主消息链路，调用方通常会 fire-and-forget 并吞掉错误。
   await supabase.storage.from(MESSAGE_ATTACHMENTS_BUCKET).remove(removablePaths);
 }
 
@@ -406,6 +377,7 @@ export async function downloadAttachmentBuffer(
     } catch (error) {
       const retryDelay = ATTACHMENT_DOWNLOAD_RETRY_DELAYS_MS[attempt];
 
+      // 只对网络型失败做短重试；权限、路径、格式错误要尽快暴露给上层。
       if (!isFetchNetworkError(error) || retryDelay === undefined) {
         throw error;
       }
@@ -415,6 +387,4 @@ export async function downloadAttachmentBuffer(
   }
 }
 
-export function getFileExtension(fileName: string) {
-  return extname(fileName).toLowerCase();
-}
+export { buildAttachmentObjectUrl, getAttachmentFileExtension as getFileExtension } from "@/lib/attachment-config";

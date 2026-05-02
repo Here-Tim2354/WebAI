@@ -35,3 +35,7 @@ wiki/submissions/WebAI需求分析文档.docx
 
 # playwright
 .playwright-mcp/*
+
+# local codex scratch files
+.codex/tmp_*.sql
+

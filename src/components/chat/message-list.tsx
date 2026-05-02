@@ -1,4 +1,12 @@
-import { memo, RefObject, useEffect, useState } from "react";
+import {
+  memo,
+  RefObject,
+  TouchEvent as ReactTouchEvent,
+  UIEvent,
+  useEffect,
+  useState,
+  WheelEvent as ReactWheelEvent,
+} from "react";
 import { motion } from "motion/react";
 import {
   ArrowDownIcon,
@@ -24,7 +32,10 @@ type MessageListProps = {
   onUploadAttachments: (files: File[]) => Promise<MessageAttachment[]>;
   onBranchFromMessage: (message: ChatMessage) => Promise<void>;
   onRegenerateMessage: (message: ChatMessage) => Promise<void>;
-  onScroll: () => void;
+  onScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onWheelCapture: (event: ReactWheelEvent<HTMLDivElement>) => void;
+  onTouchStartCapture: (event: ReactTouchEvent<HTMLDivElement>) => void;
+  onTouchMoveCapture: (event: ReactTouchEvent<HTMLDivElement>) => void;
   onJumpToLatest: () => void;
   showJumpToLatest: boolean;
 };
@@ -59,6 +70,9 @@ function MessageListComponent({
   onBranchFromMessage,
   onRegenerateMessage,
   onScroll,
+  onWheelCapture,
+  onTouchStartCapture,
+  onTouchMoveCapture,
   onJumpToLatest,
   showJumpToLatest,
 }: MessageListProps) {
@@ -114,6 +128,9 @@ function MessageListComponent({
       ref={scrollContainerRef}
       className="relative flex-1 px-2 sm:px-3"
       onScroll={onScroll}
+      onWheelCapture={onWheelCapture}
+      onTouchStartCapture={onTouchStartCapture}
+      onTouchMoveCapture={onTouchMoveCapture}
     >
       {messages.length === 0 ? (
         <motion.div
@@ -167,14 +184,17 @@ function MessageListComponent({
           ))}
           <div ref={messageEndRef} />
           {showJumpToLatest ? (
-            <button
-              className="sticky bottom-4 mx-auto inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-[0_18px_32px_rgba(33,43,61,0.18)]"
+            <motion.button
+              className="sticky bottom-5 z-20 mx-auto inline-flex size-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/96 text-slate-600 shadow-[0_16px_34px_rgba(35,55,92,0.16)] backdrop-blur-md transition-colors hover:bg-white hover:text-slate-900"
               type="button"
               onClick={onJumpToLatest}
+              aria-label="跳转到底部"
+              initial={{ opacity: 0, y: 8, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.18, ease: smoothEase }}
             >
               <ArrowDownIcon className="size-4" />
-              最新
-            </button>
+            </motion.button>
           ) : null}
         </div>
       )}

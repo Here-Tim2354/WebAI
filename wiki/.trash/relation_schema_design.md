@@ -80,7 +80,7 @@
 
 也就是说：
 
-- 整体设计范围不等于当前实现范围
+- 整体设计范围不等于运行方式范围
 - 当前 Supabase 中未落地 `favorites` 与 `search_records`，不代表其被从系统设计中删除
 
 ---
@@ -439,4 +439,4 @@
 
 ## 八、一句话总结
 
-当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录，以及当前多模型目录与能力注册；其中实际已落地的是 `auth.users / profiles / conversations / messages / openai_compatible_models / gemini_models`，后续仍可继续通过收藏、搜索等扩展表补全更完整的产品能力。
+当前关系模式已经能够支撑用户身份管理、会话持久化、消息记录、消息收藏、搜索行为记录，以及当前多模型目录与能力注册；其中实际纳入系统边界的是 `auth.users / profiles / conversations / messages / openai_compatible_models / gemini_models`，后续仍可继续通过收藏、搜索等扩展表补全更完整的产品能力。

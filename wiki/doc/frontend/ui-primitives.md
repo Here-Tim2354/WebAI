@@ -6,7 +6,7 @@ aliases:
 
 # UI Primitives 说明
 
-本文档记录当前项目内几个跨聊天组件复用的轻量 UI primitive。
+这篇笔记整理当前项目内几个跨聊天组件复用的轻量 UI primitive。
 
 代码入口：
 - `src/components/ui/tooltip.tsx`
@@ -58,9 +58,16 @@ aliases:
 
 - 当前是否接近底部
 - 是否应该继续跟随流式输出
-- 是否应该显示“最新”按钮
+- 是否应该显示“跳转到底部”按钮
 
 如果 ref 指到 root，流式回答期间就可能误判滚动位置，导致用户上滑阅读时仍被自动拉回底部。
+
+使用时需要注意两个细节：
+
+- `OverlayScrollbarsComponent` 使用 `defer` 初始化，真实 viewport 可能晚于 React ref 首次赋值才 ready
+- `ScrollArea` 会在 OverlayScrollbars `initialized` 事件触发后重新发布 viewport ref
+
+因此，调用方不应假设首次拿到的 ref 一定已经是最终滚动节点。消息区滚动 hook 也会通过 `data-overlayscrollbars-viewport` 兜底确认真实滚动容器。
 
 项目同时在 `globals.css` 中定义了原生滚动条默认样式：
 - `scrollbar-width: thin`

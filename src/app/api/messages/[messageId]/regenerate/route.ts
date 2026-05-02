@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
+import { assertAttachmentInputAllowed } from "@/lib/attachment-capabilities";
 import { ServerEnvError } from "@/lib/env/server";
 import { getNetworkErrorMessage } from "@/lib/network-errors";
 import { regenerateAssistantMessageRequestSchema } from "@/lib/schemas/chat";
 import {
-  assertAttachmentsOwnedByUser,
   cleanupUnreferencedAttachments,
   getAttachmentPaths,
   normalizeMessageAttachments,
@@ -134,7 +134,14 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, modelId, webSearchEnabled, urls, attachments } =
+    const {
+      conversationId,
+      modelId,
+      thinkingLevel,
+      webSearchEnabled,
+      urls,
+      attachments,
+    } =
       parsed.data;
     let conversation = await getConversationById(
       supabase,
@@ -235,8 +242,13 @@ export async function POST(request: Request, context: RouteContext) {
           }
         : previousUserMessage.metadata;
 
+    // 重新生成可以顺手修改会话模型 / 联网开关，所以先更新会话再计算最终模型。
     if (
       (modelId && conversation.modelId !== modelId) ||
+      (
+        thinkingLevel !== undefined &&
+        conversation.thinkingLevel !== thinkingLevel
+      ) ||
       (
         webSearchEnabled !== undefined &&
         conversation.webSearchEnabled !== webSearchEnabled
@@ -248,6 +260,7 @@ export async function POST(request: Request, context: RouteContext) {
         conversationId,
         {
           modelId: modelId ?? undefined,
+          thinkingLevel,
           webSearchEnabled,
         },
       );
@@ -259,28 +272,17 @@ export async function POST(request: Request, context: RouteContext) {
       : null;
     const effectiveAttachments = nextPreviousUserMetadata.attachments ?? [];
 
-    if (effectiveAttachments.length > 0) {
-      assertAttachmentsOwnedByUser(user.id, effectiveAttachments);
-    }
-
-    if (effectiveAttachments.length > 0 && selectedModel) {
-      const hasImageAttachment = effectiveAttachments.some(
-        (attachment) => attachment.kind === "image",
-      );
-      const hasFileAttachment = effectiveAttachments.some(
-        (attachment) => attachment.kind === "file",
-      );
-
-      if (hasImageAttachment && !selectedModel.capabilities.image) {
-        throw new ModelRegistryError("当前模型不支持图片输入。");
-      }
-
-      if (hasFileAttachment && !selectedModel.capabilities.files) {
-        throw new ModelRegistryError("当前模型不支持文件输入。");
-      }
-    }
+    // 重新生成复用上一条 user 消息的附件上下文；
+    // 如果本次请求覆盖了附件，也要按新 metadata 重新检查权限和模型能力。
+    assertAttachmentInputAllowed({
+      userId: user.id,
+      attachments: effectiveAttachments,
+      model: selectedModel,
+    });
 
     if (urls !== undefined || attachments !== undefined) {
+      // URL / 附件覆盖不只是临时请求参数，也会写回上一条 user 消息，
+      // 这样刷新页面或之后分支时仍能看到同一份上下文。
       await updateConversationMessage(
         supabase,
         conversationId,
@@ -312,6 +314,7 @@ export async function POST(request: Request, context: RouteContext) {
       conversation,
       messagesForModel,
       model: selectedModel,
+      thinkingLevel: conversation.thinkingLevel,
       urls: effectiveUrls,
       attachments: effectiveAttachments,
       requestSignal: request.signal,

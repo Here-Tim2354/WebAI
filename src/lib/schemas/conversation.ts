@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  DEFAULT_THINKING_LEVEL,
+  thinkingLevelSchema,
+} from "./thinking";
 
 export const conversationSchema = z.object({
   id: z.string().uuid(),
@@ -6,6 +10,7 @@ export const conversationSchema = z.object({
   systemPrompt: z.string().max(2000).nullable(),
   modelId: z.string().uuid().nullable(),
   webSearchEnabled: z.boolean(),
+  thinkingLevel: thinkingLevelSchema,
   status: z.enum(["active", "archived"]),
   archivedAt: z.string().nullable(),
   isFavorite: z.boolean(),
@@ -38,6 +43,7 @@ export const createConversationRequestSchema = z.object({
     .optional(),
   modelId: z.string().uuid("模型标识不正确。").optional(),
   webSearchEnabled: z.boolean().optional(),
+  thinkingLevel: thinkingLevelSchema.optional().default(DEFAULT_THINKING_LEVEL),
 });
 
 export const updateConversationRequestSchema = z.object({
@@ -54,6 +60,7 @@ export const updateConversationRequestSchema = z.object({
     .optional(),
   modelId: z.string().uuid("模型标识不正确。").optional(),
   webSearchEnabled: z.boolean().optional(),
+  thinkingLevel: thinkingLevelSchema.optional(),
   status: conversationStatusSchema.optional(),
 }).refine(
   (value) =>
@@ -61,6 +68,7 @@ export const updateConversationRequestSchema = z.object({
     value.systemPrompt !== undefined ||
     value.modelId !== undefined ||
     value.webSearchEnabled !== undefined ||
+    value.thinkingLevel !== undefined ||
     value.status !== undefined,
   {
     message: "至少需要提供一个可更新字段。",

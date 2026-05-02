@@ -30,6 +30,7 @@ function isEscaped(content: string, index: number) {
 }
 
 function isSingleDollarDelimiter(content: string, index: number) {
+  // 只处理单个 $，块级 $$...$$ 交给 remark-math 原生逻辑。
   return (
     content[index] === "$" &&
     content[index - 1] !== "$" &&
@@ -68,6 +69,8 @@ function escapeCjkContaminatedSingleDollarMath(content: string) {
     const mathCandidate = content.slice(index + 1, closingIndex);
 
     if (containsCjkNaturalLanguage(mathCandidate)) {
+      // 中文自然语言里常出现“$价格$”一类文本，直接交给 KaTeX 会被渲染成错误公式。
+      // 这里仅转义含中文/中文标点的单美元片段，正常数学公式仍保持可渲染。
       nextContent += `\\$${mathCandidate}\\$`;
       index = closingIndex;
       continue;
@@ -78,6 +81,24 @@ function escapeCjkContaminatedSingleDollarMath(content: string) {
   }
 
   return nextContent;
+}
+
+function normalizeSingleLineDisplayMath(content: string) {
+  return content
+    .split("\n")
+    .map((line) => {
+      const match = /^\s*\$\$([\s\S]+)\$\$\s*$/.exec(line);
+      const mathContent = match?.[1]?.trim();
+
+      if (!mathContent) {
+        return line;
+      }
+
+      // 模型常把块级公式压成单行 $$...$$。
+      // 拆成独立块后，KaTeX 会按 display math 居中渲染，不会挤在段落里。
+      return `\n$$\n${mathContent}\n$$\n`;
+    })
+    .join("\n");
 }
 
 // ReactMarkdown 的 code/pre 回调拿到的是 ReactNode。
@@ -170,7 +191,9 @@ export function MarkdownMessage({
           },
         }}
       >
-        {escapeCjkContaminatedSingleDollarMath(content)}
+        {normalizeSingleLineDisplayMath(
+          escapeCjkContaminatedSingleDollarMath(content),
+        )}
       </ReactMarkdown>
     </div>
   );

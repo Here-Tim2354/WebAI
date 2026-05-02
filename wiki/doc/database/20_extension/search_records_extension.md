@@ -5,13 +5,13 @@
 - `phase_overview.md` 中 `Phase 4`
 - `Phase 4.3` 曾短暂尝试会话搜索
 
-当前状态：
+状态：
 
 - `withdrawn`
-- 搜索入口与 `/api/conversations/search` 已从产品代码撤回
+- 搜索入口与 `/api/conversations/search` 不进入产品主链路
 - `20260427083000_phase4_conversation_organization.sql` 曾创建该实验对象
-- `20260427091000_remove_conversation_search.sql` 已推送远端，用于清理远端函数与表
-- 已确认远端 `search_records` 与 `search_user_conversations` 均不存在
+- `20260427091000_remove_conversation_search.sql` 用于清理相关函数与表
+- Supabase 环境不应保留 `search_records` 与 `search_user_conversations`
 
 当前实体：
 
@@ -27,7 +27,7 @@
 - `result_count`
 - `created_at`
 
-当前判断：
+阶段判断：
 
 - 当前产品判断认为会话搜索暂不需要进入 Phase 4.3 主链路
 - 搜索记录不迁入 `10_verified/`

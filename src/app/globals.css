@@ -337,6 +337,20 @@ a {
   color: color-mix(in oklch, var(--foreground) 80%, white 20%);
 }
 
+.markdown .katex-display {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15rem 0.25rem 0.3rem;
+  text-align: center;
+}
+
+.markdown .katex-display > .katex {
+  max-width: 100%;
+}
+
 .markdown-table-wrap {
   margin: 1rem 0;
   border: 1px solid color-mix(in oklch, var(--border) 88%, white 12%);

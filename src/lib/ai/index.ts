@@ -3,6 +3,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { streamWithGemini } from "./gemini";
 import { streamWithOpenAICompatible } from "./openai-compatible";
+import { ThinkingLevel } from "@/lib/schemas/thinking";
 
 type StreamAssistantReplyOptions = {
   model?: RuntimeAIModel | null;
@@ -10,6 +11,7 @@ type StreamAssistantReplyOptions = {
   webSearchEnabled?: boolean;
   urls?: string[];
   supabase?: SupabaseClient;
+  thinkingLevel?: ThinkingLevel;
   abortSignal?: AbortSignal;
 };
 
@@ -36,6 +38,9 @@ export async function* streamAssistantReply(
     webSearchEnabled: options?.webSearchEnabled,
     urls: options?.urls,
     supabase: options?.supabase,
+    thinkingLevel: options?.model?.capabilities.reasoning
+      ? options?.thinkingLevel
+      : undefined,
     modelName:
       options?.model?.provider === "gemini"
         ? options.model.upstreamModelId

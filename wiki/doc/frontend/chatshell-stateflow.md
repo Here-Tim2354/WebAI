@@ -6,7 +6,7 @@ aliases:
 
 # ChatShell 前端状态流说明
 
-本文档用于理解 `ChatShell` 的前端运行机制，而不是页面展示结构。
+这篇笔记帮助我们理解 `ChatShell` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
 - `src/components/chat/chat-shell.tsx`
@@ -93,7 +93,7 @@ const [user, setUser] = useState(initialUser);
 作用：
 - 表示当前客户端工作区是否有已登录用户
 
-当前实现：
+运行方式：
 - 初始值来自服务端
 - 退出登录时会被置为 `null`
 - 当 `user === null` 时，组件直接切换到 `AuthPanel`
@@ -249,15 +249,21 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 - `scrollContainerRef`
 - `showJumpToLatest`
 - `shouldStickToBottomRef`
+- `isAutoScrollPausedByUserRef`
+- `scrollIntentRef`
 - `lastMessageIdRef`
+- `lastScrollTopRef`
 
 用途分别是：
 
 - 定位消息末尾锚点
-- 获取滚动容器
+- 获取滚动容器。这里应指向 OverlayScrollbars 的真实 viewport
 - 控制“回到底部”按钮显示
 - 记录当前是否应自动吸底
-- 判断本次变化是不是一条真正的新消息
+- 记录用户是否已经主动上移
+- 记录 wheel / touch 的最近滚动意图
+- 保留最新消息 id
+- 记录上一帧滚动位置，用于识别真实上移
 
 ---
 
@@ -281,7 +287,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 - 客户端挂载后的模型列表刷新
 
-当前实现：
+运行方式：
 
 1. 请求 `/api/models`
 2. 校验响应结构
@@ -312,7 +318,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 - 当前激活会话的完整快照加载
 
-当前实现：
+运行方式：
 
 1. 如果没有 `activeConversationId`，直接结束
 2. 请求 `/api/conversations/:conversationId`
@@ -410,8 +416,9 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 1. 在 `messages` 变化后执行
 2. 如果当前仍处于“应吸底”状态，则滚动到消息末尾
-3. 如果是新消息，用 `smooth`
-4. 如果只是同一条消息的重复渲染，用 `auto`
+3. 如果用户已经主动上移，则不再抢滚动位置，只显示回到底部按钮
+4. wheel / touch 捕获阶段会提前暂停自动吸底，避免等流式内容更新后再被拉回底部
+5. 点击回到底部按钮后，才恢复自动吸底
 
 ---
 

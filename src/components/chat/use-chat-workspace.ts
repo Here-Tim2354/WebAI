@@ -8,6 +8,10 @@ import {
   conversationResponseSchema,
 } from "@/lib/schemas/conversation";
 import { AIModel, aiModelListResponseSchema } from "@/lib/schemas/model";
+import {
+  DEFAULT_THINKING_LEVEL,
+  ThinkingLevel,
+} from "@/lib/schemas/thinking";
 
 type UseChatWorkspaceOptions = {
   initialConversations: Conversation[];
@@ -24,6 +28,7 @@ type CreateConversationOptions = {
   modelId?: string | null;
   systemPrompt?: string | null;
   webSearchEnabled?: boolean;
+  thinkingLevel?: ThinkingLevel;
   consumeDraftControls?: boolean;
 };
 
@@ -91,6 +96,9 @@ export function useChatWorkspace({
   );
   const [draftSystemPrompt, setDraftSystemPrompt] = useState<string | null>(null);
   const [draftWebSearchEnabled, setDraftWebSearchEnabled] = useState(true);
+  const [draftThinkingLevel, setDraftThinkingLevel] = useState<ThinkingLevel>(
+    DEFAULT_THINKING_LEVEL,
+  );
 
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
@@ -103,6 +111,8 @@ export function useChatWorkspace({
   const currentSystemPrompt = activeConversation?.systemPrompt ?? draftSystemPrompt;
   const currentWebSearchEnabled =
     activeConversation?.webSearchEnabled ?? draftWebSearchEnabled;
+  const currentThinkingLevel =
+    activeConversation?.thinkingLevel ?? draftThinkingLevel;
   const selectedModel = availableModels.find(
     (model) => model.id === selectedModelId,
   ) ?? (
@@ -125,6 +135,7 @@ export function useChatWorkspace({
     setDraftModelId(getDefaultModelId(models));
     setDraftSystemPrompt(null);
     setDraftWebSearchEnabled(true);
+    setDraftThinkingLevel(DEFAULT_THINKING_LEVEL);
   }, [availableModels]);
 
   // upsert 的目标是“有则更新，无则插入”，这样重命名、拉取详情、发送消息后都能复用同一入口刷新列表。
@@ -176,6 +187,7 @@ export function useChatWorkspace({
           modelId: options?.modelId ?? undefined,
           systemPrompt: options?.systemPrompt ?? undefined,
           webSearchEnabled: options?.webSearchEnabled,
+          thinkingLevel: options?.thinkingLevel,
         }),
       });
       const payload = await response.json();
@@ -346,6 +358,7 @@ export function useChatWorkspace({
       modelId?: string;
       systemPrompt?: string;
       webSearchEnabled?: boolean;
+      thinkingLevel?: ThinkingLevel;
     },
   ) => {
     const response = await fetch(`/api/conversations/${conversationId}`, {
@@ -368,6 +381,7 @@ export function useChatWorkspace({
     setWorkspaceError(null);
 
     if (!activeConversationId || !activeConversation) {
+      // 空白首页还没有真实会话，只把模型作为草稿控制项保存到本地。
       setDraftModelId(modelId);
       return;
     }
@@ -401,6 +415,7 @@ export function useChatWorkspace({
     setWorkspaceError(null);
 
     if (!activeConversationId || !activeConversation) {
+      // system prompt 和模型一样，在首条消息创建会话时才真正落库。
       setDraftSystemPrompt(nextSystemPrompt);
       return;
     }
@@ -562,6 +577,8 @@ export function useChatWorkspace({
       favoritedAt: nextIsFavorite ? new Date().toISOString() : null,
     };
 
+    // 收藏操作需要同时维护 active / archived / favorite 三份列表视图。
+    // 先乐观更新能让菜单响应更快，失败时再按 previousConversation 回滚。
     if (activeConversation.status === "archived") {
       setArchivedConversations((current) =>
         sortConversations(
@@ -632,6 +649,42 @@ export function useChatWorkspace({
     upsertConversation,
   ]);
 
+  const handleSelectThinkingLevel = useCallback(async (
+    thinkingLevel: ThinkingLevel,
+  ) => {
+    setWorkspaceError(null);
+
+    if (!activeConversationId || !activeConversation) {
+      setDraftThinkingLevel(thinkingLevel);
+      return;
+    }
+
+    const previousConversation = activeConversation;
+
+    upsertConversation({
+      ...activeConversation,
+      thinkingLevel,
+    });
+
+    try {
+      const nextConversation = await patchConversationControls(
+        activeConversationId,
+        {
+          thinkingLevel,
+        },
+      );
+      upsertConversation(nextConversation);
+    } catch (error) {
+      upsertConversation(previousConversation);
+      setWorkspaceError(getErrorMessage(error));
+    }
+  }, [
+    activeConversation,
+    activeConversationId,
+    patchConversationControls,
+    upsertConversation,
+  ]);
+
   const handleArchiveConversation = useCallback(async (conversationId: string) => {
     setIsArchivingConversationId(conversationId);
     setWorkspaceError(null);
@@ -656,6 +709,8 @@ export function useChatWorkspace({
           (conversation) => conversation.id !== conversationId,
         );
 
+        // 如果归档的是当前会话，自动切到下一条 active 会话；
+        // 没有下一条时回到空白草稿态。
         setActiveConversationId((activeId) => {
           if (activeId !== conversationId) {
             return activeId;
@@ -741,6 +796,8 @@ export function useChatWorkspace({
       }
 
       const parsed = chatSessionResponseSchema.parse(payload);
+      // 分支返回的是完整会话快照，必须同时写入会话列表和消息缓存，
+      // 否则切到新会话时会出现空消息或再次拉取闪烁。
       upsertConversation(parsed.conversation);
       syncConversationMessages(parsed.conversation.id, parsed.messages);
       setActiveConversationId(parsed.conversation.id);
@@ -766,6 +823,7 @@ export function useChatWorkspace({
         modelId: draftModelId ?? undefined,
         systemPrompt: draftSystemPrompt ?? undefined,
         webSearchEnabled: draftWebSearchEnabled,
+        thinkingLevel: draftThinkingLevel,
         consumeDraftControls: true,
       });
       return conversation.id;
@@ -778,6 +836,7 @@ export function useChatWorkspace({
     createConversation,
     draftModelId,
     draftSystemPrompt,
+    draftThinkingLevel,
     draftWebSearchEnabled,
   ]);
 
@@ -809,6 +868,7 @@ export function useChatWorkspace({
     selectedModel,
     currentSystemPrompt,
     currentWebSearchEnabled,
+    currentThinkingLevel,
     groupedModels,
     workspaceError,
     isCreatingConversation,
@@ -828,6 +888,7 @@ export function useChatWorkspace({
     handleRestoreConversation,
     handleBranchConversation,
     handleSelectModel,
+    handleSelectThinkingLevel,
     handleToggleFavoriteConversation,
     loadArchivedConversations,
     loadFavoriteConversations,

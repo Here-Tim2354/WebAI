@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { conversationSchema } from "./conversation";
+import { thinkingLevelSchema } from "./thinking";
 
 export const chatMessageRoleSchema = z.enum([
   "user",
@@ -44,6 +45,13 @@ export const chatMessageMetadataSchema = z
   .object({
     urls: urlContextUrlsSchema.optional(),
     attachments: messageAttachmentsSchema.optional(),
+    thinking: z
+      .object({
+        content: z.string(),
+        level: thinkingLevelSchema,
+        status: z.enum(["streaming", "complete", "cancelled", "error"]),
+      })
+      .optional(),
   })
   .passthrough()
   .default({});
@@ -69,6 +77,7 @@ export const sendMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   content: z.string().trim(),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  thinkingLevel: thinkingLevelSchema.optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),
 }).refine(
@@ -85,6 +94,7 @@ export const editMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   content: z.string().trim(),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  thinkingLevel: thinkingLevelSchema.optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),
 }).refine(
@@ -96,6 +106,7 @@ export const editMessageRequestSchema = z.object({
 export const regenerateAssistantMessageRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
   modelId: z.string().trim().min(1, "模型标识不能为空。").optional(),
+  thinkingLevel: thinkingLevelSchema.optional(),
   webSearchEnabled: z.boolean().optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),

@@ -1,5 +1,10 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Conversation } from "@/lib/schemas/conversation";
+import {
+  DEFAULT_THINKING_LEVEL,
+  ThinkingLevel,
+  thinkingLevelSchema,
+} from "@/lib/schemas/thinking";
 
 type ConversationRow = {
   id: string;
@@ -7,6 +12,7 @@ type ConversationRow = {
   system_prompt: string | null;
   model_id: string | null;
   web_search_enabled: boolean;
+  thinking_level: ThinkingLevel | null;
   status: "active" | "archived";
   archived_at: string | null;
   favorites?: { created_at: string }[] | null;
@@ -26,6 +32,9 @@ function mapConversation(row: ConversationRow): Conversation {
     systemPrompt: row.system_prompt,
     modelId: row.model_id,
     webSearchEnabled: row.web_search_enabled,
+    thinkingLevel: thinkingLevelSchema.catch(DEFAULT_THINKING_LEVEL).parse(
+      row.thinking_level,
+    ),
     status: row.status,
     archivedAt: row.archived_at,
     isFavorite: row.is_favorite ?? favorite !== null,
@@ -36,7 +45,7 @@ function mapConversation(row: ConversationRow): Conversation {
 }
 
 const conversationSelectFields =
-  "id, title, system_prompt, model_id, web_search_enabled, status, archived_at, created_at, updated_at, favorites(created_at)";
+  "id, title, system_prompt, model_id, web_search_enabled, thinking_level, status, archived_at, created_at, updated_at, favorites(created_at)";
 
 export class ConversationAccessError extends Error {
   constructor(message: string) {
@@ -84,7 +93,7 @@ export async function listFavoriteConversations(
   const { data, error } = await supabase
     .from("conversations")
     .select(
-      "id, title, system_prompt, model_id, web_search_enabled, status, archived_at, created_at, updated_at, favorites!inner(created_at)",
+      "id, title, system_prompt, model_id, web_search_enabled, thinking_level, status, archived_at, created_at, updated_at, favorites!inner(created_at)",
     )
     .eq("user_id", userId);
 
@@ -112,6 +121,7 @@ export async function createConversation(
   systemPrompt?: string,
   modelId?: string,
   webSearchEnabled = true,
+  thinkingLevel: ThinkingLevel = DEFAULT_THINKING_LEVEL,
 ) {
   const { data, error } = await supabase
     .from("conversations")
@@ -121,6 +131,7 @@ export async function createConversation(
       system_prompt: systemPrompt?.trim() ? systemPrompt.trim() : null,
       model_id: modelId ?? null,
       web_search_enabled: webSearchEnabled,
+      thinking_level: thinkingLevel,
     })
     .select(conversationSelectFields)
     .single();
@@ -160,6 +171,7 @@ type UpdateConversationInput = {
   systemPrompt?: string;
   modelId?: string;
   webSearchEnabled?: boolean;
+  thinkingLevel?: ThinkingLevel;
   status?: "active" | "archived";
 };
 
@@ -178,6 +190,7 @@ export async function updateConversation(
     system_prompt?: string | null;
     model_id?: string | null;
     web_search_enabled?: boolean;
+    thinking_level?: ThinkingLevel;
     status?: "active" | "archived";
     archived_at?: string | null;
   } = {};
@@ -198,6 +211,10 @@ export async function updateConversation(
 
   if (updates.webSearchEnabled !== undefined) {
     nextConversationUpdate.web_search_enabled = updates.webSearchEnabled;
+  }
+
+  if (updates.thinkingLevel !== undefined) {
+    nextConversationUpdate.thinking_level = updates.thinkingLevel;
   }
 
   if (updates.status !== undefined) {

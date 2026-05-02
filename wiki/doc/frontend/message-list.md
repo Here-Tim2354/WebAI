@@ -6,7 +6,7 @@ aliases:
 
 # MessageList 页面结构说明
 
-本文档用于快速理解 `MessageList` 组件在页面中的职责，以及它具体展示什么内容。
+这篇笔记帮助我们快速理解 `MessageList` 组件在页面中的职责，以及它具体展示什么内容。
 
 代码入口：
 - `src/components/chat/message-list.tsx`
@@ -48,15 +48,22 @@ aliases:
 组件最外层是一个滚动容器：
 
 ```tsx
-<div ref={scrollContainerRef} ... onScroll={onScroll}>
+<ScrollArea
+  ref={scrollContainerRef}
+  onScroll={onScroll}
+  onWheelCapture={onWheelCapture}
+  onTouchStartCapture={onTouchStartCapture}
+  onTouchMoveCapture={onTouchMoveCapture}
+>
   {messages.length === 0 ? 空状态 : 消息列表}
-</div>
+</ScrollArea>
 ```
 
 这说明它最核心的职责有两个：
 
 - 承载滚动
 - 在空状态和消息流之间切换
+- 把滚轮和触摸意图向父层滚动 hook 透传
 
 ---
 
@@ -91,7 +98,7 @@ messages.length === 0
     <MessageBubble key={message.id} message={message} />
   ))}
   <div ref={messageEndRef} />
-  {showJumpToLatest ? <button>最新</button> : null}
+  {showJumpToLatest ? <button aria-label="跳转到底部">向下箭头</button> : null}
 </div>
 ```
 
@@ -99,7 +106,7 @@ messages.length === 0
 
 - 消息列表
 - 消息末尾锚点
-- 回到底部按钮
+- 回到底部圆形箭头按钮
 
 ---
 
@@ -177,12 +184,16 @@ MessageList
 
 - `showJumpToLatest === true`
 
-就会显示一个“最新”按钮。
+就会显示一个白色圆形的向下箭头按钮。
 
 这个按钮的作用是：
 
 - 当用户已经向上滚动离开底部时
 - 提供一个快速回到最新消息位置的入口
+
+按钮只负责展示和触发 `onJumpToLatest`，不会自己判断滚动状态。
+
+用户是否已经上移、是否应暂停流式输出期间的自动吸底，由父层的 `useMessageScroll` 决定。
 
 ---
 
@@ -192,7 +203,7 @@ MessageList
 
 ```tsx
 MessageList
-├─ 滚动容器 div
+├─ ScrollArea 滚动容器
 │  ├─ 空状态欢迎页
 │  │  ├─ 标题
 │  │  ├─ 光标动画
@@ -202,7 +213,7 @@ MessageList
 │     │  └─ MarkdownMessage
 │     │     └─ CodeBlock
 │     ├─ messageEndRef 锚点
-│     └─ “最新”按钮
+│     └─ “跳转到底部”箭头按钮
 ```
 
 ---

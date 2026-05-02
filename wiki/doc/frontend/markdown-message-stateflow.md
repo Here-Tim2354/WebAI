@@ -5,7 +5,7 @@ aliases:
 
 # MarkdownMessage 状态流说明
 
-本文档用于理解 `MarkdownMessage` 如何把文本内容送进不同的渲染分支。
+这篇笔记帮助我们理解 `MarkdownMessage` 如何把文本内容送进不同的渲染分支。
 
 代码入口：
 - `src/components/chat/markdown-message.tsx`

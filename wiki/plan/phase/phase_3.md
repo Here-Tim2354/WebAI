@@ -73,7 +73,7 @@
   - [[doc/database/30_mapping/feature_to_table_mapping|feature_to_table_mapping]]
   - [[doc/database/40_verification/migration_checklist|migration_checklist]]
 - 前置确认重点包括：
-  - 当前实现是否仍然服务课程的数据库主线
+  - 系统结构是否仍然服务课程的数据库主线
   - 数据字典是否仍然从用户视角出发，而不是退化成字段表
   - 当前新增功能是否真的支撑 CRUD 演示
   - 当前数据库结构是否仍然能从需求和用例反推
@@ -121,7 +121,7 @@
 
 ## 推荐实现顺序
 1. 先阅读课程要求、执行清单和 [[doc/database/GUIDE|GUIDE]]，统一数据库表达口径
-2. 先确认 `Supabase MCP` 当前状态，并通过官方资料核实本轮实现依赖的关键能力
+2. 先确认 `Supabase MCP` 状态，并通过官方资料核实这部分能力依赖的关键能力
 3. 完成 `Supabase` 核心关系模式的 migration 设计与落地
 4. 接入浏览器端与服务端 `Supabase client`，明确身份获取与数据库访问边界
 5. 先实现会话级 CRUD：新建、查询、打开、重命名、删除
@@ -148,7 +148,7 @@
 - 目标：
   - 把关系模式真正落到 `Supabase PostgreSQL`
 - 重点：
-  - 在落地前先确认本轮依赖的 `Supabase MCP` 与官方文档口径
+  - 在进入实现前先确认 `Supabase MCP` 与官方文档口径
   - 建立 `profiles`、`conversations`、`messages`
   - 明确主键、外键、可空性、默认值
   - 配置关键索引
@@ -261,7 +261,7 @@
 - migration 可以作为课程设计中的数据库实现证据
 - 项目从“刷新即丢失的单页原型”进入“有数据库主线支撑的聊天系统”
 
-## 当前阶段判断
+## 阶段位置
 - `Phase 3.5` 已完成消息持久化闭环
 - 会话 CRUD、消息持久化与当前页面主链路已经进入稳定态
 - `Phase 3.6` 可以开始验收，重点做 RLS 验证、数据库说明补全与答辩支撑材料整理

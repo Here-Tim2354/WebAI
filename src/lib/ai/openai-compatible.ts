@@ -2,6 +2,7 @@ import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
 import { ChatMessage } from "@/lib/schemas/chat";
 import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { getSystemInstruction } from "./system-instruction";
+import { AssistantStreamDelta } from "./types";
 
 type GenerateWithOpenAICompatibleOptions = {
   model: RuntimeAIModel;
@@ -90,7 +91,7 @@ function extractAssistantDelta(payload: OpenAICompatibleStreamChunk) {
 export async function* streamWithOpenAICompatible(
   messages: ChatMessage[],
   options: GenerateWithOpenAICompatibleOptions,
-) {
+): AsyncGenerator<AssistantStreamDelta> {
   const env = getServerEnv();
   const apiKey = requireServerEnvValue(
     env.OPENAI_COMPATIBLE_API_KEY,
@@ -187,7 +188,10 @@ export async function* streamWithOpenAICompatible(
           }
 
           hasDelta = true;
-          yield delta;
+          yield {
+            type: "text",
+            delta,
+          };
         }
       }
     }

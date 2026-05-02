@@ -8,6 +8,7 @@ import {
   createChatMessage,
 } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
+import { ThinkingLevel } from "@/lib/schemas/thinking";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -84,6 +85,8 @@ function mergeAssistantMessageParts(
 
     return {
       ...nextMessage,
+      // parts 保留“每次服务端新增的片段”，MessageBubble 可以据此做更自然的局部 reveal。
+      // 如果直接覆盖为完整 content，前端会失去本次新增内容的边界。
       parts: [
         ...previousMessage.parts,
         {
@@ -96,6 +99,8 @@ function mergeAssistantMessageParts(
 
   return {
     ...nextMessage,
+    // 如果服务端返回的内容不是旧内容的前缀，说明发生了重算或回退。
+    // 此时放弃增量拼接，直接用完整文本重建 parts，避免展示错位。
     parts: [
       {
         type: "text" as const,
@@ -110,6 +115,7 @@ type SubmitOptions = {
   content: string;
   attachments?: MessageAttachment[];
   selectedModelId?: string | null;
+  thinkingLevel?: ThinkingLevel;
   onConversationSynced: (conversation: Conversation) => void;
 };
 
@@ -239,6 +245,75 @@ export function useChatSession() {
     });
   }, [updateConversationMessages]);
 
+  const markAssistantMessageCancelled = useCallback((
+    conversationId: string,
+    currentAssistantMessageId: string,
+    latestAssistantMessage: ChatMessage,
+  ) => {
+    const hasVisibleAssistantContent =
+      latestAssistantMessage.content.trim().length > 0 ||
+      Boolean(latestAssistantMessage.metadata.thinking?.content?.trim());
+
+    updateConversationMessages(conversationId, (current) => {
+      const nextMessages = [...current];
+      const replaceIndex = nextMessages.findIndex(
+        (message) => message.id === currentAssistantMessageId,
+      );
+      const latestIndex = nextMessages.findIndex(
+        (message) => message.id === latestAssistantMessage.id,
+      );
+      const targetIndex = replaceIndex !== -1 ? replaceIndex : latestIndex;
+
+      if (hasVisibleAssistantContent && targetIndex !== -1) {
+        nextMessages[targetIndex] = createChatMessage({
+          id: latestAssistantMessage.id,
+          role: "assistant",
+          content: latestAssistantMessage.content,
+          status: "cancelled",
+          metadata: latestAssistantMessage.metadata,
+        });
+        return nextMessages;
+      }
+
+      const emptyPlaceholderIds = new Set([
+        currentAssistantMessageId,
+        latestAssistantMessage.id,
+      ]);
+      const withoutEmptyPlaceholder = nextMessages.filter((message) => {
+        if (!emptyPlaceholderIds.has(message.id) || message.role !== "assistant") {
+          return true;
+        }
+
+        return (
+          message.content.trim().length > 0 ||
+          Boolean(message.metadata.thinking?.content?.trim())
+        );
+      });
+
+      for (let index = withoutEmptyPlaceholder.length - 1; index >= 0; index -= 1) {
+        const message = withoutEmptyPlaceholder[index];
+
+        if (
+          message.role !== "assistant" ||
+          (
+            message.content.trim().length === 0 &&
+            !message.metadata.thinking?.content?.trim()
+          )
+        ) {
+          continue;
+        }
+
+        withoutEmptyPlaceholder[index] = {
+          ...message,
+          status: "cancelled",
+        };
+        return withoutEmptyPlaceholder;
+      }
+
+      return withoutEmptyPlaceholder;
+    });
+  }, [updateConversationMessages]);
+
   const addUrlContextUrl = useCallback((candidateUrl?: string): AddUrlContextResult => {
     const normalizedUrl = normalizeUrlCandidate(
       candidateUrl ?? urlContextInputValue,
@@ -312,6 +387,8 @@ export function useChatSession() {
     const conversationId = streamingConversationIdRef.current;
 
     if (conversationId) {
+      // 同时通知服务端和中断浏览器 fetch：
+      // 服务端负责停止模型流与写 cancelled，前端 abort 负责尽快结束本地 reader。
       void fetch("/api/chat/cancel", {
         method: "POST",
         headers: {
@@ -343,6 +420,7 @@ export function useChatSession() {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    // 流可能把一条 JSON 事件切成多个 Uint8Array，这个 buffer 专门保存未读完的半行。
     let buffer = "";
     let currentAssistantMessageId = assistantPlaceholder.id;
     let latestAssistantMessage = assistantPlaceholder;
@@ -370,6 +448,8 @@ export function useChatSession() {
             JSON.parse(trimmedLine),
           );
 
+          // 服务端事件只表达“消息/会话的新快照”，本地通过 replaceMessage 合并到当前缓存。
+          // 这样发送、编辑、重新生成三条链路可以共用同一个流消费器。
           switch (parsedEvent.type) {
             case "assistant-message-created": {
               const nextAssistantMessage = mergeAssistantMessageParts(
@@ -427,6 +507,7 @@ export function useChatSession() {
       const trailingLine = buffer.trim();
 
       if (trailingLine) {
+        // 正常情况下事件都以换行结束；这里兜底处理最后一行没带换行的响应。
         const parsedEvent = chatStreamEventSchema.parse(
           JSON.parse(trailingLine),
         );
@@ -462,6 +543,7 @@ export function useChatSession() {
     content: submittedContent,
     attachments,
     selectedModelId,
+    thinkingLevel,
     onConversationSynced,
   }: SubmitOptions) => {
     const content = submittedContent.trim();
@@ -500,6 +582,8 @@ export function useChatSession() {
     let currentAssistantMessageId = assistantPlaceholder.id;
     let latestAssistantMessage = assistantPlaceholder;
 
+    // 先乐观写入用户消息和 assistant 占位，让界面立即响应。
+    // 如果请求失败，catch 分支会把占位消息转成 error/cancelled 状态。
     updateConversationMessages(conversationId, (current) => [
       ...current.filter((message) => message.role !== "error"),
       userMessage,
@@ -524,6 +608,7 @@ export function useChatSession() {
           conversationId,
           content,
           modelId: selectedModelId ?? undefined,
+          thinkingLevel,
           urls:
             submittedUrlContextUrls.length > 0
               ? submittedUrlContextUrls
@@ -548,13 +633,21 @@ export function useChatSession() {
       currentAssistantMessageId = result.currentAssistantMessageId;
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
+      if (isAbortError(error)) {
+        markAssistantMessageCancelled(
+          conversationId,
+          currentAssistantMessageId,
+          latestAssistantMessage,
+        );
+        return;
+      }
+
       const nextAssistantMessage = createChatMessage({
         id: currentAssistantMessageId,
         role: "assistant",
-        content: isAbortError(error)
-          ? latestAssistantMessage.content
-          : latestAssistantMessage.content || getErrorMessage(error),
-        status: isAbortError(error) ? "cancelled" : "error",
+        content: latestAssistantMessage.content || getErrorMessage(error),
+        status: "error",
+        metadata: latestAssistantMessage.metadata,
       });
 
       latestAssistantMessage = nextAssistantMessage;
@@ -572,6 +665,7 @@ export function useChatSession() {
   }, [
     consumeAssistantStream,
     isSubmitting,
+    markAssistantMessageCancelled,
     replaceMessage,
     updateConversationMessages,
     urlContextUrls,
@@ -585,6 +679,7 @@ export function useChatSession() {
     urls,
     attachments,
     selectedModelId,
+    thinkingLevel,
     onConversationSynced,
   }: EditMessageOptions) => {
     const trimmedContent = content.trim();
@@ -622,6 +717,8 @@ export function useChatSession() {
       }
 
       const nextMessages = current.slice(0, targetMessageIndex + 1);
+      // 覆盖式编辑会截断目标消息之后的上下文，并立刻追加新的 assistant 占位。
+      // 这和服务端 PATCH 的“编辑 + 删除后续 + 重新生成”保持同一语义。
       nextMessages[targetMessageIndex] = {
         ...nextMessages[targetMessageIndex],
         content: trimmedContent,
@@ -665,6 +762,7 @@ export function useChatSession() {
           conversationId,
           content: trimmedContent,
           modelId: selectedModelId ?? undefined,
+          thinkingLevel,
           urls: submittedUrlContextUrls,
           attachments: submittedAttachments,
         }),
@@ -673,6 +771,7 @@ export function useChatSession() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
+        // 重新生成失败时还原旧 assistant 消息，避免用户丢失原回复。
         syncConversationMessages(conversationId, previousMessages);
         throw new Error(payload?.error?.message ?? "编辑消息失败。");
       }
@@ -687,17 +786,10 @@ export function useChatSession() {
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (isAbortError(error)) {
-        const nextAssistantMessage = createChatMessage({
-          id: currentAssistantMessageId,
-          role: "assistant",
-          content: latestAssistantMessage.content,
-          status: "cancelled",
-        });
-
-        replaceMessage(
+        markAssistantMessageCancelled(
           conversationId,
           currentAssistantMessageId,
-          nextAssistantMessage,
+          latestAssistantMessage,
         );
         return;
       }
@@ -707,6 +799,7 @@ export function useChatSession() {
         role: "assistant",
         content: latestAssistantMessage.content || getErrorMessage(error),
         status: "error",
+        metadata: latestAssistantMessage.metadata,
       });
 
       replaceMessage(
@@ -725,6 +818,7 @@ export function useChatSession() {
     consumeAssistantStream,
     conversationMessages,
     isSubmitting,
+    markAssistantMessageCancelled,
     replaceMessage,
     syncConversationMessages,
     updateConversationMessages,
@@ -734,6 +828,7 @@ export function useChatSession() {
     conversationId,
     messageId,
     selectedModelId,
+    thinkingLevel,
     webSearchEnabled,
     urls,
     attachments,
@@ -771,6 +866,8 @@ export function useChatSession() {
         submittedUrlContextUrls.length > 0 ||
         submittedAttachments.length > 0
       ) {
+        // 重新生成允许临时覆盖“上一条 user 消息”的 URL/附件上下文。
+        // 服务端也会同步更新这条 user 消息的 metadata，保证历史和当前 UI 一致。
         for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
           if (nextMessages[index].role !== "user") {
             continue;
@@ -812,6 +909,7 @@ export function useChatSession() {
         body: JSON.stringify({
           conversationId,
           modelId: selectedModelId ?? undefined,
+          thinkingLevel,
           webSearchEnabled,
           urls:
             submittedUrlContextUrls.length > 0
@@ -825,6 +923,7 @@ export function useChatSession() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
+        // 编辑失败时恢复原消息列表，避免前端停在一个服务端没有接受的乐观状态。
         syncConversationMessages(conversationId, previousMessages);
         restoredPreviousMessages = true;
         throw new Error(payload?.error?.message ?? "重新生成失败。");
@@ -844,17 +943,10 @@ export function useChatSession() {
       }
 
       if (isAbortError(error)) {
-        const nextAssistantMessage = createChatMessage({
-          id: currentAssistantMessageId,
-          role: "assistant",
-          content: latestAssistantMessage.content,
-          status: "cancelled",
-        });
-
-        replaceMessage(
+        markAssistantMessageCancelled(
           conversationId,
           currentAssistantMessageId,
-          nextAssistantMessage,
+          latestAssistantMessage,
         );
         return;
       }
@@ -864,6 +956,7 @@ export function useChatSession() {
         role: "assistant",
         content: latestAssistantMessage.content || getErrorMessage(error),
         status: "error",
+        metadata: latestAssistantMessage.metadata,
       });
 
       replaceMessage(
@@ -882,6 +975,7 @@ export function useChatSession() {
     consumeAssistantStream,
     conversationMessages,
     isSubmitting,
+    markAssistantMessageCancelled,
     replaceMessage,
     syncConversationMessages,
     updateConversationMessages,

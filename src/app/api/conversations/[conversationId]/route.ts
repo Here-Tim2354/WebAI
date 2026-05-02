@@ -104,6 +104,7 @@ export async function GET(_request: Request, context: RouteContext) {
  * 当前 PATCH 同时承担两类会话级更新：
  * 1. 标题重命名
  * 2. 会话级 system prompt 更新
+ * 3. 模型、联网和思考档位等会话控制项更新
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
@@ -156,6 +157,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         systemPrompt: parsed.data.systemPrompt,
         modelId: parsed.data.modelId,
         webSearchEnabled: parsed.data.webSearchEnabled,
+        thinkingLevel: parsed.data.thinkingLevel,
         status: parsed.data.status,
       },
     );

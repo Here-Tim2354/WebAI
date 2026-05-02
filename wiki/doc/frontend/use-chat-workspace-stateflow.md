@@ -5,7 +5,7 @@ aliases:
 
 # useChatWorkspace 状态流说明
 
-本文档用于理解 `useChatWorkspace` 如何协调会话、模型、草稿控制项与工作区错误状态。
+这篇笔记帮助我们理解 `useChatWorkspace` 如何协调会话、模型、草稿控制项与工作区错误状态。
 
 代码入口：
 - `src/components/chat/use-chat-workspace.ts`

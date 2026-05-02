@@ -17,6 +17,7 @@
 | 发送消息 | `messages`, `conversations` | 先写用户消息，再 touch 会话更新时间 |
 | 保存会话级提示词 | `conversations` | `system_prompt` |
 | 会话级联网搜索偏好 | `conversations` | `web_search_enabled`，当前默认开启 |
+| 会话级思考档位 | `conversations` | `thinking_level`，取值为 `minimal / low / medium / high`，当前默认 `minimal` |
 
 ## 当前系统配置层
 
@@ -29,7 +30,7 @@
 
 ## 当前仍在扩展层
 
-| 功能 | 目标表 | 当前状态 |
+| 功能 | 目标表 | 状态 |
 | --- | --- | --- |
 | 收藏消息 | `favorites` | `planned` |
 | 搜索记录 | `search_records` | `planned` |

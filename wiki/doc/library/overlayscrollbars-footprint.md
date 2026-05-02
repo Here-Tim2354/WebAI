@@ -6,7 +6,7 @@ aliases:
 
 # OverlayScrollbars 库痕迹
 
-本文档记录 `OverlayScrollbars` 在当前项目中的实际落点和边界。
+这篇笔记整理 `OverlayScrollbars` 在当前项目中的实际落点和边界。
 
 相关依赖：
 - `overlayscrollbars`
@@ -24,7 +24,6 @@ aliases:
 代码入口：
 - `src/components/ui/scroll-area.tsx`
 - `src/components/ui/scroll-options.ts`
-- `src/components/ui/use-overlay-scrollbar.ts`
 - `src/app/globals.css`
 
 当前主要使用 `ScrollArea` 包装普通 div 滚动区域：
@@ -62,7 +61,7 @@ Dropdown Popup 不接 OverlayScrollbars。
 - OverlayScrollbars 会改写目标节点内部结构
 - 两者叠加容易触发 React 卸载阶段的 `removeChild` 异常
 
-## 3. 当前实现约束
+## 3. 运行方式约束
 
 `ScrollArea` 必须使用官方 React wrapper：
 
@@ -72,7 +71,7 @@ Dropdown Popup 不接 OverlayScrollbars。
 
 不要再把 `useOverlayScrollbars` 手动初始化到包含 React children 的节点上。
 
-同时，`ScrollArea` 通过 `useImperativeHandle` 暴露 ref 时，应优先返回：
+同时，`ScrollArea` 对外发布 ref 时，应优先返回：
 
 ```tsx
 scrollRef.current?.osInstance()?.elements().viewport
@@ -81,6 +80,10 @@ scrollRef.current?.osInstance()?.elements().viewport
 如果实例还未 ready，再 fallback 到 wrapper element。
 
 原因是手动初始化会让外部库改写 React 已经接管的 DOM 子树，后续 React 删除子节点时可能找不到原父节点。
+
+还有一个容易踩的点：`OverlayScrollbarsComponent` 开启 `defer` 后，首次 React ref 赋值可能早于 OverlayScrollbars 初始化完成。
+
+因此当前 `ScrollArea` 会监听 `initialized` 事件，并在事件触发时重新把 forwarded ref 指到真实 viewport。消息列表的滚动 hook 也会通过 `data-overlayscrollbars-viewport` 做兜底查找，避免流式输出时因为读到 wrapper root 而误判滚动位置。
 
 ## 4. 后续维护建议
 

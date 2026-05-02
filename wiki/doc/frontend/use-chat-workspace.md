@@ -6,7 +6,7 @@ aliases:
 
 # useChatWorkspace 说明
 
-本文档用于理解 `useChatWorkspace` 在当前前端架构里的位置，以及它具体负责哪些工作区编排逻辑。
+这篇笔记帮助我们理解 `useChatWorkspace` 在当前前端架构里的位置，以及它具体负责哪些工作区编排逻辑。
 
 代码入口：
 - `src/components/chat/use-chat-workspace.ts`
@@ -27,7 +27,7 @@ aliases:
 - 当前激活会话
 - 模型列表同步
 - 草稿控制项
-- 会话级提示词、模型与联网开关 patch
+- 会话级提示词、模型、联网开关与思考档位 patch
 - 当前会话详情同步
 - 工作区级错误状态
 
@@ -49,6 +49,7 @@ aliases:
 - `draftModelId`
 - `draftSystemPrompt`
 - `draftWebSearchEnabled`
+- `draftThinkingLevel`
 - `workspaceError`
 - `isCreatingConversation`
 - `isDeletingConversationId`
@@ -71,6 +72,7 @@ aliases:
 - `handleSelectModel`
 - `saveSystemPrompt`
 - `toggleWebSearchEnabled`
+- `handleSelectThinkingLevel`
 - `ensureConversationId`
 - `upsertConversation`
 - `resetAfterSignOut`
@@ -107,7 +109,7 @@ aliases:
 作用：
 
 - 同步当前会话的消息快照
-- 同步标题、`systemPrompt`、`modelId`、`webSearchEnabled`
+- 同步标题、`systemPrompt`、`modelId`、`webSearchEnabled`、`thinkingLevel`
 - 避免首页一次性塞入所有历史消息
 
 ---
@@ -121,9 +123,11 @@ aliases:
 - 模型列表拉取
 - 当前会话详情拉取
 - 草稿模型 / 草稿提示词 / 草稿联网开关
+- 草稿思考档位
 - 会话级提示词保存
 - 会话级模型切换
 - 会话级联网切换
+- 会话级思考档位切换
 
 这会让 `ChatShell` 很快重新膨胀成“页面壳 + 工作区规则总控”。
 
@@ -137,4 +141,4 @@ aliases:
 
 ## 6. 一句话理解
 
-`useChatWorkspace` 是当前聊天工作区的编排层：它把会话、模型、草稿控制项、联网偏好、工作区错误和会话级 patch 收在一起，让 `ChatShell` 可以回到页面壳组件的角色。
+`useChatWorkspace` 是当前聊天工作区的编排层：它把会话、模型、草稿控制项、联网偏好、思考档位、工作区错误和会话级 patch 收在一起，让 `ChatShell` 可以回到页面壳组件的角色。

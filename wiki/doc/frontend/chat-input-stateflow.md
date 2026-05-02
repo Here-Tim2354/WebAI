@@ -5,7 +5,7 @@ aliases:
 
 # ChatInput 前端状态流说明
 
-本文档用于理解 `ChatInput` 的前端运行机制，而不是页面展示结构。
+这篇笔记帮助我们理解 `ChatInput` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
 - `src/components/chat/chat-input.tsx`
@@ -158,7 +158,7 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 - 输入框高度随内容变化自动增长
 
-当前实现：
+运行方式：
 
 1. 先拿到 `textareaRef.current`
 2. 把高度暂时设为 `0px`
@@ -184,7 +184,7 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 - 发送完成后把焦点重新放回输入框
 
-当前实现：
+运行方式：
 
 - 当 `isSubmitting === false` 时
 - 调用 `textareaRef.current?.focus()`

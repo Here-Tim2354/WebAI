@@ -6,7 +6,7 @@ aliases:
 
 # MarkdownMessage 说明
 
-本文档用于理解 `MarkdownMessage` 如何把消息正文渲染成富文本，以及它如何把代码块继续下沉到 `CodeBlock`。
+这篇笔记帮助我们理解 `MarkdownMessage` 如何把消息正文渲染成富文本，以及它如何把代码块继续下沉到 `CodeBlock`。
 
 代码入口：
 - `src/components/chat/markdown-message.tsx`

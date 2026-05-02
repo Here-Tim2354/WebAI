@@ -12,23 +12,35 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpIcon,
   GlobeIcon,
+  LightbulbIcon,
   Link2Icon,
   LoaderCircleIcon,
-  PaperclipIcon,
+  PlusIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MessageAttachment } from "@/lib/schemas/chat";
+import {
+  ThinkingLevel,
+  thinkingLevelLabelMap,
+} from "@/lib/schemas/thinking";
 import { panelSpring, smoothEase } from "./motion-presets";
 import type { AddUrlContextResult } from "./use-chat-session";
 import {
-  AttachmentEditorDialog,
   AttachmentPreviewList,
+  getAttachmentAcceptMimeTypes,
   getAttachmentFileValidationError,
 } from "./message-attachments";
 
@@ -44,10 +56,12 @@ type ChatInputProps = {
   supportsUrlContext: boolean;
   supportsImages: boolean;
   supportsFiles: boolean;
+  supportsReasoning: boolean;
+  thinkingLevel: ThinkingLevel;
   isUploadingAttachments: boolean;
   onToggleWebSearch: () => void | Promise<void>;
+  onThinkingLevelChange: (level: ThinkingLevel) => void | Promise<void>;
   onUrlContextInputChange: (value: string) => void;
-  onUrlContextUrlsChange: (urls: string[]) => void;
   onAttachmentsChange: Dispatch<SetStateAction<MessageAttachment[]>>;
   onToggleUrlContextPanel: () => void;
   onAddUrlContextUrl: () => AddUrlContextResult;
@@ -69,10 +83,12 @@ export function ChatInput({
   supportsUrlContext,
   supportsImages,
   supportsFiles,
+  supportsReasoning,
+  thinkingLevel,
   isUploadingAttachments,
   onToggleWebSearch,
+  onThinkingLevelChange,
   onUrlContextInputChange,
-  onUrlContextUrlsChange,
   onAttachmentsChange,
   onToggleUrlContextPanel,
   onAddUrlContextUrl,
@@ -85,7 +101,9 @@ export function ChatInput({
 }: ChatInputProps) {
   const shouldReduceMotion = Boolean(useReducedMotion());
   const [draftValue, setDraftValue] = useState("");
-  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
+  const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false);
+  const [optimisticThinkingLevel, setOptimisticThinkingLevel] =
+    useState(thinkingLevel);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [textareaHeight, setTextareaHeight] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -99,6 +117,12 @@ export function ChatInput({
   const hasAttachments = attachments.length > 0;
   const canToggleWebSearch = !disabled && !isSubmitting;
   const canToggleUrlContext = !disabled && !isSubmitting;
+  const canAddAttachments =
+    !disabled &&
+    !isSubmitting &&
+    !isUploadingAttachments &&
+    (supportsImages || supportsFiles);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
   const urlContextHint = isUrlLimitWarningVisible
     ? "至多输入4条URL"
@@ -107,7 +131,15 @@ export function ChatInput({
         : "当前模型暂不支持 URL Context";
   const webSearchTooltip = "联网";
   const urlContextTooltip = "添加URL";
-  const attachmentTooltip = "修改附加项";
+  const attachmentTooltip =
+    supportsImages || supportsFiles ? "添加文件" : "当前模型暂不支持文件";
+  const attachmentAcceptMimeTypes = getAttachmentAcceptMimeTypes({
+    supportsFiles,
+    supportsImages,
+  });
+  const thinkingTooltip = supportsReasoning
+    ? `thinking: ${thinkingLevelLabelMap[optimisticThinkingLevel]}`
+    : "当前模型暂不支持思考档位";
 
   const showUrlLimitWarning = () => {
     setIsUrlLimitWarningVisible(true);
@@ -146,6 +178,7 @@ export function ChatInput({
     try {
       await onSubmit(submittedValue, attachments);
     } catch {
+      // 发送失败时把文本草稿还给用户；附件草稿由上层状态保留。
       setDraftValue(submittedValue);
     }
   };
@@ -156,6 +189,7 @@ export function ChatInput({
   };
 
   const handleInlineUploadFiles = (files: File[]) => {
+    // 粘贴 / 拖拽不经过弹窗，也必须先走同一套附件预校验。
     const validationError = getAttachmentFileValidationError(files, {
       currentAttachmentCount: attachments.length,
       currentAttachmentSizes: attachments.map((attachment) => attachment.size),
@@ -206,6 +240,10 @@ export function ChatInput({
   }, [isSubmitting]);
 
   useEffect(() => {
+    setOptimisticThinkingLevel(thinkingLevel);
+  }, [thinkingLevel]);
+
+  useEffect(() => {
     return () => {
       if (urlLimitWarningTimeoutRef.current !== null) {
         window.clearTimeout(urlLimitWarningTimeoutRef.current);
@@ -218,7 +256,7 @@ export function ChatInput({
       className={cn(
         "mx-auto flex w-full flex-col border border-border/90 bg-background/95 backdrop-blur-xl",
         isUrlContextPanelOpen ? "gap-1.5" : "gap-2.5",
-        "max-w-4xl rounded-[10px] px-3.5 pt-2 pb-3.5 shadow-[0_28px_38px_rgba(48,82,139,0.1)]",
+        "max-w-4xl rounded-[10px] px-3.5 pt-3 pb-3.5 shadow-[0_28px_38px_rgba(48,82,139,0.1)]",
       )}
       initial={false}
       animate={
@@ -326,7 +364,7 @@ export function ChatInput({
           ref={textareaRef}
           className={cn(
             "max-h-56 resize-none border-0 bg-transparent px-1 py-0 text-[0.98rem] leading-8 shadow-none ring-0 [field-sizing:fixed] focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-transparent",
-            "min-h-8 rounded-none",
+            "min-h-12 rounded-none",
           )}
           animate={textareaHeight ? { height: textareaHeight } : undefined}
           transition={
@@ -343,6 +381,7 @@ export function ChatInput({
             const files = Array.from(event.clipboardData.files);
 
             if (files.length > 0) {
+              // 文本仍按浏览器默认粘贴；只有检测到文件时才进入附件上传流程。
               handleInlineUploadFiles(files);
             }
           }}
@@ -386,6 +425,54 @@ export function ChatInput({
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
+            <Tooltip content={attachmentTooltip}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className={cn(
+                  "relative h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
+                  hasAttachments &&
+                    "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
+                  !supportsImages && !supportsFiles && "opacity-80",
+                )}
+                type="button"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={!canAddAttachments}
+                aria-label="添加文件"
+              >
+                {isUploadingAttachments ? (
+                  <LoaderCircleIcon className="size-4 animate-spin" />
+                ) : (
+                  <PlusIcon className="size-4" />
+                )}
+                {hasAttachments ? (
+                  <span
+                    className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-[7px] bg-sky-600 px-1 text-[0.65rem] font-medium leading-4 text-white shadow-[0_4px_10px_rgba(2,132,199,0.2)]"
+                    aria-hidden="true"
+                  >
+                    {attachments.length}
+                  </span>
+                ) : null}
+              </Button>
+            </Tooltip>
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              disabled={!canAddAttachments}
+              accept={attachmentAcceptMimeTypes}
+              tabIndex={-1}
+              onChange={(event) => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                event.currentTarget.value = "";
+
+                if (files.length > 0) {
+                  handleInlineUploadFiles(files);
+                }
+              }}
+            />
+
             <Tooltip content={webSearchTooltip}>
               <Button
                 variant="outline"
@@ -404,6 +491,59 @@ export function ChatInput({
                 <GlobeIcon className="size-4" />
               </Button>
             </Tooltip>
+
+            <DropdownMenu
+              open={isThinkingMenuOpen}
+              onOpenChange={setIsThinkingMenuOpen}
+            >
+              <Tooltip content={thinkingTooltip}>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className={cn(
+                        "h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
+                        supportsReasoning &&
+                          "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
+                        !supportsReasoning && "opacity-80",
+                      )}
+                      type="button"
+                      disabled={disabled || isSubmitting || !supportsReasoning}
+                      aria-label={`thinking: ${thinkingLevelLabelMap[optimisticThinkingLevel]}`}
+                    >
+                      <LightbulbIcon className="size-4" />
+                    </Button>
+                  }
+                />
+              </Tooltip>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                sideOffset={8}
+                className="w-36 rounded-[12px] border border-border/70 bg-white/96 p-1 shadow-[0_16px_42px_rgba(58,84,132,0.12)]"
+              >
+                <DropdownMenuRadioGroup
+                  value={optimisticThinkingLevel}
+                  onValueChange={(value) => {
+                    const nextThinkingLevel = value as ThinkingLevel;
+                    setOptimisticThinkingLevel(nextThinkingLevel);
+                    void onThinkingLevelChange(nextThinkingLevel);
+                    setIsThinkingMenuOpen(false);
+                  }}
+                >
+                  {Object.entries(thinkingLevelLabelMap).map(([level, label]) => (
+                    <DropdownMenuRadioItem
+                      key={level}
+                      value={level}
+                      className="rounded-[9px] px-2 py-1.5 text-[0.78rem]"
+                    >
+                      {label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Tooltip content={urlContextTooltip}>
               <Button
@@ -428,37 +568,6 @@ export function ChatInput({
                   {urlContextUrls.length}
                 </span>
                 <span className="sr-only">已添加 {urlContextUrls.length} 条 URL</span>
-              </Button>
-            </Tooltip>
-
-            <Tooltip content={attachmentTooltip}>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                className={cn(
-                  "relative h-7 w-9 rounded-[8px] border-border/70 bg-background/82 text-muted-foreground shadow-none hover:bg-white/86 hover:text-slate-800",
-                  (isAttachmentDialogOpen || hasAttachments) &&
-                    "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82 hover:text-sky-800",
-                  !supportsImages && !supportsFiles && "opacity-80",
-                )}
-                type="button"
-                onClick={() => setIsAttachmentDialogOpen(true)}
-                disabled={disabled || isSubmitting}
-                aria-label="修改附加项"
-              >
-                {isUploadingAttachments ? (
-                  <LoaderCircleIcon className="size-4 animate-spin" />
-                ) : (
-                  <PaperclipIcon className="size-4" />
-                )}
-                {hasAttachments ? (
-                  <span
-                    className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-[7px] bg-sky-600 px-1 text-[0.65rem] font-medium leading-4 text-white shadow-[0_4px_10px_rgba(2,132,199,0.2)]"
-                    aria-hidden="true"
-                  >
-                    {attachments.length}
-                  </span>
-                ) : null}
               </Button>
             </Tooltip>
           </div>
@@ -488,20 +597,6 @@ export function ChatInput({
           </Button>
         </div>
       </div>
-      <AttachmentEditorDialog
-        open={isAttachmentDialogOpen}
-        title="修改附加项"
-        urls={urlContextUrls}
-        attachments={attachments}
-        disabled={disabled || isSubmitting}
-        supportsFiles={supportsFiles}
-        supportsImages={supportsImages}
-        isUploading={isUploadingAttachments}
-        onOpenChange={setIsAttachmentDialogOpen}
-        onUrlsChange={onUrlContextUrlsChange}
-        onAttachmentsChange={onAttachmentsChange}
-        onUploadFiles={handleUploadFiles}
-      />
     </motion.div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   FileTextIcon,
   ImageIcon,
@@ -20,12 +21,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tooltip } from "@/components/ui/tooltip";
+import {
+  MAX_FILE_ATTACHMENT_SIZE,
+  MAX_IMAGE_ATTACHMENT_SIZE,
+  MAX_MESSAGE_ATTACHMENTS,
+  MAX_MESSAGE_ATTACHMENTS_SIZE,
+  SUPPORTED_FILE_EXTENSION_SET,
+  SUPPORTED_FILE_MIME_TYPE_SET,
+  SUPPORTED_IMAGE_EXTENSION_SET,
+  SUPPORTED_IMAGE_MIME_TYPES,
+  SUPPORTED_IMAGE_MIME_TYPE_SET,
+  XLSX_MIME_TYPE,
+  buildAttachmentObjectUrl,
+  formatAttachmentSize,
+  getAttachmentFileExtension,
+} from "@/lib/attachment-config";
 import { type MessageAttachment } from "@/lib/schemas/chat";
 import { cn } from "@/lib/utils";
+import { smoothEase } from "./motion-presets";
 import {
   MAX_EDIT_URL_CONTEXT_ITEMS,
   normalizeUrlCandidate,
 } from "./message-url-context";
+
+const previewBackdropTransition = { duration: 0.18, ease: smoothEase } as const;
+const previewPanelTransition = {
+  type: "spring",
+  stiffness: 420,
+  damping: 34,
+  mass: 0.72,
+} as const;
 
 type AttachmentEditorDialogProps = {
   open: boolean;
@@ -42,61 +67,16 @@ type AttachmentEditorDialogProps = {
   onUploadFiles: (files: File[]) => Promise<MessageAttachment[]>;
 };
 
-const MAX_MESSAGE_ATTACHMENTS = 5;
-const MAX_IMAGE_ATTACHMENT_SIZE = 5 * 1024 * 1024;
-const MAX_FILE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-const MAX_MESSAGE_ATTACHMENTS_SIZE = 20 * 1024 * 1024;
-const XLSX_MIME_TYPE =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const SUPPORTED_IMAGE_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-]);
-const SUPPORTED_IMAGE_EXTENSIONS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-]);
-const SUPPORTED_FILE_MIME_TYPES = new Set([
-  "application/pdf",
-  "text/plain",
-  "text/markdown",
-  "text/csv",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  XLSX_MIME_TYPE,
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-]);
-const SUPPORTED_FILE_EXTENSIONS = new Set([
-  ".pdf",
-  ".txt",
-  ".md",
-  ".csv",
-  ".doc",
-  ".docx",
-  ".xlsx",
-  ".ppt",
-  ".pptx",
-]);
-
-function getFileExtension(fileName: string) {
-  const dotIndex = fileName.lastIndexOf(".");
-
-  return dotIndex === -1 ? "" : fileName.slice(dotIndex).toLowerCase();
-}
-
-function getAcceptMimeTypes({
+export function getAttachmentAcceptMimeTypes({
   supportsFiles,
   supportsImages,
 }: {
   supportsFiles: boolean;
   supportsImages: boolean;
 }) {
+  // accept 只负责优化文件选择器展示，真正的安全校验仍在客户端预校验和服务端上传阶段各做一次。
   return [
-    ...(supportsImages ? Array.from(SUPPORTED_IMAGE_MIME_TYPES) : []),
+    ...(supportsImages ? SUPPORTED_IMAGE_MIME_TYPES : []),
     ...(supportsFiles
       ? [
           "application/pdf",
@@ -125,19 +105,20 @@ function isSupportedByCurrentModel(
     supportsImages: boolean;
   },
 ) {
-  if (SUPPORTED_IMAGE_MIME_TYPES.has(file.type)) {
+  // Windows / Office 场景经常给空 MIME 或泛 MIME，所以这里同时按扩展名兜底判断。
+  if (SUPPORTED_IMAGE_MIME_TYPE_SET.has(file.type)) {
     return supportsImages;
   }
 
-  if (SUPPORTED_IMAGE_EXTENSIONS.has(getFileExtension(file.name))) {
+  if (SUPPORTED_IMAGE_EXTENSION_SET.has(getAttachmentFileExtension(file.name))) {
     return supportsImages;
   }
 
-  if (SUPPORTED_FILE_MIME_TYPES.has(file.type)) {
+  if (SUPPORTED_FILE_MIME_TYPE_SET.has(file.type)) {
     return supportsFiles;
   }
 
-  if (SUPPORTED_FILE_EXTENSIONS.has(getFileExtension(file.name))) {
+  if (SUPPORTED_FILE_EXTENSION_SET.has(getAttachmentFileExtension(file.name))) {
     return supportsFiles;
   }
 
@@ -158,6 +139,7 @@ export function getAttachmentFileValidationError(
     supportsImages: boolean;
   },
 ) {
+  // 这是输入区和弹窗共用的轻量预校验；服务端仍会按同一配置再校验一次。
   if (
     files.some(
       (file) =>
@@ -172,7 +154,7 @@ export function getAttachmentFileValidationError(
   }
 
   if (files.some((file) => file.size > getFileSizeLimit(file))) {
-    return `文件大小超过限制：图片不得超过 ${formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatFileSize(MAX_FILE_ATTACHMENT_SIZE)}。`;
+    return `文件大小超过限制：图片不得超过 ${formatAttachmentSize(MAX_IMAGE_ATTACHMENT_SIZE)}，文件不得超过 ${formatAttachmentSize(MAX_FILE_ATTACHMENT_SIZE)}。`;
   }
 
   const totalSize = [
@@ -181,28 +163,16 @@ export function getAttachmentFileValidationError(
   ].reduce((sum, size) => sum + size, 0);
 
   if (totalSize > MAX_MESSAGE_ATTACHMENTS_SIZE) {
-    return "单条消息附加项总大小不能超过 20MB。";
+    return `单条消息附加项总大小不能超过 ${formatAttachmentSize(MAX_MESSAGE_ATTACHMENTS_SIZE)}。`;
   }
 
   return null;
 }
 
-function formatFileSize(size: number) {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
 function getFileSizeLimit(file: File) {
   return (
-    SUPPORTED_IMAGE_MIME_TYPES.has(file.type) ||
-    SUPPORTED_IMAGE_EXTENSIONS.has(getFileExtension(file.name))
+    SUPPORTED_IMAGE_MIME_TYPE_SET.has(file.type) ||
+    SUPPORTED_IMAGE_EXTENSION_SET.has(getAttachmentFileExtension(file.name))
   )
     ? MAX_IMAGE_ATTACHMENT_SIZE
     : MAX_FILE_ATTACHMENT_SIZE;
@@ -212,23 +182,93 @@ function getAttachmentLabel(attachment: MessageAttachment) {
   return attachment.fileName;
 }
 
-function getAttachmentDescription(attachment: MessageAttachment) {
-  if (
-    attachment.originalFileName &&
-    attachment.originalFileName !== attachment.fileName
-  ) {
-    return `${attachment.originalFileName} 已转换`;
-  }
-
-  return null;
-}
-
 function isConvertedXlsxAttachment(attachment: MessageAttachment) {
   return attachment.originalMimeType === XLSX_MIME_TYPE;
 }
 
-function buildAttachmentObjectUrl(storagePath: string) {
-  return `/api/attachments/object?path=${encodeURIComponent(storagePath)}`;
+function ImagePreviewPortal({
+  attachment,
+  onClose,
+}: {
+  attachment: MessageAttachment | null;
+  onClose: () => void;
+}) {
+  const shouldReduceMotion = Boolean(useReducedMotion());
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      {attachment ? (
+        // 图片预览放到 document.body，避免被输入框或消息容器的 overflow 裁切。
+        <motion.div
+          key={attachment.id}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={getAttachmentLabel(attachment)}
+          initial={shouldReduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0 }}
+          transition={shouldReduceMotion ? { duration: 0 } : previewBackdropTransition}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            onClick={onClose}
+            aria-label="关闭图片预览"
+          />
+          <motion.div
+            className="relative flex max-h-full max-w-full flex-col gap-3"
+            initial={
+              shouldReduceMotion
+                ? false
+                : { opacity: 0, scale: 0.96, y: 12, filter: "blur(2px)" }
+            }
+            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, scale: 0.98, y: 8, filter: "blur(1px)" }
+            }
+            transition={shouldReduceMotion ? { duration: 0 } : previewPanelTransition}
+          >
+            <button
+              type="button"
+              className="absolute -top-3 -right-3 z-10 inline-flex size-9 items-center justify-center rounded-full border border-white/18 bg-slate-950/78 text-white shadow-[0_14px_32px_rgba(15,23,42,0.35)] transition-colors hover:bg-slate-900"
+              onClick={onClose}
+              aria-label="关闭图片预览"
+            >
+              <XIcon className="size-4" />
+            </button>
+            <div className="overflow-hidden rounded-[16px] border border-white/14 bg-white/8 p-2 shadow-[0_28px_90px_rgba(15,23,42,0.42)]">
+              <img
+                src={buildAttachmentObjectUrl(attachment.storagePath)}
+                alt={getAttachmentLabel(attachment)}
+                className="max-h-[calc(100dvh-8rem)] max-w-[calc(100vw-3rem)] rounded-[10px] object-contain"
+              />
+            </div>
+            <motion.div
+              className="mx-auto max-w-[min(34rem,calc(100vw-3rem))] truncate rounded-full border border-white/12 bg-slate-950/58 px-3 py-1.5 text-center text-xs text-white/82 shadow-[0_12px_30px_rgba(15,23,42,0.25)]"
+              initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : { duration: 0.16, ease: smoothEase }
+              }
+            >
+              {getAttachmentLabel(attachment)}
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body,
+  );
 }
 
 export function AttachmentPreviewList({
@@ -306,19 +346,15 @@ export function AttachmentPreviewList({
               className="flex max-w-[18rem] items-center gap-2 rounded-[10px] border border-blue-100/85 bg-white/70 px-2.5 py-2 text-xs text-slate-600"
             >
               <FileTextIcon className="size-4 shrink-0 text-sky-500" />
-              <div className="min-w-0">
-                <div className="truncate font-medium text-slate-700">
-                  {getAttachmentLabel(attachment)}
-                </div>
-                <div className="text-[0.68rem] text-slate-400">
-                  {getAttachmentDescription(attachment) ??
-                    formatFileSize(attachment.size)}
-                </div>
-                {getAttachmentDescription(attachment) ? (
-                  <div className="text-[0.68rem] text-slate-400">
-                    {formatFileSize(attachment.size)}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0 truncate font-medium text-slate-700">
+                    {getAttachmentLabel(attachment)}
                   </div>
-                ) : null}
+                  <div className="shrink-0 text-[0.68rem] text-slate-400">
+                    {formatAttachmentSize(attachment.size)}
+                  </div>
+                </div>
                 {isConvertedXlsxAttachment(attachment) ? (
                   <div className="text-[0.68rem] text-sky-600">
                     XLSX 已自动转为 CSV
@@ -340,42 +376,10 @@ export function AttachmentPreviewList({
         )}
       </div>
 
-      {previewAttachment && typeof document !== "undefined" ? createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label={getAttachmentLabel(previewAttachment)}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 cursor-zoom-out"
-            onClick={() => setPreviewAttachment(null)}
-            aria-label="关闭图片预览"
-          />
-          <div className="relative flex max-h-full max-w-full flex-col gap-3">
-            <button
-              type="button"
-              className="absolute -top-3 -right-3 z-10 inline-flex size-9 items-center justify-center rounded-full border border-white/18 bg-slate-950/78 text-white shadow-[0_14px_32px_rgba(15,23,42,0.35)] transition-colors hover:bg-slate-900"
-              onClick={() => setPreviewAttachment(null)}
-              aria-label="关闭图片预览"
-            >
-              <XIcon className="size-4" />
-            </button>
-            <div className="overflow-hidden rounded-[16px] border border-white/14 bg-white/8 p-2 shadow-[0_28px_90px_rgba(15,23,42,0.42)]">
-              <img
-                src={buildAttachmentObjectUrl(previewAttachment.storagePath)}
-                alt={getAttachmentLabel(previewAttachment)}
-                className="max-h-[calc(100dvh-8rem)] max-w-[calc(100vw-3rem)] rounded-[10px] object-contain"
-              />
-            </div>
-            <div className="mx-auto max-w-[min(34rem,calc(100vw-3rem))] truncate rounded-full border border-white/12 bg-slate-950/58 px-3 py-1.5 text-center text-xs text-white/82 shadow-[0_12px_30px_rgba(15,23,42,0.25)]">
-              {getAttachmentLabel(previewAttachment)}
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
+      <ImagePreviewPortal
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </>
   );
 }
@@ -398,7 +402,10 @@ export function AttachmentEditorDialog({
   const [urlError, setUrlError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const canUpload = !disabled && (supportsFiles || supportsImages);
-  const acceptMimeTypes = getAcceptMimeTypes({ supportsFiles, supportsImages });
+  const acceptMimeTypes = getAttachmentAcceptMimeTypes({
+    supportsFiles,
+    supportsImages,
+  });
 
   const addUrl = () => {
     const normalizedUrl = normalizeUrlCandidate(urlValue);
@@ -444,6 +451,7 @@ export function AttachmentEditorDialog({
     }
 
     try {
+      // onUploadFiles 由上层负责真正上传；弹窗只关心校验、错误展示和本地列表合并。
       const uploaded = await onUploadFiles(files);
       onAttachmentsChange((current) => [...current, ...uploaded]);
       setAttachmentError(null);
@@ -596,19 +604,15 @@ export function AttachmentEditorDialog({
                         ) : (
                           <FileTextIcon className="size-4 shrink-0 text-sky-500" />
                         )}
-                        <div className="min-w-0">
-                          <div className="truncate text-sm text-slate-700">
-                            {getAttachmentLabel(attachment)}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {getAttachmentDescription(attachment) ??
-                              formatFileSize(attachment.size)}
-                          </div>
-                          {getAttachmentDescription(attachment) ? (
-                            <div className="text-xs text-slate-400">
-                              {formatFileSize(attachment.size)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="min-w-0 truncate text-sm text-slate-700">
+                              {getAttachmentLabel(attachment)}
                             </div>
-                          ) : null}
+                            <div className="shrink-0 text-xs text-slate-400">
+                              {formatAttachmentSize(attachment.size)}
+                            </div>
+                          </div>
                           {isConvertedXlsxAttachment(attachment) ? (
                             <div className="text-xs text-sky-600">
                               XLSX 已自动转为 CSV

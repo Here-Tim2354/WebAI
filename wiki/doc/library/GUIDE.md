@@ -13,6 +13,7 @@ aliases:
 - [[library/library-footprints]]
 - [[library/shadcn-footprint]]
 - [[library/tailwindcss-footprint]]
+- [[library/overlayscrollbars-footprint]]
 
 ## 和前端文档的关系
 
@@ -22,4 +23,5 @@ aliases:
 
 - 想知道“UI 为什么看起来统一”，先看 [[library/shadcn-footprint]]
 - 想知道“为什么样式大多写在 `className` 里”，先看 [[library/tailwindcss-footprint]]
+- 想知道“为什么消息区滚动不能只读 wrapper root”，看 [[library/overlayscrollbars-footprint]]
 - 想快速了解这组笔记的组织方式，看 [[library/library-footprints]]

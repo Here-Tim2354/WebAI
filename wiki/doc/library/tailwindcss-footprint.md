@@ -6,7 +6,7 @@ aliases:
 
 # Tailwind CSS 在本项目中的痕迹
 
-本文档记录 Tailwind CSS 在当前项目里的实际作用，重点回答：
+这篇笔记整理 Tailwind CSS 在当前项目里的实际作用，重点回答：
 
 - 为什么项目里大多数样式都写在 `className` 中
 - 为什么全局 CSS 没有膨胀成一个超大样式文件

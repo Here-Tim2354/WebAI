@@ -1,14 +1,13 @@
-# 已验证关系模式设计
+# 核心关系模式设计
 
 ## 文档定位
 
-本文只记录当前已经验证成立的关系模式。
+这篇笔记只记录数据库主线中已经纳入系统边界、并能支撑课程设计说明的关系模式。
 
-这里的“已验证”指：
+这里的“核心”指：
 
-- 已在 `supabase/migrations/` 中落地，或
-- 已被当前代码查询路径和接口契约实际使用，或
-- 已被 `phase_overview.md` 当前阶段目标明确纳入，并与实现保持一致
+- 对应 migration、查询路径和接口契约能互相对上，或
+- 已被 `phase_overview.md` 的阶段目标明确纳入，并与系统使用方式保持一致
 
 需求基线：
 
@@ -25,9 +24,9 @@
 
 ---
 
-## 一、当前已验证关系模式总览
+## 一、核心关系模式总览
 
-当前已验证并纳入数据库主线或系统配置层的表为：
+纳入数据库主线或系统配置层的表为：
 
 - `auth.users`
 - `profiles`
@@ -44,7 +43,7 @@
 - `ai_models` 作为模型注册表父表承接通用字段
 - `openai_compatible_models` 与 `gemini_models` 作为 provider 子表承接实现差异
 
-当前阶段判断：
+阶段位置：
 
 - 数据库课程设计主线仍是“用户进入系统 -> 创建或打开会话 -> 发送消息 -> 恢复历史会话”
 - 模型注册表属于 `Phase 4` 已进入实现的系统配置能力
@@ -97,7 +96,11 @@
 | `user_id` | `uuid` | 否 | 否 | `auth.users.id` | 无 | 所属用户 |
 | `title` | `varchar(100)` | 否 | 否 | 否 | 无 | 会话标题 |
 | `system_prompt` | `text` | 是 | 否 | 否 | 无 | 会话级提示词 |
+| `model_id` | `uuid` | 是 | 否 | `ai_models.id` | 无 | 当前会话模型 |
+| `web_search_enabled` | `boolean` | 否 | 否 | 否 | `true` | 会话级联网开关 |
+| `thinking_level` | `text` | 否 | 否 | 否 | `minimal` | 会话级思考档位，取值为 `minimal / low / medium / high` |
 | `status` | `conversation_status` | 否 | 否 | 否 | `active` | 会话状态 |
+| `archived_at` | `timestamptz` | 是 | 否 | 否 | 无 | 归档时间 |
 | `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 创建时间 |
 | `updated_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 更新时间 |
 
@@ -121,7 +124,7 @@
 - 英文表名：`ai_models`
 - 作用：保存跨 provider 通用的模型元数据，并作为统一 `modelId` 的来源
 
-当前已验证字段以当前代码查询路径为准：
+字段以查询路径和接口契约为准：
 
 | 字段名 | 类型 | 可空 | 说明 |
 | --- | --- | --- | --- |
@@ -147,7 +150,7 @@
 - 英文表名：`openai_compatible_models`
 - 作用：保存采用 OpenAI 兼容接口的 provider 专属字段与能力位
 
-当前已验证字段以代码查询路径为准：
+字段以查询路径和接口契约为准：
 
 | 字段名 | 类型 | 可空 | 说明 |
 | --- | --- | --- | --- |
@@ -168,7 +171,7 @@
 
 说明：
 
-- 当前实现目标已经切换到最终态父子表结构
+- 模型注册表采用父子表结构
 - `base_url` 仍由该子表提供给 `OpenAI compatible` 调用层
 - 通用展示字段、启用状态与默认模型策略统一放在父表 `ai_models`
 
@@ -178,7 +181,7 @@
 - 英文表名：`gemini_models`
 - 作用：保存 Gemini provider 专属字段与能力位
 
-当前已验证字段以代码查询路径为准：
+字段以查询路径和接口契约为准：
 
 | 字段名 | 类型 | 可空 | 说明 |
 | --- | --- | --- | --- |
@@ -200,7 +203,7 @@
 
 说明：
 
-- 当前实现目标已经切换到最终态父子表结构
+- 模型注册表采用父子表结构
 - `url_context`、`code_execution` 等能力位仍由该子表提供给运行时模型
 - 通用展示字段、启用状态与默认模型策略统一放在父表 `ai_models`
 
@@ -226,7 +229,7 @@
 - `openai_compatible_models.ai_model_id -> ai_models.id`
 - `gemini_models.ai_model_id -> ai_models.id`
 
-### 当前已验证约束
+### 核心约束
 
 - `ai_models.provider` 取值为 `openai_compatible` / `gemini`
 - `conversations.status` 取值为 `active` / `archived`
@@ -278,9 +281,9 @@
 
 ---
 
-## 六、当前边界总结
+## 六、边界总结
 
-当前数据库设计必须区分两层：
+数据库设计需要区分两层：
 
 - 数据库主线：
   - `auth.users`
@@ -292,7 +295,7 @@
   - `openai_compatible_models`
   - `gemini_models`
 
-不再写入本文的扩展实体：
+这篇笔记不混入的扩展实体：
 
 - `favorites`
 - `search_records`
@@ -303,4 +306,4 @@
 
 ## 七、一句话总结
 
-当前已验证关系模式已经足以支撑数据库课程设计主线和“父表 + provider 子表”的第一版模型注册表；后续扩展能力应继续通过扩展层文档推进，而不是直接混入已验证关系模式。
+这组核心关系模式足以支撑数据库课程设计主线和“父表 + provider 子表”的第一版模型注册表；后续扩展能力继续通过扩展层笔记推进，避免和数据库主线混写。

@@ -1,8 +1,8 @@
-# 已验证范围说明
+# 数据库范围说明
 
-本文用于快速判断某项数据库设计目前处于什么状态。
+这篇笔记帮助我们快速判断某项数据库设计处于什么状态。
 
-## 当前已验证
+## 数据库主线
 
 - 会话 CRUD
 - 消息持久化与恢复
@@ -11,10 +11,10 @@
 - `openai_compatible_models` / `gemini_models` 作为 provider 子表
 - 前端模型选择读取已启用模型列表
 - 服务端按 `modelId` 分发到对应 provider
-- 远端 Supabase 已完成模型注册表父子表最终态重建
-- 当前远端首个已验证 seed 为 `Gemini 3 Flash Preview`
+- Supabase 环境采用模型注册表父子表结构
+- 首个模型 seed 为 `Gemini 3 Flash Preview`
 
-## 当前未纳入已验证
+## 暂不进入数据库主线
 
 - 收藏表与收藏链路
 - 搜索记录表与搜索页面

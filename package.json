@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start --port 4000",
     "lint": "eslint",
+    "check:deadcode": "knip --include files,dependencies,unlisted",
+    "check:deadcode:exports": "knip --exports",
     "typecheck": "tsc --noEmit",
     "check:phase1": "node scripts/phase1-acceptance.mjs"
   },
@@ -31,7 +33,6 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "read-excel-file": "^9.0.6",
-    "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-cjk-friendly": "^2.0.1",
     "remark-cjk-friendly-gfm-strikethrough": "^2.0.1",
@@ -44,12 +45,13 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.1.6",
+    "knip": "^6.8.0",
+    "postcss": "8.5.12",
     "typescript": "^5.9.3"
   },
   "overrides": {

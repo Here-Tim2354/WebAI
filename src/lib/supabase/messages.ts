@@ -74,6 +74,7 @@ export async function listConversationMessagesThrough(
     throw new Error("消息不存在，或你没有访问权限。");
   }
 
+  // 分支会话只复制目标消息之前的线性上下文，不在原会话里维护复杂树结构。
   return {
     targetMessage: messages[targetMessageIndex],
     messages: messages.slice(0, targetMessageIndex + 1),
@@ -139,6 +140,7 @@ export async function cloneConversationMessages(
     return [];
   }
 
+  // 批量复制时显式写入递增 created_at，避免多条消息同一时间戳导致展示顺序不稳定。
   const firstCreatedAt = Date.now();
   const { data, error } = await supabase
     .from("messages")
@@ -175,6 +177,7 @@ export async function updateConversationMessage(
   messageId: string,
   updates: UpdateConversationMessageInput,
 ) {
+  // updates 是局部更新；只写入显式传入的字段，避免 undefined 把现有内容擦掉。
   const nextMessageUpdate: {
     content?: string;
     status?: ChatMessage["status"];
@@ -235,6 +238,8 @@ export async function editUserMessageAndDeleteFollowing(
   content: string,
   metadata: ChatMessageMetadata,
 ) {
+  // 这条 RPC 把“更新 user 消息 metadata/content + 删除后续消息”放进数据库事务。
+  // 前端编辑语义依赖这个原子性，否则可能出现消息已改但旧 assistant 仍残留。
   const { error } = await supabase.rpc(
     "edit_user_message_metadata_and_delete_following",
     {

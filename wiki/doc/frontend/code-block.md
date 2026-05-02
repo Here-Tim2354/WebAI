@@ -6,7 +6,7 @@ aliases:
 
 # CodeBlock 说明
 
-本文档用于理解 `CodeBlock` 如何渲染高亮代码块，以及它当前的复制按钮实现。
+这篇笔记帮助我们理解 `CodeBlock` 如何渲染高亮代码块，以及它当前的复制按钮实现。
 
 代码入口：
 - `src/components/chat/code-block.tsx`
@@ -29,7 +29,7 @@ aliases:
 
 ## 2. 高亮策略
 
-当前实现使用：
+这里使用：
 
 - `highlight.js`
 
@@ -42,7 +42,7 @@ aliases:
 
 ---
 
-## 3. 复制按钮当前实现
+## 3. 复制按钮运行方式
 
 复制按钮当前已经改成图标按钮：
 

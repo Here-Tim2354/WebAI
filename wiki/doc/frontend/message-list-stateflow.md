@@ -5,7 +5,7 @@ aliases:
 
 # MessageList 前端状态流说明
 
-本文档用于理解 `MessageList` 的前端运行机制，而不是页面展示结构。
+这篇笔记帮助我们理解 `MessageList` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
 - `src/components/chat/message-list.tsx`
@@ -35,6 +35,9 @@ aliases:
 - `scrollContainerRef`
 - `loadingHint`
 - `onScroll`
+- `onWheelCapture`
+- `onTouchStartCapture`
+- `onTouchMoveCapture`
 - `onJumpToLatest`
 - `showJumpToLatest`
 
@@ -44,6 +47,7 @@ aliases:
 - 滚动策略也由父层 hook 协调
 - `MessageList` 主要负责按这些输入做展示
 - 单条消息的细节状态并不在这里继续展开
+- wheel / touch 的捕获阶段事件也只是向外传递，避免展示层自己维护滚动判断
 
 ---
 
@@ -93,7 +97,7 @@ const [typedTitle, setTypedTitle] = useState("");
 [emptyTitle, messages.length]
 ```
 
-当前实现：
+运行方式：
 
 1. 如果当前已有消息，则直接返回，不启动动画
 2. 如果没有消息：
@@ -118,6 +122,7 @@ const [typedTitle, setTypedTitle] = useState("");
 
 - `MessageList` 只接收 `scrollContainerRef`
 - `MessageList` 只接收 `onScroll`
+- `MessageList` 只接收 `onWheelCapture / onTouchStartCapture / onTouchMoveCapture`
 - `MessageList` 只接收 `showJumpToLatest`
 - `MessageList` 只接收 `onJumpToLatest`
 
@@ -130,6 +135,7 @@ const [typedTitle, setTypedTitle] = useState("");
 - 展示层更纯粹
 - 滚动逻辑可以被父层统一协调
 - `MessageList` 不需要知道“为什么显示回到底部按钮”
+- 用户上移时可以在捕获阶段立刻通知父层，而不是等 `scroll` 事件晚一步再判断
 
 ---
 
@@ -189,8 +195,24 @@ const [typedTitle, setTypedTitle] = useState("");
 - 展示在 `MessageList`
 - 逻辑归 `useMessageScroll`
 
+当前按钮外观是白色圆形向下箭头，语义是“跳转到底部”，不再显示“最新”文字。
+
+## 9. 流式输出期间的用户上移
+
+流式输出时，用户如果尝试往上看旧内容，页面不应该继续抢滚动焦点。
+
+状态流是：
+
+1. `MessageList` 在 `ScrollArea` 上接收 wheel / touch 捕获阶段事件
+2. 捕获事件立刻交给 `useMessageScroll`
+3. `useMessageScroll` 标记用户已经主动上移，并暂停自动吸底
+4. 后续消息继续流式更新时，只显示回到底部按钮，不再强行滚到最下方
+5. 用户点击向下箭头后，再恢复自动吸底
+
+这个判断依赖 `ScrollArea` 暴露的真实 OverlayScrollbars viewport。若 ref 指向 wrapper root，父层会读到错误的 `scrollTop / scrollHeight`，从而误判用户是否接近底部。
+
 ---
 
-## 9. 一句话总结
+## 10. 一句话总结
 
 `MessageList` 的状态流仍然很轻：它自己只管理空状态标题动画，消息与滚动的主控制权留在父层和专门的滚动 hook 中，而单条消息的 reveal、Markdown 和代码块复制体验则继续下沉到消息子组件链路。

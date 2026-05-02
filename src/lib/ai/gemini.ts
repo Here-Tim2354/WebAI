@@ -1,9 +1,15 @@
-import { Content, GoogleGenAI } from "@google/genai";
+import {
+  Content,
+  GoogleGenAI,
+  ThinkingLevel as GeminiThinkingLevel,
+} from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { downloadAttachmentBuffer } from "@/lib/attachments";
 import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
 import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
+import { ThinkingLevel } from "@/lib/schemas/thinking";
 import { getSystemInstruction } from "./system-instruction";
+import { AssistantStreamDelta } from "./types";
 
 type GenerateWithGeminiOptions = {
   conversationSystemPrompt?: string | null;
@@ -11,8 +17,30 @@ type GenerateWithGeminiOptions = {
   urls?: string[];
   supabase?: SupabaseClient;
   modelName?: string;
+  thinkingLevel?: ThinkingLevel;
   abortSignal?: AbortSignal;
 };
+
+type GeminiStreamChunkPart = {
+  text?: string;
+  thought?: boolean;
+};
+
+type GeminiStreamChunk = {
+  text?: string;
+  candidates?: Array<{
+    content?: {
+      parts?: GeminiStreamChunkPart[];
+    };
+  }>;
+};
+
+const geminiThinkingLevelMap = {
+  minimal: GeminiThinkingLevel.MINIMAL,
+  low: GeminiThinkingLevel.LOW,
+  medium: GeminiThinkingLevel.MEDIUM,
+  high: GeminiThinkingLevel.HIGH,
+} as const satisfies Record<ThinkingLevel, GeminiThinkingLevel>;
 
 function normalizeUrls(urls?: string[]) {
   if (!urls) {
@@ -34,6 +62,8 @@ function withUrlContextPrompt(messages: ChatMessage[], urls: string[]) {
   }
 
   const nextMessages = [...messages];
+  // URL Context 是请求级能力，不直接改数据库里的消息正文。
+  // 这里只在发给 Gemini 前临时增强最后一条用户消息。
   const lastUserMessageIndex = [...nextMessages].findLastIndex(
     (message) => message.role === "user" && message.content.trim().length > 0,
   );
@@ -66,6 +96,7 @@ async function toGeminiAttachmentParts(
   const parts = [];
 
   for (const attachment of attachments) {
+    // 附件保存在私有 Storage 中，模型调用前才下载成 Gemini 可消费的 part。
     const buffer = await downloadAttachmentBuffer(supabase, attachment);
 
     if (
@@ -76,6 +107,7 @@ async function toGeminiAttachmentParts(
         attachment.mimeType === "text/csv"
       )
     ) {
+      // 文本类文件直接展开成 text part，比 inlineData 更利于模型读取具体内容。
       parts.push({
         text: [
           `附件：${attachment.fileName}`,
@@ -85,6 +117,7 @@ async function toGeminiAttachmentParts(
       continue;
     }
 
+    // 图片和 PDF 继续用 inlineData。前置 text part 只负责告诉模型附件名。
     parts.push({
       text: `附件：${attachment.fileName}`,
     });
@@ -112,6 +145,8 @@ async function toGeminiContents(
           (message.metadata.attachments?.length ?? 0) > 0
         ),
     );
+  // Gemini 上下文里只给最新用户消息附加二进制/文本附件。
+  // 历史 user 消息仍保留正文，避免每次重新生成都重复下载和传输所有旧附件。
   const latestUserMessageId = [...normalizedMessages]
     .reverse()
     .find((message) => message.role === "user")?.id;
@@ -149,7 +184,7 @@ async function toGeminiContents(
 export async function* streamWithGemini(
   messages: ChatMessage[],
   options?: GenerateWithGeminiOptions,
-) {
+): AsyncGenerator<AssistantStreamDelta> {
   const env = getServerEnv();
   const apiKey = requireServerEnvValue(
     env.GEMINI_API_KEY,
@@ -197,13 +232,70 @@ export async function* streamWithGemini(
             ],
           }
         : {}),
+      ...(options?.thinkingLevel
+        ? {
+            thinkingConfig: {
+              // Gemini 3 Flash 不支持彻底关闭 thinking；minimal 是最低档。
+              thinkingLevel: geminiThinkingLevelMap[options.thinkingLevel],
+              includeThoughts: true,
+            },
+          }
+        : {}),
       abortSignal: options?.abortSignal,
     },
   });
   let aggregatedText = "";
+  let aggregatedThought = "";
 
   for await (const chunk of response) {
-    const chunkText = chunk.text ?? "";
+    const normalizedChunk = chunk as GeminiStreamChunk;
+    const parts = normalizedChunk.candidates?.[0]?.content?.parts ?? [];
+    let hasTextPart = false;
+
+    for (const part of parts) {
+      if (!part.text) {
+        continue;
+      }
+
+      hasTextPart = true;
+
+      if (part.thought) {
+        const delta = part.text.startsWith(aggregatedThought)
+          ? part.text.slice(aggregatedThought.length)
+          : part.text;
+
+        if (!delta) {
+          continue;
+        }
+
+        aggregatedThought += delta;
+        yield {
+          type: "thought",
+          delta,
+        };
+        continue;
+      }
+
+      const delta = part.text.startsWith(aggregatedText)
+        ? part.text.slice(aggregatedText.length)
+        : part.text;
+
+      if (!delta) {
+        continue;
+      }
+
+      aggregatedText += delta;
+      yield {
+        type: "text",
+        delta,
+      };
+    }
+
+    if (hasTextPart) {
+      continue;
+    }
+
+    const chunkText = normalizedChunk.text ?? "";
 
     if (!chunkText) {
       continue;
@@ -213,12 +305,17 @@ export async function* streamWithGemini(
       ? chunkText.slice(aggregatedText.length)
       : chunkText;
 
+    // 不同 Gemini 模型可能返回“累计文本”或“增量文本”。
+    // 上层只接受 delta，这里把两种格式统一成新增片段。
     if (!delta) {
       continue;
     }
 
     aggregatedText += delta;
-    yield delta;
+    yield {
+      type: "text",
+      delta,
+    };
   }
 
   if (!aggregatedText.trim()) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAssistantStreamResponse } from "@/lib/ai/assistant-stream-response";
+import { assertAttachmentInputAllowed } from "@/lib/attachment-capabilities";
 import { ServerEnvError } from "@/lib/env/server";
 import {
   chatMessageMetadataSchema,
@@ -17,7 +18,6 @@ import {
   ModelRegistryError,
 } from "@/lib/supabase/model-registry";
 import {
-  assertAttachmentsOwnedByUser,
   cleanupUnreferencedAttachments,
   getAttachmentPaths,
   normalizeMessageAttachments,
@@ -152,7 +152,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, content, modelId, urls, attachments } = parsed.data;
+    const { conversationId, content, modelId, thinkingLevel, urls, attachments } =
+      parsed.data;
     let conversation = await getConversationById(
       supabase,
       user.id,
@@ -182,9 +183,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (modelId && conversation.modelId !== modelId) {
+    if (
+      (modelId && conversation.modelId !== modelId) ||
+      (
+        thinkingLevel !== undefined &&
+        conversation.thinkingLevel !== thinkingLevel
+      )
+    ) {
       conversation = await updateConversation(supabase, user.id, conversationId, {
         modelId,
+        thinkingLevel,
       });
     }
 
@@ -201,31 +209,19 @@ export async function PATCH(request: Request, context: RouteContext) {
               ? { attachments: normalizeMessageAttachments(attachments) }
               : {}),
           };
+    // modelId 可能在编辑时一并切换，附件能力校验必须基于最终会话模型。
     const effectiveModelId = modelId ?? conversation.modelId;
     const selectedModel = effectiveModelId
       ? await getEnabledModelById(supabase, effectiveModelId)
       : null;
 
-    if (nextMetadata.attachments && nextMetadata.attachments.length > 0) {
-      assertAttachmentsOwnedByUser(user.id, nextMetadata.attachments);
-    }
-
-    if (nextMetadata.attachments && nextMetadata.attachments.length > 0 && selectedModel) {
-      const hasImageAttachment = nextMetadata.attachments.some(
-        (attachment) => attachment.kind === "image",
-      );
-      const hasFileAttachment = nextMetadata.attachments.some(
-        (attachment) => attachment.kind === "file",
-      );
-
-      if (hasImageAttachment && !selectedModel.capabilities.image) {
-        throw new ModelRegistryError("当前模型不支持图片输入。");
-      }
-
-      if (hasFileAttachment && !selectedModel.capabilities.files) {
-        throw new ModelRegistryError("当前模型不支持文件输入。");
-      }
-    }
+    // 编辑带附件消息时，前端传回的是 metadata 引用。
+    // 服务端必须重新确认路径归属和模型能力，不能只信任已上传成功。
+    assertAttachmentInputAllowed({
+      userId: user.id,
+      attachments: nextMetadata.attachments ?? [],
+      model: selectedModel,
+    });
 
     if (targetMessageIndex === -1) {
       throw new Error("消息不存在，或你没有访问权限。");
@@ -244,6 +240,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         nextMetadata,
       );
     } catch {
+      // RPC 是首选原子路径；fallback 保证远端函数异常时仍能完成“更新目标消息 + 删除后续”。
+      // fallback 不是严格事务，但能避免整个编辑链路被单个 RPC 问题卡死。
       await updateConversationMessage(
         supabase,
         conversationId,
@@ -287,6 +285,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       conversation,
       messagesForModel,
       model: selectedModel,
+      thinkingLevel: conversation.thinkingLevel,
       urls: nextMetadata.urls,
       attachments: nextMetadata.attachments,
       requestSignal: request.signal,

@@ -118,7 +118,6 @@ export function ChatShell({
     isUrlContextPanelOpen,
     isSubmitting,
     setUrlContextInputValue,
-    setUrlContextUrls,
     setDraftAttachments,
     getMessages,
     handleSubmit,
@@ -142,6 +141,7 @@ export function ChatShell({
     selectedModel,
     currentSystemPrompt,
     currentWebSearchEnabled,
+    currentThinkingLevel,
     groupedModels,
     workspaceError,
     isCreatingConversation,
@@ -161,6 +161,7 @@ export function ChatShell({
     handleRestoreConversation,
     handleBranchConversation,
     handleSelectModel,
+    handleSelectThinkingLevel,
     handleToggleFavoriteConversation,
     loadArchivedConversations,
     loadFavoriteConversations,
@@ -181,6 +182,9 @@ export function ChatShell({
     scrollContainerRef,
     showJumpToLatest,
     handleScroll,
+    handleWheelCapture,
+    handleTouchStartCapture,
+    handleTouchMoveCapture,
     scrollToLatest,
   } = useMessageScroll({ messages });
   const hasMessages = messages.length > 0;
@@ -275,6 +279,7 @@ export function ChatShell({
       content,
       attachments,
       selectedModelId,
+      thinkingLevel: currentThinkingLevel,
       // handleSubmit 只知道聊天接口返回了最新会话，
       // 具体怎么把它并回列表由 ChatShell 决定。
       onConversationSynced(conversation) {
@@ -283,6 +288,7 @@ export function ChatShell({
     });
   }, [
     ensureConversationId,
+    currentThinkingLevel,
     handleSubmit,
     selectedModelId,
     setWorkspaceError,
@@ -328,6 +334,7 @@ export function ChatShell({
         urls: update.urls,
         attachments: update.attachments,
         selectedModelId,
+        thinkingLevel: currentThinkingLevel,
         onConversationSynced(conversation) {
           upsertConversation(conversation);
         },
@@ -337,6 +344,7 @@ export function ChatShell({
     }
   }, [
     activeConversationId,
+    currentThinkingLevel,
     editMessageAndRegenerate,
     selectedModelId,
     setWorkspaceError,
@@ -394,6 +402,7 @@ export function ChatShell({
         conversationId: activeConversationId,
         messageId: message.id,
         selectedModelId,
+        thinkingLevel: currentThinkingLevel,
         webSearchEnabled: currentWebSearchEnabled,
         urls: urlContextUrls,
         onConversationSynced(conversation) {
@@ -405,6 +414,7 @@ export function ChatShell({
     }
   }, [
     activeConversationId,
+    currentThinkingLevel,
     currentWebSearchEnabled,
     regenerateAssistantMessage,
     selectedModelId,
@@ -654,6 +664,9 @@ export function ChatShell({
               onBranchFromMessage={handleBranchFromMessage}
               onRegenerateMessage={handleRegenerateMessage}
               onScroll={handleScroll}
+              onWheelCapture={handleWheelCapture}
+              onTouchStartCapture={handleTouchStartCapture}
+              onTouchMoveCapture={handleTouchMoveCapture}
               showJumpToLatest={showJumpToLatest}
               onJumpToLatest={handleJumpToLatest}
             />
@@ -672,10 +685,12 @@ export function ChatShell({
                   supportsUrlContext={selectedModel?.capabilities.urlContext ?? false}
                   supportsImages={selectedModel?.capabilities.image ?? false}
                   supportsFiles={selectedModel?.capabilities.files ?? false}
+                  supportsReasoning={selectedModel?.capabilities.reasoning ?? false}
+                  thinkingLevel={currentThinkingLevel}
                   isUploadingAttachments={isUploadingAttachments}
                   onToggleWebSearch={toggleWebSearchEnabled}
+                  onThinkingLevelChange={handleSelectThinkingLevel}
                   onUrlContextInputChange={setUrlContextInputValue}
-                  onUrlContextUrlsChange={setUrlContextUrls}
                   onAttachmentsChange={setDraftAttachments}
                   onToggleUrlContextPanel={toggleUrlContextPanel}
                   onAddUrlContextUrl={addUrlContextUrl}
