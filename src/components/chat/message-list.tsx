@@ -124,81 +124,86 @@ function MessageListComponent({
   const latestAssistantMessageId = getLatestAssistantMessageId(messages);
 
   return (
-    <ScrollArea
-      ref={scrollContainerRef}
-      className="relative flex-1 px-2 sm:px-3"
-      onScroll={onScroll}
-      onWheelCapture={onWheelCapture}
-      onTouchStartCapture={onTouchStartCapture}
-      onTouchMoveCapture={onTouchMoveCapture}
-    >
-      {messages.length === 0 ? (
-        <motion.div
-          className="flex min-h-full justify-center px-2 pt-[8vh] pb-10 sm:pt-[10vh]"
-          initial={false}
-        >
-          <div className="w-full max-w-4xl px-2">
-            <div className="mx-auto max-w-2xl text-center">
-              <h1 className="text-pretty text-[2.8rem] font-semibold tracking-[0.05em] text-foreground [font-family:'Source_Han_Serif_SC','Noto_Serif_SC','Songti_SC','STSong',serif] sm:text-[3.75rem]">
-                {typedTitle}
-                {showTypingCursor ? (
-                  <motion.span
-                    className="ml-[0.2em] inline-block text-foreground/70"
-                    animate={{ opacity: [0.28, 1, 0.28] }}
-                    transition={{
-                      duration: 1.25,
-                      repeat: Infinity,
-                      ease: smoothEase,
-                    }}
-                  >
-                    _
-                  </motion.span>
+    <div className="relative min-h-0 flex-1">
+      <ScrollArea
+        ref={scrollContainerRef}
+        className="h-full px-2 sm:px-3"
+        onScroll={onScroll}
+        onWheelCapture={onWheelCapture}
+        onTouchStartCapture={onTouchStartCapture}
+        onTouchMoveCapture={onTouchMoveCapture}
+      >
+        {messages.length === 0 ? (
+          <motion.div
+            className="flex min-h-full justify-center px-2 pt-[8vh] pb-10 sm:pt-[10vh]"
+            initial={false}
+          >
+            <div className="w-full max-w-4xl px-2">
+              <div className="mx-auto max-w-2xl text-center">
+                <h1 className="text-pretty text-[2.8rem] font-semibold tracking-[0.05em] text-foreground [font-family:'Source_Han_Serif_SC','Noto_Serif_SC','Songti_SC','STSong',serif] sm:text-[3.75rem]">
+                  {typedTitle}
+                  {showTypingCursor ? (
+                    <motion.span
+                      className="ml-[0.2em] inline-block text-foreground/70"
+                      animate={{ opacity: [0.28, 1, 0.28] }}
+                      transition={{
+                        duration: 1.25,
+                        repeat: Infinity,
+                        ease: smoothEase,
+                      }}
+                    >
+                      _
+                    </motion.span>
+                  ) : null}
+                </h1>
+                {loadingHint ? (
+                  <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground/75">
+                    <LoaderCircleIcon className="size-3.5 animate-spin" />
+                    {loadingHint}
+                  </p>
                 ) : null}
-              </h1>
-              {loadingHint ? (
-                <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground/75">
-                  <LoaderCircleIcon className="size-3.5 animate-spin" />
-                  {loadingHint}
-                </p>
-              ) : null}
+              </div>
             </div>
+          </motion.div>
+        ) : (
+          <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-7 px-1 pt-8 pb-10 sm:px-3 sm:pt-10 sm:pb-12">
+            {messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                actionsDisabled={actionsDisabled}
+                canRegenerate={message.id === latestAssistantMessageId}
+                supportsImages={supportsImages}
+                supportsFiles={supportsFiles}
+                isUploadingAttachments={isUploadingAttachments}
+                onCopy={onCopyMessage}
+                onEdit={onEditMessage}
+                onUploadAttachments={onUploadAttachments}
+                onBranch={onBranchFromMessage}
+                onRegenerate={onRegenerateMessage}
+              />
+            ))}
+            <div ref={messageEndRef} />
           </div>
-        </motion.div>
-      ) : (
-        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-7 px-1 pt-8 pb-10 sm:px-3 sm:pt-10 sm:pb-12">
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              actionsDisabled={actionsDisabled}
-              canRegenerate={message.id === latestAssistantMessageId}
-              supportsImages={supportsImages}
-              supportsFiles={supportsFiles}
-              isUploadingAttachments={isUploadingAttachments}
-              onCopy={onCopyMessage}
-              onEdit={onEditMessage}
-              onUploadAttachments={onUploadAttachments}
-              onBranch={onBranchFromMessage}
-              onRegenerate={onRegenerateMessage}
-            />
-          ))}
-          <div ref={messageEndRef} />
-          {showJumpToLatest ? (
-            <motion.button
-              className="sticky bottom-5 z-20 mx-auto inline-flex size-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/96 text-slate-600 shadow-[0_16px_34px_rgba(35,55,92,0.16)] backdrop-blur-md transition-colors hover:bg-white hover:text-slate-900"
-              type="button"
-              onClick={onJumpToLatest}
-              aria-label="跳转到底部"
-              initial={{ opacity: 0, y: 8, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.18, ease: smoothEase }}
-            >
-              <ArrowDownIcon className="size-4" />
-            </motion.button>
-          ) : null}
+        )}
+      </ScrollArea>
+
+      {showJumpToLatest ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center">
+          <motion.button
+            className="pointer-events-auto inline-flex size-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/96 text-slate-600 shadow-[0_16px_34px_rgba(35,55,92,0.16)] backdrop-blur-md transition-colors hover:bg-white hover:text-slate-900"
+            type="button"
+            onClick={onJumpToLatest}
+            aria-label="跳转到底部"
+            initial={{ opacity: 0, y: 8, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.18, ease: smoothEase }}
+          >
+            <ArrowDownIcon className="size-4" />
+          </motion.button>
         </div>
-      )}
-    </ScrollArea>
+      ) : null}
+    </div>
   );
 }
 

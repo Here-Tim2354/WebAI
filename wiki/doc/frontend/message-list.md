@@ -45,18 +45,22 @@ aliases:
 
 ## 2. 顶层结构
 
-组件最外层是一个滚动容器：
+组件最外层是一层相对定位容器，内部放置滚动区和悬浮按钮：
 
 ```tsx
-<ScrollArea
-  ref={scrollContainerRef}
-  onScroll={onScroll}
-  onWheelCapture={onWheelCapture}
-  onTouchStartCapture={onTouchStartCapture}
-  onTouchMoveCapture={onTouchMoveCapture}
->
-  {messages.length === 0 ? 空状态 : 消息列表}
-</ScrollArea>
+<div className="relative min-h-0 flex-1">
+  <ScrollArea
+    ref={scrollContainerRef}
+    onScroll={onScroll}
+    onWheelCapture={onWheelCapture}
+    onTouchStartCapture={onTouchStartCapture}
+    onTouchMoveCapture={onTouchMoveCapture}
+  >
+    {messages.length === 0 ? 空状态 : 消息列表}
+  </ScrollArea>
+
+  {showJumpToLatest ? 悬浮向下箭头 : null}
+</div>
 ```
 
 这说明它最核心的职责有两个：
@@ -64,6 +68,7 @@ aliases:
 - 承载滚动
 - 在空状态和消息流之间切换
 - 把滚轮和触摸意图向父层滚动 hook 透传
+- 在滚动内容外侧放置回到底部按钮，避免按钮出现或消失改变消息流高度
 
 ---
 
@@ -98,15 +103,15 @@ messages.length === 0
     <MessageBubble key={message.id} message={message} />
   ))}
   <div ref={messageEndRef} />
-  {showJumpToLatest ? <button aria-label="跳转到底部">向下箭头</button> : null}
 </div>
 ```
 
-也就是说，消息流区域由三块组成：
+也就是说，消息流区域由两块组成：
 
 - 消息列表
 - 消息末尾锚点
-- 回到底部圆形箭头按钮
+
+回到底部圆形箭头按钮不在消息流内部，而是由外层相对定位容器作为悬浮层展示。
 
 ---
 
@@ -195,6 +200,8 @@ MessageList
 
 用户是否已经上移、是否应暂停流式输出期间的自动吸底，由父层的 `useMessageScroll` 决定。
 
+按钮使用绝对定位悬浮在滚动区域下方，不参与 `ScrollArea` 内部内容排版。这样按钮出现或消失时，消息流的 `scrollHeight` 不会变化，拖动 OverlayScrollbars 滚动条到底部时也不会因为内容高度反复变化而造成上下闪烁。
+
 ---
 
 ## 9. 页面结构树
@@ -203,17 +210,18 @@ MessageList
 
 ```tsx
 MessageList
-├─ ScrollArea 滚动容器
-│  ├─ 空状态欢迎页
-│  │  ├─ 标题
-│  │  ├─ 光标动画
-│  │  └─ loadingHint
-│  └─ 消息流
-│     ├─ MessageBubble 列表
-│     │  └─ MarkdownMessage
-│     │     └─ CodeBlock
-│     ├─ messageEndRef 锚点
-│     └─ “跳转到底部”箭头按钮
+├─ 外层相对定位容器
+│  ├─ ScrollArea 滚动容器
+│  │  ├─ 空状态欢迎页
+│  │  │  ├─ 标题
+│  │  │  ├─ 光标动画
+│  │  │  └─ loadingHint
+│  │  └─ 消息流
+│  │     ├─ MessageBubble 列表
+│  │     │  └─ MarkdownMessage
+│  │     │     └─ CodeBlock
+│  │     └─ messageEndRef 锚点
+│  └─ “跳转到底部”悬浮箭头按钮
 ```
 
 ---

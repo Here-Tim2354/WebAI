@@ -26,10 +26,7 @@ import {
   AttachmentEditorDialog,
   AttachmentPreviewList,
 } from "./message-attachments";
-import {
-  areUrlListsEqual,
-  MessageUrlContextSummary,
-} from "./message-url-context";
+import { MessageUrlContextSummary } from "./message-url-context";
 import { softSpring, smoothEase } from "./motion-presets";
 
 export type EditMessageUpdate = {
@@ -364,7 +361,13 @@ function ThinkingSummary({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const title =
-    thinking.status === "streaming" || isStreaming ? "思考中" : "已思考";
+    thinking.status === "cancelled"
+      ? "已停止"
+      : thinking.status === "error"
+        ? "思考失败"
+        : thinking.status === "streaming" || isStreaming
+          ? "思考中"
+          : "已思考";
 
   return (
     <motion.div
@@ -532,16 +535,6 @@ export function MessageBubble({
       !canEdit ||
       (trimmedValue.length === 0 && editAttachments.length === 0)
     ) {
-      return;
-    }
-
-    const contentChanged = trimmedValue !== message.content;
-    const urlsChanged = !areUrlListsEqual(nextUrls, metadataUrls);
-    const attachmentsChanged =
-      JSON.stringify(editAttachments) !== JSON.stringify(metadataAttachments);
-
-    if (!contentChanged && !urlsChanged && !attachmentsChanged) {
-      setIsEditing(false);
       return;
     }
 

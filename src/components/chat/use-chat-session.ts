@@ -110,6 +110,26 @@ function mergeAssistantMessageParts(
   };
 }
 
+function createCancelledAssistantMessage(message: ChatMessage) {
+  return createChatMessage({
+    id: message.id,
+    role: "assistant",
+    content: message.content,
+    status: "cancelled",
+    metadata: {
+      ...message.metadata,
+      ...(message.metadata.thinking
+        ? {
+            thinking: {
+              ...message.metadata.thinking,
+              status: "cancelled" as const,
+            },
+          }
+        : {}),
+    },
+  });
+}
+
 type SubmitOptions = {
   conversationId: string;
   content: string;
@@ -250,10 +270,6 @@ export function useChatSession() {
     currentAssistantMessageId: string,
     latestAssistantMessage: ChatMessage,
   ) => {
-    const hasVisibleAssistantContent =
-      latestAssistantMessage.content.trim().length > 0 ||
-      Boolean(latestAssistantMessage.metadata.thinking?.content?.trim());
-
     updateConversationMessages(conversationId, (current) => {
       const nextMessages = [...current];
       const replaceIndex = nextMessages.findIndex(
@@ -262,55 +278,35 @@ export function useChatSession() {
       const latestIndex = nextMessages.findIndex(
         (message) => message.id === latestAssistantMessage.id,
       );
-      const targetIndex = replaceIndex !== -1 ? replaceIndex : latestIndex;
+      const activeAssistantIndex = [...nextMessages]
+        .reverse()
+        .findIndex((message) =>
+          message.role === "assistant" &&
+          (message.status === "pending" || message.status === "streaming")
+        );
+      const fallbackIndex =
+        activeAssistantIndex === -1
+          ? -1
+          : nextMessages.length - 1 - activeAssistantIndex;
+      const targetIndex =
+        replaceIndex !== -1
+          ? replaceIndex
+          : latestIndex !== -1
+            ? latestIndex
+            : fallbackIndex;
 
-      if (hasVisibleAssistantContent && targetIndex !== -1) {
-        nextMessages[targetIndex] = createChatMessage({
-          id: latestAssistantMessage.id,
-          role: "assistant",
-          content: latestAssistantMessage.content,
-          status: "cancelled",
-          metadata: latestAssistantMessage.metadata,
+      if (targetIndex !== -1) {
+        nextMessages[targetIndex] = createCancelledAssistantMessage({
+          ...latestAssistantMessage,
+          id: nextMessages[targetIndex].id,
         });
         return nextMessages;
       }
 
-      const emptyPlaceholderIds = new Set([
-        currentAssistantMessageId,
-        latestAssistantMessage.id,
-      ]);
-      const withoutEmptyPlaceholder = nextMessages.filter((message) => {
-        if (!emptyPlaceholderIds.has(message.id) || message.role !== "assistant") {
-          return true;
-        }
-
-        return (
-          message.content.trim().length > 0 ||
-          Boolean(message.metadata.thinking?.content?.trim())
-        );
-      });
-
-      for (let index = withoutEmptyPlaceholder.length - 1; index >= 0; index -= 1) {
-        const message = withoutEmptyPlaceholder[index];
-
-        if (
-          message.role !== "assistant" ||
-          (
-            message.content.trim().length === 0 &&
-            !message.metadata.thinking?.content?.trim()
-          )
-        ) {
-          continue;
-        }
-
-        withoutEmptyPlaceholder[index] = {
-          ...message,
-          status: "cancelled",
-        };
-        return withoutEmptyPlaceholder;
-      }
-
-      return withoutEmptyPlaceholder;
+      return [
+        ...nextMessages,
+        createCancelledAssistantMessage(latestAssistantMessage),
+      ];
     });
   }, [updateConversationMessages]);
 

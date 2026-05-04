@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>WebAI 项目简报</title>
+<meta name="author" content="Kami">
+<meta name="description" content="WebAI 是一套基于 Supabase 的 AI 对话与会话管理系统，支持会话持久化、消息操作、模型配置和附件输入。">
+<meta name="keywords" content="WebAI, Supabase, AI 对话, 会话管理, 附件输入">
+<meta name="generator" content="Kami">
+<style>
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("../fonts/TsangerJinKai02-W04.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("../fonts/TsangerJinKai02-W05.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W05.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+  }
+
+  @page {
+    size: A4;
+    margin: 20mm 22mm 22mm 22mm;
+    background: #f5f4ed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --parchment: #f5f4ed;
+    --ivory: #faf9f5;
+    --sand: #e8e6dc;
+    --near-black: #141413;
+    --dark-warm: #3d3d3a;
+    --olive: #504e49;
+    --stone: #6b6a64;
+    --brand: #1B365D;
+    --border: #e8e6dc;
+    --border-soft: #e5e3d8;
+    --tag-bg: #EEF2F7;
+    --serif: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif;
+    --sans: var(--serif);
+  }
+
+  html, body { background: var(--parchment); }
+
+  @media screen {
+    body {
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 20mm 22mm 22mm 22mm;
+    }
+    .page + .page { margin-top: 18mm; }
+  }
+
+  body {
+    color: var(--near-black);
+    font-family: var(--serif);
+    font-size: 10pt;
+    line-height: 1.55;
+    letter-spacing: 0.3pt;
+  }
+
+  .page {
+    min-height: 255mm;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page + .page { break-before: page; }
+
+  .topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20pt;
+    color: var(--stone);
+    font-size: 9pt;
+    line-height: 1.45;
+  }
+
+  .eyebrow {
+    color: var(--brand);
+    font-size: 9pt;
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+  }
+
+  .meta {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .hero {
+    margin-top: 34pt;
+    padding-left: 10pt;
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+  }
+
+  h1 {
+    font-size: 31pt;
+    font-weight: 500;
+    line-height: 1.13;
+    color: var(--near-black);
+    margin-top: 5pt;
+    margin-bottom: 10pt;
+  }
+
+  .subtitle {
+    max-width: 118mm;
+    color: var(--olive);
+    font-size: 12pt;
+    line-height: 1.55;
+  }
+
+  .lead {
+    max-width: 142mm;
+    margin-top: 30pt;
+    color: var(--dark-warm);
+    font-size: 12pt;
+    line-height: 1.62;
+  }
+
+  .hl {
+    color: var(--brand);
+    font-weight: 500;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16pt;
+    margin-top: 34pt;
+    padding-top: 14pt;
+    border-top: 0.5pt solid var(--border);
+  }
+
+  .metric {
+    break-inside: avoid;
+  }
+
+  .metric-value {
+    display: block;
+    color: var(--brand);
+    font-size: 22pt;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 5pt;
+  }
+
+  .metric-label {
+    color: var(--olive);
+    font-size: 9.2pt;
+    line-height: 1.45;
+  }
+
+  .summary {
+    margin-top: auto;
+    padding-top: 22pt;
+  }
+
+  .summary-line {
+    border-top: 0.5pt dotted var(--border);
+    padding-top: 10pt;
+    color: var(--stone);
+    font-size: 9.2pt;
+    line-height: 1.5;
+  }
+
+  .section-title {
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+    margin-bottom: 13pt;
+  }
+
+  h2 {
+    font-size: 16pt;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--near-black);
+  }
+
+  .section-kicker {
+    margin-top: 2pt;
+    color: var(--stone);
+    font-size: 9pt;
+    line-height: 1.45;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22pt;
+    margin-bottom: 26pt;
+  }
+
+  .block {
+    break-inside: avoid;
+  }
+
+  .block p {
+    color: var(--dark-warm);
+    margin-bottom: 8pt;
+  }
+
+  ul.dash {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  ul.dash li {
+    position: relative;
+    padding-left: 13pt;
+    margin-bottom: 5pt;
+    color: var(--olive);
+    line-height: 1.5;
+  }
+
+  ul.dash li::before {
+    content: "\2013";
+    position: absolute;
+    left: 0;
+    color: var(--brand);
+  }
+
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16pt;
+    margin-top: 6pt;
+    margin-bottom: 28pt;
+  }
+
+  .tl-step {
+    padding-top: 9pt;
+    border-top: 0.5pt solid var(--border);
+    break-inside: avoid;
+  }
+
+  .tl-year {
+    color: var(--brand);
+    font-size: 11pt;
+    font-weight: 500;
+    line-height: 1.25;
+    margin-bottom: 4pt;
+  }
+
+  .tl-head {
+    color: var(--near-black);
+    font-size: 10.5pt;
+    font-weight: 500;
+    margin-bottom: 3pt;
+  }
+
+  .tl-body {
+    color: var(--olive);
+    font-size: 9.2pt;
+    line-height: 1.45;
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5pt;
+    margin-bottom: 9pt;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--brand);
+    font-size: 9pt;
+    font-weight: 500;
+    padding: 1pt 5pt;
+    border-radius: 2pt;
+    letter-spacing: 0.4pt;
+  }
+
+  .callout {
+    margin-top: auto;
+    border-left: 2pt solid var(--brand);
+    padding: 5pt 0 5pt 14pt;
+    color: var(--olive);
+    line-height: 1.58;
+    break-inside: avoid;
+  }
+
+  .footer {
+    margin-top: 18pt;
+    padding-top: 7pt;
+    border-top: 0.5pt dotted var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 12pt;
+    color: var(--stone);
+    font-size: 9pt;
+    line-height: 1.45;
+  }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <div class="topline">
+    <div>
+      <div class="eyebrow">项目简报</div>
+      <div>AI 对话与会话管理系统</div>
+    </div>
+    <div class="meta">
+      WebAI<br>
+      2026.05.03
+    </div>
+  </div>
+
+  <header class="hero">
+    <h1>WebAI</h1>
+    <div class="subtitle">基于 Supabase 的 AI 对话与会话管理系统</div>
+  </header>
+
+  <p class="lead">
+    WebAI 是一套以会话为核心的 AI 对话系统。用户可以创建会话、发送问题、查看流式回复，并在历史记录中恢复、整理和管理对话。系统使用 Supabase 保存用户、会话、消息、模型配置与附件信息，使聊天过程形成可查询、可维护的数据链路。
+  </p>
+
+  <section class="metrics" aria-label="项目扫描指标">
+    <div class="metric">
+      <span class="metric-value">会话</span>
+      <div class="metric-label">围绕会话创建、历史恢复、重命名、收藏和归档组织聊天记录</div>
+    </div>
+    <div class="metric">
+      <span class="metric-value">消息</span>
+      <div class="metric-label">支持流式回复、复制、编辑、重新生成和分支，保留对话调整空间</div>
+    </div>
+    <div class="metric">
+      <span class="metric-value">附件</span>
+      <div class="metric-label">支持图片、PDF、文本、Excel、Word 和 PPT 等文件进入对话上下文</div>
+    </div>
+  </section>
+
+  <section class="summary">
+    <p class="summary-line">
+      项目目标是提供一个结构清晰、体验完整、数据边界明确的 AI 对话应用，可用于功能演示、数据库设计说明和课程答辩展示。
+    </p>
+  </section>
+</main>
+
+<main class="page">
+  <section>
+    <div class="section-title">
+      <h2>系统主线</h2>
+      <div class="section-kicker">以会话为中心组织聊天、数据和文件</div>
+    </div>
+
+    <div class="grid">
+      <div class="block">
+        <p>
+          用户在一个工作区内完成聊天和会话管理。系统支持新建会话、发送消息、查看流式回复，并提供历史恢复、收藏、归档等管理能力。
+        </p>
+        <ul class="dash">
+          <li>聊天页面面向连续阅读和长文本输入，减少无关操作干扰。</li>
+          <li>消息支持复制、编辑、重新生成和分支，便于修正问题和延展上下文。</li>
+          <li>模型、提示词、联网开关和思考档位按会话保存，避免不同会话互相干扰。</li>
+        </ul>
+      </div>
+
+      <div class="block">
+        <p>
+          数据库保存系统的核心业务状态。用户、会话、消息、模型配置和附件信息通过明确的数据表组织，支撑页面查询、历史恢复和权限隔离。
+        </p>
+        <ul class="dash">
+          <li>用户、会话、消息三类对象构成聊天系统的基础数据模型。</li>
+          <li>模型注册表记录服务商、模型能力和会话默认模型。</li>
+          <li>私有存储桶保存文件对象，附件记录保存展示信息与归属关系。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">
+      <h2>阶段路线</h2>
+      <div class="section-kicker">从基础聊天扩展到完整的会话管理应用</div>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-step">
+        <div class="tl-year">基础聊天</div>
+        <div class="tl-head">多轮对话</div>
+        <div class="tl-body">提供输入、回复、加载状态和错误反馈，保证基本聊天流程完整。</div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-year">数据持久化</div>
+        <div class="tl-head">会话与消息</div>
+        <div class="tl-body">使用数据库保存会话和消息，支持历史列表、详情恢复和会话管理。</div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-year">能力扩展</div>
+        <div class="tl-head">控制与附件</div>
+        <div class="tl-body">加入流式生成、会话级配置、消息操作、收藏归档和多模态输入。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">
+      <h2>功能概览</h2>
+      <div class="section-kicker">一次会话从输入到保存的完整流程</div>
+    </div>
+
+    <div class="grid">
+      <div class="block">
+        <div class="tag-row">
+          <span class="tag">聊天</span>
+          <span class="tag">附件</span>
+          <span class="tag">上下文</span>
+        </div>
+        <ul class="dash">
+          <li>用户可以发送文本问题，也可以附加图片和常见文档文件。</li>
+          <li>系统把消息正文、URL 和附件一起作为本轮对话的上下文。</li>
+          <li>AI 回复以流式方式显示，长回复阅读时保留回到底部的操作入口。</li>
+        </ul>
+      </div>
+
+      <div class="block">
+        <div class="tag-row">
+          <span class="tag">数据</span>
+          <span class="tag">权限</span>
+          <span class="tag">管理</span>
+        </div>
+        <ul class="dash">
+          <li>会话列表、消息记录和附件信息保存在数据库与私有存储中。</li>
+          <li>用户只能访问自己的会话和文件，文件路径按用户目录隔离。</li>
+          <li>收藏、归档、恢复和重命名让历史会话保持可整理、可追溯。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="callout">
+    WebAI 将<span class="hl">自然聊天体验</span>、<span class="hl">数据库持久化</span>和<span class="hl">会话管理能力</span>整合在同一套应用中，形成从用户输入到数据保存的完整应用链路。
+  </div>
+
+  <div class="footer">
+    <span>数据库课程设计项目材料</span>
+    <span>WebAI · Supabase / Next.js / TypeScript</span>
+  </div>
+</main>
+
+</body>
+</html>

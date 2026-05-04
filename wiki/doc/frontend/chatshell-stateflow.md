@@ -235,6 +235,28 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 - 输入框焦点回归时机
 - 是否允许重复提交
 
+### 5.5 停止生成状态
+
+`useChatSession` 还维护：
+
+- `streamingConversationId`
+- `abortControllerRef`
+- `streamingConversationIdRef`
+
+它们共同服务“停止生成”：
+
+- `streamingConversationId` 表示当前哪一个会话处于生成中
+- `abortControllerRef` 用于中断浏览器侧 fetch reader
+- `streamingConversationIdRef` 让停止按钮在异步回调里仍能拿到最新会话 id
+
+点击停止后，前端会同时：
+
+- 请求 `/api/chat/cancel`，让服务端停止模型流
+- abort 当前 fetch，让本地 reader 尽快结束
+- 把本次 assistant 占位或流式消息转成 `cancelled`
+
+如果本地还没有收到服务端创建的真实 assistant id，会优先替换当前会话最后一条 `pending / streaming` assistant，避免把上一条回复误标为已停止。
+
 ---
 
 ## 7. useMessageScroll 管理的状态
@@ -568,6 +590,7 @@ useChatSession
   -> 管输入框文本
   -> 管 URL Context 输入与已确认 URL
   -> 管发送中状态
+  -> 管停止生成后的本地 cancelled 状态
 
 useMessageScroll
   -> 管自动吸底
