@@ -13,7 +13,7 @@ type HomePageProps = {
 
 /**
  * 首页是一个 Server Component：
- * 先在服务端恢复当前用户和初始工作区数据，再把“首屏可直接渲染”的状态交给 ChatShell。
+ * 服务端负责恢复用户和初始工作区数据，再把“首屏可直接渲染”的状态交给 ChatShell。
  */
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = await searchParams;
@@ -39,7 +39,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const conversations = user
     ? await listConversations(supabase, user.id)
     : [];
-  const models = user ? await listEnabledModels(supabase) : [];
+  const models = user ? await listEnabledModels(supabase, user.id) : [];
   // auth 查询参数由邮箱确认页回跳时带上，用来在首页给出一次性的登录结果提示。
   const initialAuthMessage =
     resolvedSearchParams.auth === "error"

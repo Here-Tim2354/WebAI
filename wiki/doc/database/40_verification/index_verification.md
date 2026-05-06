@@ -9,18 +9,16 @@
 
 ## 模型注册表
 
-- [x] `ai_models` 是否按 `is_enabled + sort_order + label` 查询模式优化
-- [x] `ai_models(provider)` 是否有 `is_default = true` 的部分唯一约束
-- [x] `openai_compatible_models.ai_model_id` 是否有唯一索引与外键索引
-- [x] `gemini_models.ai_model_id` 是否有唯一索引与外键索引
+- [x] `model_catalog(default_enabled, sort_order, label)` 是否有索引
+- [x] `model_fetched(user_id, is_enabled, sort_order, label)` 是否有索引
+- [x] `model_fetched(user_id)` 是否有 `is_default = true and is_enabled = true` 的部分唯一约束
 
 索引状态：
 
-- Supabase 环境需要包含 `ai_models_enabled_idx`
-- Supabase 环境需要包含 `ai_models_sort_order_idx`
-- Supabase 环境需要包含 `ai_models_default_per_provider_unique_idx`
-- Supabase 环境需要包含 `openai_compatible_models_ai_model_id_idx`
-- Supabase 环境需要包含 `gemini_models_ai_model_id_idx`
+- Supabase 环境需要包含 `model_catalog_default_enabled_idx`
+- Supabase 环境需要包含 `model_fetched_user_enabled_idx`
+- Supabase 环境需要包含 `model_fetched_user_model_idx`
+- Supabase 环境需要包含 `model_fetched_single_default_per_user_idx`
 - advisor 如果提示这些索引“尚未使用”，通常属于观测期现象，不等于索引设计错误
 
 ## 原则

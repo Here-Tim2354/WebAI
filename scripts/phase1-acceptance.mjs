@@ -1,4 +1,4 @@
-﻿import http from "node:http";
+import http from "node:http";
 import { spawn, spawnSync } from "node:child_process";
 
 const HOST = "127.0.0.1";

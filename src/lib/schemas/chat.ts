@@ -41,6 +41,35 @@ export const messageAttachmentSchema = z.object({
 
 export const messageAttachmentsSchema = z.array(messageAttachmentSchema).max(5);
 
+const optionalRuntimeConfigStringSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  },
+  z.string().min(1).optional(),
+);
+
+const optionalRuntimeConfigUrlSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  },
+  z.string().url("Gemini URL 格式不正确。").optional(),
+);
+
+export const geminiRuntimeConfigSchema = z.object({
+  apiKey: optionalRuntimeConfigStringSchema,
+  baseUrl: optionalRuntimeConfigUrlSchema,
+});
+
 export const chatMessageMetadataSchema = z
   .object({
     urls: urlContextUrlsSchema.optional(),
@@ -80,9 +109,12 @@ export const sendMessageRequestSchema = z.object({
   thinkingLevel: thinkingLevelSchema.optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),
+  geminiRuntimeConfig: geminiRuntimeConfigSchema.optional(),
 }).refine(
   (value) =>
-    value.content.length > 0 || (value.attachments?.length ?? 0) > 0,
+    value.content.length > 0 ||
+    (value.urls?.length ?? 0) > 0 ||
+    (value.attachments?.length ?? 0) > 0,
   "消息正文和附加项至少需要保留一个。",
 );
 
@@ -97,9 +129,12 @@ export const editMessageRequestSchema = z.object({
   thinkingLevel: thinkingLevelSchema.optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),
+  geminiRuntimeConfig: geminiRuntimeConfigSchema.optional(),
 }).refine(
   (value) =>
-    value.content.length > 0 || (value.attachments?.length ?? 0) > 0,
+    value.content.length > 0 ||
+    (value.urls?.length ?? 0) > 0 ||
+    (value.attachments?.length ?? 0) > 0,
   "消息正文和附加项至少需要保留一个。",
 );
 
@@ -110,6 +145,7 @@ export const regenerateAssistantMessageRequestSchema = z.object({
   webSearchEnabled: z.boolean().optional(),
   urls: urlContextUrlsSchema.optional(),
   attachments: messageAttachmentsSchema.optional(),
+  geminiRuntimeConfig: geminiRuntimeConfigSchema.optional(),
 });
 
 export const chatSessionResponseSchema = z.object({
@@ -149,6 +185,7 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatMessageMetadata = z.infer<typeof chatMessageMetadataSchema>;
 export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
 export type ChatStreamEvent = z.infer<typeof chatStreamEventSchema>;
+export type GeminiRuntimeConfig = z.infer<typeof geminiRuntimeConfigSchema>;
 
 type CreateChatMessageInput = {
   id?: string;

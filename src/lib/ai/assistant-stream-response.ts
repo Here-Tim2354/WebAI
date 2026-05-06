@@ -8,6 +8,7 @@ import {
 import {
   type ChatMessage,
   type ChatMessageMetadata,
+  type GeminiRuntimeConfig,
   type MessageAttachment,
   type ChatStreamEvent,
 } from "@/lib/schemas/chat";
@@ -16,6 +17,7 @@ import { type ThinkingLevel } from "@/lib/schemas/thinking";
 import { type RuntimeAIModel } from "@/lib/supabase/model-registry";
 import {
   createConversationMessage,
+  MessageMutationConflictError,
   updateConversationMessage,
 } from "@/lib/supabase/messages";
 import { touchConversation } from "@/lib/supabase/conversations";
@@ -30,6 +32,7 @@ type CreateAssistantStreamResponseOptions = {
   messagesForModel: ChatMessage[];
   model: RuntimeAIModel | null;
   thinkingLevel?: ThinkingLevel;
+  geminiRuntimeConfig?: GeminiRuntimeConfig;
   urls?: string[];
   attachments?: MessageAttachment[];
   requestSignal: AbortSignal;
@@ -58,6 +61,16 @@ function createStreamResponse(stream: ReadableStream<Uint8Array>) {
 }
 
 function getAssistantFailureContent(error: unknown) {
+  if (
+    error instanceof MessageMutationConflictError ||
+    (
+      error instanceof Error &&
+      /Cannot coerce the result to a single JSON object/i.test(error.message)
+    )
+  ) {
+    return "这条回复已被新的编辑替换，旧生成已停止。";
+  }
+
   return (
     getNetworkErrorMessage(
       error,
@@ -71,7 +84,7 @@ function getAssistantFailureContent(error: unknown) {
 
 /**
  * 统一生成 assistant 流式响应，并把每个阶段同步到 messages 表。
- * 路由层只负责准备上下文，这里负责“生成 + 落库 + NDJSON 事件”。
+ * 路由层负责准备上下文，流响应层负责“生成 + 落库 + NDJSON 事件”。
  */
 export async function createAssistantStreamResponse({
   supabase,
@@ -82,6 +95,7 @@ export async function createAssistantStreamResponse({
   urls,
   attachments,
   thinkingLevel,
+  geminiRuntimeConfig,
   requestSignal,
 }: CreateAssistantStreamResponseOptions) {
   // assistant 占位消息先落库，前端才能立刻拿到稳定 ID 并在后续事件里替换同一条气泡。
@@ -99,7 +113,7 @@ export async function createAssistantStreamResponse({
     serverAbortController.signal,
   ]);
 
-  // /api/chat/cancel 通过 conversationId 找到这里注册的 AbortController。
+  // /api/chat/cancel 通过 conversationId 找到本模块注册的 AbortController。
   // requestSignal 则覆盖浏览器主动断开连接的场景。
   registerConversationStream(conversation.id, serverAbortController);
 
@@ -158,6 +172,7 @@ export async function createAssistantStreamResponse({
               urls,
               supabase,
               thinkingLevel,
+              geminiRuntimeConfig,
               abortSignal: mergedAbortController.signal,
             },
           )) {
@@ -266,6 +281,19 @@ export async function createAssistantStreamResponse({
           });
           closeStream();
         } catch (error) {
+          if (error instanceof MessageMutationConflictError) {
+            enqueueEvent({
+              type: "assistant-message-updated",
+              message: {
+                ...nextAssistantMessage,
+                content: "",
+                status: "cancelled",
+              },
+            });
+            closeStream();
+            return;
+          }
+
           const isCancelled =
             mergedAbortController.signal.aborted || isAbortError(error);
           const fallbackContent =
@@ -287,22 +315,39 @@ export async function createAssistantStreamResponse({
               : nextAssistantMessage.metadata;
 
           // 取消与真实错误都需要写回 assistant 记录；
-          // 区别在于取消不再继续向已中断的前端推送 done 事件。
-          nextAssistantMessage = await updateConversationMessage(
-            supabase,
-            conversation.id,
-            nextAssistantMessage.id,
-            {
-              content: fallbackContent,
-              status: isCancelled ? "cancelled" : "error",
-              metadata: fallbackMetadata,
-            },
-          );
-          nextConversation = await touchConversation(
-            supabase,
-            userId,
-            conversation.id,
-          );
+          // 取消不再继续向已中断的前端推送 done 事件。
+          try {
+            nextAssistantMessage = await updateConversationMessage(
+              supabase,
+              conversation.id,
+              nextAssistantMessage.id,
+              {
+                content: fallbackContent,
+                status: isCancelled ? "cancelled" : "error",
+                metadata: fallbackMetadata,
+              },
+            );
+            nextConversation = await touchConversation(
+              supabase,
+              userId,
+              conversation.id,
+            );
+          } catch (persistError) {
+            if (persistError instanceof MessageMutationConflictError) {
+              enqueueEvent({
+                type: "assistant-message-updated",
+                message: {
+                  ...nextAssistantMessage,
+                  content: "",
+                  status: "cancelled",
+                },
+              });
+              closeStream();
+              return;
+            }
+
+            throw persistError;
+          }
 
           if (!mergedAbortController.signal.aborted) {
             enqueueEvent({

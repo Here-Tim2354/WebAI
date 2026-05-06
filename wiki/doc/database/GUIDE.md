@@ -48,7 +48,7 @@
 
 ## 数据库状态
 
-- Supabase 环境采用模型注册表父子表结构
-- `ai_models` 是统一模型入口
-- `openai_compatible_models` 与 `gemini_models` 是 provider 专属子表
-- 模型种子从 `Gemini 3 Flash Preview` 开始，`OpenAI compatible` 首批 seed 仍待补齐
+- Supabase 环境采用 `model_catalog + model_fetched` 的 Gemini-only 模型结构
+- `model_catalog` 是服务端内部能力参照表，不作为用户模型列表直接暴露
+- `model_fetched` 是用户通过 Gemini 设置拉取后的模型列表，支持启用 / 停用和默认模型选择
+- 默认能力目录覆盖 Gemini 2.5 到 Gemini 3.1 的主流文本 / 多模态模型，不包含图片生成、视频生成、Live 和 TTS 模型

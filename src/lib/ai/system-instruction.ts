@@ -8,7 +8,7 @@ type SystemInstructionOptions = {
  * 系统指令来源有两类：
  * 1. 会话级 system prompt
  * 2. 消息流里的 inline system message
- * 这里把它们合并成 provider 无关的单一字符串。
+ * 调用层把它们合并成 Gemini 可直接使用的单一字符串。
  */
 export function getSystemInstruction(
   messages: ChatMessage[],
@@ -26,7 +26,7 @@ export function getSystemInstruction(
     ...inlineSystemMessages,
   ].filter(Boolean);
 
-  // 统一用双换行拼接，既保留段落边界，也避免 provider 间提示词格式差异过大。
+  // 统一用双换行拼接，保留段落边界，避免系统规则和会话提示词粘连。
   if (instructionParts.length > 0) {
     return instructionParts.join("\n\n");
   }

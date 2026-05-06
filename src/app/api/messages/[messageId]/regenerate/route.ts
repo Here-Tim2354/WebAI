@@ -141,8 +141,20 @@ export async function POST(request: Request, context: RouteContext) {
       webSearchEnabled,
       urls,
       attachments,
+      geminiRuntimeConfig,
     } =
       parsed.data;
+
+    if (!geminiRuntimeConfig?.apiKey?.trim()) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "请先在 Gemini 设置中填写 API Key。",
+          },
+        },
+        { status: 400 },
+      );
+    }
     let conversation = await getConversationById(
       supabase,
       user.id,
@@ -242,7 +254,12 @@ export async function POST(request: Request, context: RouteContext) {
           }
         : previousUserMessage.metadata;
 
-    // 重新生成可以顺手修改会话模型 / 联网开关，所以先更新会话再计算最终模型。
+    const effectiveModelId = modelId ?? conversation.modelId;
+    const selectedModel = effectiveModelId
+      ? await getEnabledModelById(supabase, user.id, effectiveModelId)
+      : null;
+
+    // 重新生成可以顺手修改会话模型 / 联网开关。模型要先校验，避免会话被写入无效 modelId。
     if (
       (modelId && conversation.modelId !== modelId) ||
       (
@@ -265,11 +282,6 @@ export async function POST(request: Request, context: RouteContext) {
         },
       );
     }
-
-    const effectiveModelId = modelId ?? conversation.modelId;
-    const selectedModel = effectiveModelId
-      ? await getEnabledModelById(supabase, effectiveModelId)
-      : null;
     const effectiveAttachments = nextPreviousUserMetadata.attachments ?? [];
 
     // 重新生成复用上一条 user 消息的附件上下文；
@@ -315,6 +327,7 @@ export async function POST(request: Request, context: RouteContext) {
       messagesForModel,
       model: selectedModel,
       thinkingLevel: conversation.thinkingLevel,
+      geminiRuntimeConfig,
       urls: effectiveUrls,
       attachments: effectiveAttachments,
       requestSignal: request.signal,

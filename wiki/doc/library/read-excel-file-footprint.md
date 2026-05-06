@@ -37,14 +37,14 @@ aliases:
 - 只支持 `.xlsx`
 - 不支持老 `.xls`
 - 不依赖本机 Microsoft Office
-- 不依赖 LibreOffice / soffice
+- 不依赖本机 Office
 - 空表会直接返回上传错误，避免保存 `0 B` 的空 CSV
 
 ## 与其他附件转换的关系
 
 - `.xlsx`：`read-excel-file` -> CSV -> Storage 保存 CSV
-- Word / PPT：`libreoffice-convert` -> PDF -> Storage 保存 PDF
 - PDF / 文本 / Markdown / CSV：直接保存原文件内容
+- Word / PPT：不进入上传链路，选择时提示支持范围
 
 ## 后续需要回归
 

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import {
   ChatMessage,
+  GeminiRuntimeConfig,
   MessageAttachment,
   chatStreamEventSchema,
   createChatMessage,
@@ -133,9 +134,11 @@ function createCancelledAssistantMessage(message: ChatMessage) {
 type SubmitOptions = {
   conversationId: string;
   content: string;
+  urls?: string[];
   attachments?: MessageAttachment[];
   selectedModelId?: string | null;
   thinkingLevel?: ThinkingLevel;
+  geminiRuntimeConfig?: GeminiRuntimeConfig;
   onConversationSynced: (conversation: Conversation) => void;
 };
 
@@ -189,7 +192,7 @@ function normalizeUrlCandidate(url: string) {
 
 /**
  * useChatSession 管的是“消息交互状态”，不是整个页面状态：
- * 输入框内容、发送中状态、各会话消息缓存都集中收在这里。
+ * 输入框内容、发送中状态、各会话消息缓存都集中收在消息会话层。
  */
 export function useChatSession() {
   const [conversationMessages, setConversationMessages] = useState<
@@ -319,29 +322,22 @@ export function useChatSession() {
       return "invalid";
     }
 
-    let result = "invalid" as AddUrlContextResult;
-    setUrlContextUrls((current) => {
-      if (current.includes(normalizedUrl)) {
-        result = "duplicate";
-        return current;
-      }
-
-      if (current.length >= MAX_URL_CONTEXT_ITEMS) {
-        result = "limit";
-        return current;
-      }
-
-      result = "added";
-      return [...current, normalizedUrl];
-    });
-
-    if (result === "added") {
+    if (urlContextUrls.includes(normalizedUrl)) {
       setUrlContextInputValue("");
       setIsUrlContextPanelOpen(true);
+      return "duplicate";
     }
 
-    return result;
-  }, [urlContextInputValue]);
+    if (urlContextUrls.length >= MAX_URL_CONTEXT_ITEMS) {
+      return "limit";
+    }
+
+    setUrlContextUrls([...urlContextUrls, normalizedUrl]);
+    setUrlContextInputValue("");
+    setIsUrlContextPanelOpen(true);
+
+    return "added";
+  }, [urlContextInputValue, urlContextUrls]);
 
   const removeUrlContextUrl = useCallback((targetUrl: string) => {
     setUrlContextUrls((current) =>
@@ -503,7 +499,7 @@ export function useChatSession() {
       const trailingLine = buffer.trim();
 
       if (trailingLine) {
-        // 正常情况下事件都以换行结束；这里兜底处理最后一行没带换行的响应。
+        // 正常情况下事件都以换行结束；最后一行没带换行时仍需要兜底处理。
         const parsedEvent = chatStreamEventSchema.parse(
           JSON.parse(trailingLine),
         );
@@ -537,17 +533,23 @@ export function useChatSession() {
   const handleSubmit = useCallback(async ({
     conversationId,
     content: submittedContent,
+    urls,
     attachments,
     selectedModelId,
     thinkingLevel,
+    geminiRuntimeConfig,
     onConversationSynced,
   }: SubmitOptions) => {
     const content = submittedContent.trim();
-    const submittedUrlContextUrls = urlContextUrls;
+    const submittedUrlContextUrls = urls ?? urlContextUrls;
     const submittedAttachments = attachments ?? draftAttachments;
 
     if (
-      (content.length === 0 && submittedAttachments.length === 0) ||
+      (
+        content.length === 0 &&
+        submittedUrlContextUrls.length === 0 &&
+        submittedAttachments.length === 0
+      ) ||
       isSubmitting
     ) {
       return;
@@ -605,6 +607,7 @@ export function useChatSession() {
           content,
           modelId: selectedModelId ?? undefined,
           thinkingLevel,
+          geminiRuntimeConfig,
           urls:
             submittedUrlContextUrls.length > 0
               ? submittedUrlContextUrls
@@ -676,13 +679,16 @@ export function useChatSession() {
     attachments,
     selectedModelId,
     thinkingLevel,
+    geminiRuntimeConfig,
     onConversationSynced,
   }: EditMessageOptions) => {
     const trimmedContent = content.trim();
+    const submittedUrlContextUrls = urls;
     const submittedAttachments = attachments;
 
     if (
       trimmedContent.length === 0 &&
+      (submittedUrlContextUrls?.length ?? 0) === 0 &&
       (submittedAttachments?.length ?? 0) === 0
     ) {
       return;
@@ -693,7 +699,6 @@ export function useChatSession() {
     }
 
     const previousMessages = conversationMessages[conversationId] ?? [];
-    const submittedUrlContextUrls = urls;
     const assistantPlaceholder = createChatMessage({
       role: "assistant",
       content: "",
@@ -702,6 +707,8 @@ export function useChatSession() {
     const abortController = new AbortController();
     let currentAssistantMessageId = assistantPlaceholder.id;
     let latestAssistantMessage = assistantPlaceholder;
+    let responseAccepted = false;
+    let restoredPreviousMessages = false;
 
     updateConversationMessages(conversationId, (current) => {
       const targetMessageIndex = current.findIndex(
@@ -759,6 +766,7 @@ export function useChatSession() {
           content: trimmedContent,
           modelId: selectedModelId ?? undefined,
           thinkingLevel,
+          geminiRuntimeConfig,
           urls: submittedUrlContextUrls,
           attachments: submittedAttachments,
         }),
@@ -769,9 +777,11 @@ export function useChatSession() {
         const payload = await response.json().catch(() => null);
         // 重新生成失败时还原旧 assistant 消息，避免用户丢失原回复。
         syncConversationMessages(conversationId, previousMessages);
+        restoredPreviousMessages = true;
         throw new Error(payload?.error?.message ?? "编辑消息失败。");
       }
 
+      responseAccepted = true;
       const result = await consumeAssistantStream({
         response,
         conversationId,
@@ -788,6 +798,13 @@ export function useChatSession() {
           latestAssistantMessage,
         );
         return;
+      }
+
+      if (!responseAccepted) {
+        if (!restoredPreviousMessages) {
+          syncConversationMessages(conversationId, previousMessages);
+        }
+        throw error;
       }
 
       const nextAssistantMessage = createChatMessage({
@@ -828,6 +845,7 @@ export function useChatSession() {
     webSearchEnabled,
     urls,
     attachments,
+    geminiRuntimeConfig,
     onConversationSynced,
   }: RegenerateAssistantMessageOptions) => {
     if (isSubmitting) {
@@ -845,6 +863,7 @@ export function useChatSession() {
     const abortController = new AbortController();
     let currentAssistantMessageId = assistantPlaceholder.id;
     let latestAssistantMessage = assistantPlaceholder;
+    let responseAccepted = false;
     let restoredPreviousMessages = false;
 
     updateConversationMessages(conversationId, (current) => {
@@ -863,7 +882,7 @@ export function useChatSession() {
         submittedAttachments.length > 0
       ) {
         // 重新生成允许临时覆盖“上一条 user 消息”的 URL/附件上下文。
-        // 服务端也会同步更新这条 user 消息的 metadata，保证历史和当前 UI 一致。
+        // 服务端也会同步更新这条 user 消息的 metadata，保证历史和 UI 一致。
         for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
           if (nextMessages[index].role !== "user") {
             continue;
@@ -907,6 +926,7 @@ export function useChatSession() {
           modelId: selectedModelId ?? undefined,
           thinkingLevel,
           webSearchEnabled,
+          geminiRuntimeConfig,
           urls:
             submittedUrlContextUrls.length > 0
               ? submittedUrlContextUrls
@@ -925,6 +945,7 @@ export function useChatSession() {
         throw new Error(payload?.error?.message ?? "重新生成失败。");
       }
 
+      responseAccepted = true;
       const result = await consumeAssistantStream({
         response,
         conversationId,
@@ -945,6 +966,13 @@ export function useChatSession() {
           latestAssistantMessage,
         );
         return;
+      }
+
+      if (!responseAccepted) {
+        if (!restoredPreviousMessages) {
+          syncConversationMessages(conversationId, previousMessages);
+        }
+        throw error;
       }
 
       const nextAssistantMessage = createChatMessage({

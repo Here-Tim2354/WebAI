@@ -212,8 +212,8 @@ if (!user) {
 
 补充说明：
 
-- `selectedModelId` 当前对应的是模型注册表父表 `ai_models.id`
-- 真正的上游模型名会在服务端通过注册表映射到 `upstreamModelId`
+- `selectedModelId` 当前对应的是用户已启用模型表 `model_fetched.id`
+- 真正的上游模型名会在服务端通过用户模型记录映射到 `modelId`
 
 也就是说，页面头部最重要的业务交互之一，就是模型选择。
 

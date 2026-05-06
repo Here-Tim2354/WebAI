@@ -1,10 +1,10 @@
 -- WebAI overall schema draft:
 -- This file keeps a SQL-oriented schema reference.
 -- The dbdiagram-ready source of truth is `overall_er_graph.dbml`.
--- Current actual implementation includes:
+-- Core tables:
 -- auth.users / profiles / conversations / messages
--- ai_models / openai_compatible_models / gemini_models
--- favorites and search_records remain in the overall design, but are not yet landed.
+-- model_catalog / model_fetched
+-- favorites and search_records remain in the overall design, but are reserved for a later scope.
 
 CREATE TYPE "conversation_status" AS ENUM (
   'active',
@@ -35,7 +35,11 @@ CREATE TABLE "conversations" (
   "user_id" uuid NOT NULL,
   "title" varchar(100) NOT NULL,
   "system_prompt" text,
+  "model_id" uuid,
+  "web_search_enabled" boolean NOT NULL DEFAULT true,
+  "thinking_level" text NOT NULL DEFAULT 'minimal',
   "status" conversation_status NOT NULL DEFAULT 'active',
+  "archived_at" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -62,58 +66,46 @@ CREATE TABLE "search_records" (
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
-CREATE TABLE "ai_models" (
+CREATE TABLE "model_catalog" (
   "id" uuid PRIMARY KEY NOT NULL,
-  "provider" varchar(50) NOT NULL,
-  "api_style" varchar(50) NOT NULL,
-  "upstream_model_id" varchar(160) NOT NULL,
+  "provider" varchar(50) NOT NULL DEFAULT 'gemini',
+  "api_style" varchar(50) NOT NULL DEFAULT 'gemini_native',
+  "model_id" varchar(160) UNIQUE NOT NULL,
   "label" varchar(160) NOT NULL,
   "description" text,
   "icon" text,
-  "is_enabled" boolean NOT NULL DEFAULT true,
+  "input_token_limit" integer,
+  "output_token_limit" integer,
+  "capabilities" jsonb NOT NULL DEFAULT '{}',
+  "raw_metadata" jsonb NOT NULL DEFAULT '{}',
+  "source" varchar(50) NOT NULL DEFAULT 'catalog',
+  "default_enabled" boolean NOT NULL DEFAULT false,
   "is_default" boolean NOT NULL DEFAULT false,
   "sort_order" integer NOT NULL DEFAULT 0,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
 
-CREATE TABLE "openai_compatible_models" (
+CREATE TABLE "model_fetched" (
   "id" uuid PRIMARY KEY NOT NULL,
-  "ai_model_id" uuid NOT NULL,
-  "model_id" varchar(160) UNIQUE NOT NULL,
-  "base_url" text,
-  "supports_text" boolean NOT NULL DEFAULT true,
-  "supports_image" boolean NOT NULL DEFAULT false,
-  "supports_audio" boolean NOT NULL DEFAULT false,
-  "supports_video" boolean NOT NULL DEFAULT false,
-  "supports_web_search" boolean NOT NULL DEFAULT false,
-  "supports_function_calling" boolean NOT NULL DEFAULT false,
-  "supports_tools" boolean NOT NULL DEFAULT false,
-  "supports_files" boolean NOT NULL DEFAULT false,
-  "supports_structured_outputs" boolean NOT NULL DEFAULT false,
-  "supports_streaming" boolean NOT NULL DEFAULT true,
-  "supports_reasoning" boolean NOT NULL DEFAULT false,
-  "created_at" timestamptz NOT NULL DEFAULT (now()),
-  "updated_at" timestamptz NOT NULL DEFAULT (now())
-);
-
-CREATE TABLE "gemini_models" (
-  "id" uuid PRIMARY KEY NOT NULL,
-  "ai_model_id" uuid NOT NULL,
-  "name" varchar(160) UNIQUE NOT NULL,
-  "supports_text" boolean NOT NULL DEFAULT true,
-  "supports_image" boolean NOT NULL DEFAULT false,
-  "supports_audio" boolean NOT NULL DEFAULT false,
-  "supports_video" boolean NOT NULL DEFAULT false,
-  "supports_google_search" boolean NOT NULL DEFAULT false,
-  "supports_url_context" boolean NOT NULL DEFAULT false,
-  "supports_code_execution" boolean NOT NULL DEFAULT false,
-  "supports_function_calling" boolean NOT NULL DEFAULT false,
-  "supports_tools" boolean NOT NULL DEFAULT false,
-  "supports_files" boolean NOT NULL DEFAULT false,
-  "supports_structured_outputs" boolean NOT NULL DEFAULT false,
-  "supports_streaming" boolean NOT NULL DEFAULT true,
-  "supports_reasoning" boolean NOT NULL DEFAULT false,
+  "user_id" uuid NOT NULL,
+  "provider" varchar(50) NOT NULL DEFAULT 'gemini',
+  "api_style" varchar(50) NOT NULL DEFAULT 'gemini_native',
+  "base_url" text NOT NULL,
+  "model_id" varchar(160) NOT NULL,
+  "label" varchar(160) NOT NULL,
+  "description" text,
+  "icon" text,
+  "input_token_limit" integer,
+  "output_token_limit" integer,
+  "capabilities" jsonb NOT NULL DEFAULT '{}',
+  "raw_metadata" jsonb NOT NULL DEFAULT '{}',
+  "catalog_id" uuid,
+  "source" varchar(50) NOT NULL DEFAULT 'fetched',
+  "is_enabled" boolean NOT NULL DEFAULT false,
+  "is_default" boolean NOT NULL DEFAULT false,
+  "sort_order" integer NOT NULL DEFAULT 0,
+  "fetched_at" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -133,16 +125,21 @@ CREATE UNIQUE INDEX ON "favorites" ("user_id", "message_id");
 CREATE INDEX ON "search_records" ("user_id");
 CREATE INDEX ON "search_records" ("created_at");
 
-CREATE INDEX ON "ai_models" ("is_enabled");
-CREATE INDEX ON "ai_models" ("sort_order", "label");
-CREATE UNIQUE INDEX ON "ai_models" ("provider", "upstream_model_id");
-CREATE UNIQUE INDEX ON "ai_models" ("provider") WHERE "is_default" = true;
+CREATE INDEX "model_catalog_default_enabled_idx"
+  ON "model_catalog" ("default_enabled", "sort_order", "label");
+CREATE UNIQUE INDEX "model_catalog_single_default_idx"
+  ON "model_catalog" ("is_default")
+  WHERE "is_default" = true;
 
-CREATE INDEX ON "openai_compatible_models" ("ai_model_id");
-CREATE UNIQUE INDEX ON "openai_compatible_models" ("ai_model_id");
-
-CREATE INDEX ON "gemini_models" ("ai_model_id");
-CREATE UNIQUE INDEX ON "gemini_models" ("ai_model_id");
+CREATE INDEX "model_fetched_user_enabled_idx"
+  ON "model_fetched" ("user_id", "is_enabled", "sort_order", "label");
+CREATE INDEX "model_fetched_user_model_idx"
+  ON "model_fetched" ("user_id", "model_id");
+CREATE UNIQUE INDEX "model_fetched_user_base_model_idx"
+  ON "model_fetched" ("user_id", "base_url", "model_id");
+CREATE UNIQUE INDEX "model_fetched_single_default_per_user_idx"
+  ON "model_fetched" ("user_id")
+  WHERE "is_default" = true AND "is_enabled" = true;
 
 COMMENT ON COLUMN "conversations"."system_prompt" IS 'Conversation-level markdown prompt';
 
@@ -151,6 +148,9 @@ ALTER TABLE "profiles"
 
 ALTER TABLE "conversations"
   ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "conversations"
+  ADD FOREIGN KEY ("model_id") REFERENCES "model_fetched" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "messages"
   ADD FOREIGN KEY ("conversation_id") REFERENCES "conversations" ("id") DEFERRABLE INITIALLY IMMEDIATE;
@@ -164,8 +164,8 @@ ALTER TABLE "favorites"
 ALTER TABLE "search_records"
   ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "openai_compatible_models"
-  ADD FOREIGN KEY ("ai_model_id") REFERENCES "ai_models" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "model_fetched"
+  ADD FOREIGN KEY ("user_id") REFERENCES "auth"."users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "gemini_models"
-  ADD FOREIGN KEY ("ai_model_id") REFERENCES "ai_models" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "model_fetched"
+  ADD FOREIGN KEY ("catalog_id") REFERENCES "model_catalog" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;

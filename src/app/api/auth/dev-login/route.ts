@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { createAppUrl } from "@/lib/env/app-origin";
 
 // dev-login 只在本地调试环境里使用，因此缺失配置时直接抛错更容易尽早发现问题。
 function getRequiredEnvValue(name: string) {
@@ -45,11 +46,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const redirectTo = new URL("/auth/confirm", request.url).toString();
+    const redirectTo = createAppUrl("/auth/confirm", request.url).toString();
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
-        // 这里只把 Supabase 当成“生成链接的管理端客户端”使用，
+        // Supabase 在开发登录链路中只承担“生成链接的管理端客户端”职责，
         // 不需要 token 自动刷新，也不需要在服务端持久化 session。
         autoRefreshToken: false,
         persistSession: false,
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
     }
 
     // admin.generateLink 返回的是用于后续确认的原始参数，
-    // 这里手动拼回 confirm URL，模拟用户点击了邮件中的登录链接。
+    // confirm URL 使用 generateLink 返回的原始确认参数，模拟用户点击邮件中的登录链接。
     const tokenHash = data.properties.hashed_token;
     const verificationType = data.properties.verification_type;
 
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
       throw new Error("未生成有效的开发登录确认参数。");
     }
 
-    const confirmUrl = new URL("/auth/confirm", request.url);
+    const confirmUrl = createAppUrl("/auth/confirm", request.url);
     confirmUrl.searchParams.set("token_hash", tokenHash);
     confirmUrl.searchParams.set("type", verificationType);
 

@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { AlertCircleIcon, ArrowRightIcon, MailIcon, SparklesIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  ArrowRightIcon,
+  GitBranchIcon,
+  MailIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +27,7 @@ type AuthFeedbackState = {
   code?: string | null;
 };
 
-// 登录相关报错可能来自 fetch、Supabase callback 或手动抛错，统一在这里做前端提示翻译。
+// 登录相关报错可能来自 fetch、Supabase callback 或手动抛错，需要统一转换成前端提示。
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -32,7 +38,7 @@ function getErrorMessage(error: unknown) {
 
 /**
  * Supabase 邮箱回调既可能把状态放在 query string，也可能放在 hash。
- * 这里统一解析，避免前端只覆盖到其中一种回跳形态。
+ * 统一解析两种形态，避免登录页遗漏某类回跳提示。
  */
 function parseAuthFeedbackFromLocation(): AuthFeedbackState | null {
   const queryParams = new URLSearchParams(window.location.search);
@@ -95,9 +101,10 @@ export function AuthPanel({
   const [feedback, setFeedback] = useState(initialMessage);
   const [feedbackType, setFeedbackType] = useState<"info" | "error">(initialMessageType);
   const [feedbackCode, setFeedbackCode] = useState<string | null>(null);
+  const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
 
-  // 管理登录页首次挂载时的本地恢复。
-  // 当前实现会读取上次输入过的邮箱，并解析 URL / hash 中的登录回跳结果来初始化提示状态。
+  // 登录页首次挂载时需要恢复本机邮箱，并解析 URL / hash 中的登录回跳结果。
+  // 这能让过期链接、OAuth 失败和邮件发送成功都落到同一个提示区域。
   useEffect(() => {
     const savedEmail = window.localStorage.getItem(LAST_AUTH_EMAIL_KEY);
 
@@ -214,6 +221,22 @@ export function AuthPanel({
                   : "发送链接"}
             </Button>
           </form>
+
+          <div className="mt-3">
+            <Button
+              variant="outline"
+              className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
+              type="button"
+              disabled={isSubmitting || isGithubSubmitting}
+              onClick={() => {
+                setIsGithubSubmitting(true);
+                window.location.assign("/api/auth/github");
+              }}
+            >
+              <GitBranchIcon data-icon="inline-start" />
+              {isGithubSubmitting ? "跳转中..." : "GitHub"}
+            </Button>
+          </div>
 
           {feedback ? (
             <Alert

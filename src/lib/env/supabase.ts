@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Supabase 公开环境变量会在浏览器和服务端同时使用，因此这里单独维护一份轻量校验。
+// Supabase 公开环境变量会在浏览器和服务端同时使用，因此需要单独维护一份轻量校验。
 const trimmedEnvStringSchema = z.preprocess(
   (value) => (typeof value === "string" ? value.trim() : ""),
   z.string(),
@@ -33,7 +33,7 @@ function formatEnvErrorMessage(error: z.ZodError) {
     .join(" ");
 }
 
-// 和 server env 一样，Supabase 配置在首次读取后缓存，避免重复 parse。
+// Supabase 配置在首次读取后缓存，避免重复 parse。
 export function getSupabaseEnv() {
   if (cachedEnv) {
     return cachedEnv;

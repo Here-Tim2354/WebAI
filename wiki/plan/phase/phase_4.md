@@ -10,10 +10,10 @@
 - `Phase 4` 不再是“是否进入多模型和增强能力”的讨论阶段，而是正式推进阶段
 - 本阶段从以下基础继续推进：
   - 会话级 `system_prompt` 链路已打通
-  - 模型注册表已落为 `ai_models + provider 子表`
-  - AI 层已拆为 `Gemini` 与 `OpenAI compatible`
+  - 模型注册表已收口为 `model_catalog + model_fetched`
+  - AI 层围绕 Gemini 原生接口组织
   - 前端模型选择入口连接模型注册表
-- 因此本阶段默认从“已有基础之上的增量增强”开始，而不是从零规划多模型系统
+- 因此本阶段默认从“已有基础之上的增量增强”开始，而不是从零规划生成系统
 
 ## 核心原则
 
@@ -96,7 +96,7 @@
   - assistant 回复的增量渲染
   - 中断生成
   - 更细粒度的消息状态管理
-  - 模型选择入口收口
+  - Gemini 模型选择入口收口
   - 当前会话模型选择记忆
   - 会话级 `system_prompt` 的正式可编辑入口
   - 当前会话控制项的第一轮组织方式
@@ -128,10 +128,10 @@
   - assistant 中断后数据库状态应写为 `cancelled`
 - 系统边界：
   - `messages.status` 保存消息状态
-  - `conversations.model_id` 保存会话模型
+  - `conversations.model_id` 保存用户启用后的 `model_fetched.id`
   - 会话级联网配置默认开启
   - 会话级思考档位默认值为 `minimal`
-  - AI provider 层统一按 delta 流消费
+  - Gemini 调用层统一按 delta 流消费
   - Gemini provider 已能区分普通 text delta 与 `part.thought` thought summary delta
   - 聊天接口使用 NDJSON 事件流
   - `/api/chat` 已支持可选 `urls`
@@ -252,17 +252,17 @@
   - 模型能力字段从 `supports_file_search` 调整为 `supports_files`
   - 输入区支持上传、粘贴、拖拽图片和文件
   - URL、图片、文件统一进入“修改附加项”窗口
+  - Gemini 设置支持按用户 API Key / URL 拉取模型，并在用户私有模型列表中启用 / 停用
   - user 消息支持图片缩略图、点击放大和文件条展示
   - 发送、编辑、重新生成、分支均沿用消息级 metadata 上下文
-  - Gemini 输入组装已支持图片、PDF 与文本类文件
+  - Gemini 输入组装已支持图片、PDF、文本类文件与 Excel 转换后的 CSV
   - Storage object key 已改为安全路径，原始文件名只保留在 metadata 中展示，避免中文/空格文件名触发 Storage `Invalid key`
-  - Office 三件套采用服务端临时转 PDF、Storage 只保存 PDF 的策略；转换依赖 LibreOffice / soffice
-  - Markdown 正文渲染已支持基础 LaTeX 公式
+  - Word / PPT 不作为上传支持类型，文件选择阶段直接提示支持范围
+  - Markdown 正文渲染支持基础 LaTeX 公式和 `\ce{}` 化学式语法
   - 编辑带附件消息优先走数据库 RPC，并保留直接 update + delete 兜底路径，降低 RPC 单点失败风险
 - 阶段判断：
   - 多模态附件链路已经进入可体验阶段，但产品体验还需要继续打磨
-  - 文件选择、上传反馈、弹窗保存、编辑带附件消息、重新生成、分支、历史恢复、LaTeX 渲染和移动端图片预览都需要继续用真实数据深度回归
-  - Office 转 PDF 依赖部署环境中的 LibreOffice / soffice 能力，不能仅用本地 typecheck 或浏览器 smoke test 视为完成
+  - 文件选择、上传反馈、弹窗保存、编辑带附件消息、重新生成、分支、历史恢复、LaTeX / 化学式渲染和移动端图片预览都需要继续用真实数据深度回归
 - 产品边界：
   - 视频与音频明确不作为当前产品方向
   - 正文和附加项只要存在其一即可发送
@@ -272,9 +272,9 @@
   - 真实附件上传后的 UI 反馈和失败恢复
   - 编辑带附件 user 消息时的数据库原子更新 / fallback 与前端状态同步
   - assistant 重新生成和分支对附件 metadata 的继承稳定性
-  - LaTeX 渲染在流式输出、中文段落和代码块附近的边界表现
+  - LaTeX / 化学式渲染在流式输出、中文段落和代码块附近的边界表现
+  - TikZ / chemfig 不进入聊天渲染链路，避免引入 LaTeX 编译级复杂度
   - 移动端图片缩略图、页面级预览和私有 Storage 代理加载体验
-  - 部署环境是否具备 Word / PPT 转 PDF 工具链
   - 自动清理失败时是否需要后台补偿任务
 
 ### 4.5+ 预留扩展阶段
@@ -282,7 +282,6 @@
   - `Phase 4` 不应被视为封闭阶段，后续仍会继续增加新的增强功能
   - 因此阶段文档需要显式保留后续子阶段扩展位
 - 后续可能承接但暂不写死的方向包括：
-  - 更多 provider 接入
   - 更强的工具使用能力
   - 更完整的文件输入处理
   - 更深入的 Agent / reasoning 能力

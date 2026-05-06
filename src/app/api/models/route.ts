@@ -26,7 +26,7 @@ export async function GET() {
     return unauthorizedResponse();
   }
 
-  const models = await listEnabledModels(supabase);
+  const models = await listEnabledModels(supabase, user.id);
 
   return NextResponse.json(aiModelListResponseSchema.parse({ models }));
 }

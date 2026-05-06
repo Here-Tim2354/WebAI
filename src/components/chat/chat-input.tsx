@@ -43,6 +43,7 @@ import {
   getAttachmentAcceptMimeTypes,
   getAttachmentFileValidationError,
 } from "./message-attachments";
+import { normalizeUrlCandidate } from "./message-url-context";
 
 const MotionTextarea = motion.create(Textarea);
 
@@ -67,7 +68,11 @@ type ChatInputProps = {
   onAddUrlContextUrl: () => AddUrlContextResult;
   onRemoveUrlContextUrl: (url: string) => void;
   onUploadAttachments: (files: File[]) => Promise<MessageAttachment[]>;
-  onSubmit: (content: string, attachments?: MessageAttachment[]) => Promise<void>;
+  onSubmit: (
+    content: string,
+    attachments?: MessageAttachment[],
+    urls?: string[],
+  ) => Promise<void>;
   onStop: () => void;
   isSubmitting: boolean;
   disabled?: boolean;
@@ -108,8 +113,14 @@ export function ChatInput({
   const [textareaHeight, setTextareaHeight] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const urlLimitWarningTimeoutRef = useRef<number | null>(null);
+  const pendingUrlContextUrl = normalizeUrlCandidate(urlContextInputValue);
   const canSend =
-    (draftValue.trim().length > 0 || attachments.length > 0) &&
+    (
+      draftValue.trim().length > 0 ||
+      attachments.length > 0 ||
+      urlContextUrls.length > 0 ||
+      pendingUrlContextUrl !== null
+    ) &&
     !isSubmitting &&
     !disabled;
   const canStop = isSubmitting && !disabled;
@@ -164,9 +175,26 @@ export function ChatInput({
 
   const handleSubmitDraft = async () => {
     const submittedValue = draftValue;
+    const hasNewPendingUrl =
+      pendingUrlContextUrl !== null &&
+      !urlContextUrls.includes(pendingUrlContextUrl);
+
+    if (hasNewPendingUrl && urlContextUrls.length >= 4) {
+      showUrlLimitWarning();
+      return;
+    }
+
+    const submittedUrls =
+      hasNewPendingUrl
+        ? [...urlContextUrls, pendingUrlContextUrl].slice(0, 4)
+        : urlContextUrls;
 
     if (
-      (submittedValue.trim().length === 0 && attachments.length === 0) ||
+      (
+        submittedValue.trim().length === 0 &&
+        attachments.length === 0 &&
+        submittedUrls.length === 0
+      ) ||
       isSubmitting ||
       disabled
     ) {
@@ -176,7 +204,7 @@ export function ChatInput({
     setDraftValue("");
 
     try {
-      await onSubmit(submittedValue, attachments);
+      await onSubmit(submittedValue, attachments, submittedUrls);
     } catch {
       // 发送失败时把文本草稿还给用户；附件草稿由上层状态保留。
       setDraftValue(submittedValue);
@@ -231,8 +259,7 @@ export function ChatInput({
     setTextareaHeight(nextHeight);
   }, [draftValue]);
 
-  // 管理发送完成后的焦点回归。
-  // 当前实现是在 isSubmitting 重新变回 false 时，把光标焦点放回输入框。
+  // 发送完成后把焦点带回输入框，保持连续对话的输入节奏。
   useEffect(() => {
     if (!isSubmitting) {
       textareaRef.current?.focus();

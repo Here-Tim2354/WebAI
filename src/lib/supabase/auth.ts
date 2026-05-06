@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * 后端路由常见需求是“既要 supabase client，又要当前 user”，
- * 这里把两步合成一个公共入口，避免每个 route 都重复样板代码。
+ * 公共入口把两步合并，避免每个 route 都重复样板代码。
  */
 export async function getSupabaseAuthContext() {
   const supabase = await createSupabaseServerClient();

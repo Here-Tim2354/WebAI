@@ -1,5 +1,5 @@
 // 附件能力同时被客户端预校验、服务端上传处理和消息展示使用。
-// 这些常量集中在这里，避免前端和后端各维护一套支持类型与大小限制。
+// 这些常量集中维护，避免前端和后端各保留一套支持类型与大小限制。
 export const MESSAGE_ATTACHMENTS_BUCKET = "message_attachments";
 
 export const MAX_MESSAGE_ATTACHMENTS = 5;
@@ -30,18 +30,10 @@ export const SUPPORTED_STORED_FILE_MIME_TYPES = [
   "text/csv",
 ] as const;
 
-export const SUPPORTED_OFFICE_MIME_TYPES = [
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-] as const;
-
 export const SUPPORTED_SPREADSHEET_MIME_TYPES = [XLSX_MIME_TYPE] as const;
 
 export const SUPPORTED_FILE_MIME_TYPES = [
   ...SUPPORTED_STORED_FILE_MIME_TYPES,
-  ...SUPPORTED_OFFICE_MIME_TYPES,
   ...SUPPORTED_SPREADSHEET_MIME_TYPES,
 ] as const;
 
@@ -50,12 +42,11 @@ export const SUPPORTED_FILE_EXTENSIONS = [
   ".txt",
   ".md",
   ".csv",
-  ".doc",
-  ".docx",
   ".xlsx",
-  ".ppt",
-  ".pptx",
 ] as const;
+
+export const SUPPORTED_ATTACHMENT_DESCRIPTION =
+  "目前仅支持上传 PDF、Excel（.xlsx）、PNG、JPG、WEBP、TXT、Markdown、CSV。";
 
 export const ATTACHMENT_EXTENSION_MIME_TYPE_ENTRIES = [
   [".png", "image/png"],
@@ -90,9 +81,6 @@ export const SUPPORTED_IMAGE_EXTENSION_SET = new Set<string>(
 );
 export const SUPPORTED_STORED_FILE_MIME_TYPE_SET = new Set<string>(
   SUPPORTED_STORED_FILE_MIME_TYPES,
-);
-export const SUPPORTED_OFFICE_MIME_TYPE_SET = new Set<string>(
-  SUPPORTED_OFFICE_MIME_TYPES,
 );
 export const SUPPORTED_SPREADSHEET_MIME_TYPE_SET = new Set<string>(
   SUPPORTED_SPREADSHEET_MIME_TYPES,

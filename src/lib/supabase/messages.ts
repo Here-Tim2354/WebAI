@@ -19,7 +19,14 @@ type MessageRow = {
 const messageSelectFields =
   "id, conversation_id, sender_type, content, status, metadata, created_at";
 
-// messages 表里用 sender_type 表示消息来源，这里映射回前端统一的 role/status 结构。
+export class MessageMutationConflictError extends Error {
+  constructor(message = "消息已被新的编辑替换，无法继续写回旧回复。") {
+    super(message);
+    this.name = "MessageMutationConflictError";
+  }
+}
+
+// messages 表用 sender_type 表示消息来源，数据访问层映射回前端统一的 role/status 结构。
 function mapMessageRow(row: MessageRow): ChatMessage {
   return createChatMessage({
     id: row.id,
@@ -91,10 +98,14 @@ export async function getConversationMessage(
     .select(messageSelectFields)
     .eq("id", messageId)
     .eq("conversation_id", conversationId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new MessageMutationConflictError("消息不存在，或你没有访问权限。");
   }
 
   return data as MessageRow;
@@ -202,10 +213,14 @@ export async function updateConversationMessage(
     .eq("id", messageId)
     .eq("conversation_id", conversationId)
     .select(messageSelectFields)
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new MessageMutationConflictError();
   }
 
   return mapMessageRow(data as MessageRow);

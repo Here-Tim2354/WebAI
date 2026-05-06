@@ -101,7 +101,7 @@ export async function POST(request: Request, context: RouteContext) {
       user.id,
       conversationId,
     );
-    // 这里按消息列表位置截断上下文，而不是用 created_at <= target.created_at。
+    // 分支按消息列表位置截断上下文，而不是用 created_at <= target.created_at。
     // 这样即使历史数据存在同一时间戳，也不会把目标之后的消息误复制进分支。
     const { targetMessage, messages } = await listConversationMessagesThrough(
       supabase,

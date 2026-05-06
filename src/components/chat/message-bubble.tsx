@@ -533,7 +533,11 @@ export function MessageBubble({
 
     if (
       !canEdit ||
-      (trimmedValue.length === 0 && editAttachments.length === 0)
+      (
+        trimmedValue.length === 0 &&
+        editUrls.length === 0 &&
+        editAttachments.length === 0
+      )
     ) {
       return;
     }
@@ -652,8 +656,16 @@ export function MessageBubble({
             >
               <PaperclipIcon className="size-3.5" />
               修改附加项
-              {editAttachments.length > 0 ? ` · ${editAttachments.length}` : ""}
+              {editUrls.length + editAttachments.length > 0
+                ? ` · ${editUrls.length + editAttachments.length}`
+                : ""}
             </Button>
+            {editUrls.length > 0 ? (
+              <MessageUrlContextSummary
+                urls={editUrls}
+                className="pt-1"
+              />
+            ) : null}
             <AttachmentPreviewList
               attachments={editAttachments}
               className="pt-1"
@@ -682,6 +694,7 @@ export function MessageBubble({
                     isSubmittingEdit ||
                     (
                       editValue.trim().length === 0 &&
+                      editUrls.length === 0 &&
                       editAttachments.length === 0
                     )
                   }

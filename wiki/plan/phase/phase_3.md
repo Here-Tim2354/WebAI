@@ -268,7 +268,7 @@
 - 与此同时，`Phase 4` 的前期铺设已经开始：
   - 会话级 `system_prompt` 已打通
   - 模型注册表已落库
-  - AI 调用层已拆分为 `Gemini` 与 `OpenAI compatible`
+  - AI 调用层围绕 Gemini 原生接口继续收口
 - 因此当前不再是单线进入 `Phase 3.6`，而是：
   - 保持 `Phase 3` 主线作为验收基线
   - 以不破坏数据库主线为前提，逐步推进 `Phase 4` 扩展

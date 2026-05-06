@@ -26,6 +26,7 @@ import {
   MAX_IMAGE_ATTACHMENT_SIZE,
   MAX_MESSAGE_ATTACHMENTS,
   MAX_MESSAGE_ATTACHMENTS_SIZE,
+  SUPPORTED_ATTACHMENT_DESCRIPTION,
   SUPPORTED_FILE_EXTENSION_SET,
   SUPPORTED_FILE_MIME_TYPE_SET,
   SUPPORTED_IMAGE_EXTENSION_SET,
@@ -85,11 +86,7 @@ export function getAttachmentAcceptMimeTypes({
           "text/csv",
           ".md",
           ".csv",
-          ".doc",
-          ".docx",
           ".xlsx",
-          ".ppt",
-          ".pptx",
         ]
       : []),
   ].join(",");
@@ -105,7 +102,7 @@ function isSupportedByCurrentModel(
     supportsImages: boolean;
   },
 ) {
-  // Windows / Office 场景经常给空 MIME 或泛 MIME，所以这里同时按扩展名兜底判断。
+  // Windows / Office 场景经常给空 MIME 或泛 MIME，因此同时按扩展名兜底判断。
   if (SUPPORTED_IMAGE_MIME_TYPE_SET.has(file.type)) {
     return supportsImages;
   }
@@ -146,7 +143,7 @@ export function getAttachmentFileValidationError(
         !isSupportedByCurrentModel(file, { supportsFiles, supportsImages }),
     )
   ) {
-    return "当前模型不支持所选文件类型。";
+    return SUPPORTED_ATTACHMENT_DESCRIPTION;
   }
 
   if (currentAttachmentCount + files.length > MAX_MESSAGE_ATTACHMENTS) {

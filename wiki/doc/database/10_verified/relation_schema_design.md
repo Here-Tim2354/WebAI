@@ -32,22 +32,21 @@
 - `profiles`
 - `conversations`
 - `messages`
-- `ai_models`
-- `openai_compatible_models`
-- `gemini_models`
+- `model_catalog`
+- `model_fetched`
 
 其中：
 
 - `auth.users` 与 `profiles` 承接用户身份与展示资料
 - `conversations` 与 `messages` 构成数据库课程设计主线
-- `ai_models` 作为模型注册表父表承接通用字段
-- `openai_compatible_models` 与 `gemini_models` 作为 provider 子表承接实现差异
+- `model_catalog` 是服务端私有维护的 Gemini 能力参照表
+- `model_fetched` 是用户通过 Gemini 设置拉取并启用 / 停用的模型列表
 
 阶段位置：
 
 - 数据库课程设计主线仍是“用户进入系统 -> 创建或打开会话 -> 发送消息 -> 恢复历史会话”
-- 模型注册表属于 `Phase 4` 已进入实现的系统配置能力
-- 模型注册表已经影响前端模型选择和服务端 provider 分发，因此不能再当作纯设想
+- 模型目录属于 `Phase 4` 的系统配置能力
+- 模型目录影响前端模型选择和服务端 Gemini 请求，因此不能当作纯设想
 
 ---
 
@@ -96,7 +95,7 @@
 | `user_id` | `uuid` | 否 | 否 | `auth.users.id` | 无 | 所属用户 |
 | `title` | `varchar(100)` | 否 | 否 | 否 | 无 | 会话标题 |
 | `system_prompt` | `text` | 是 | 否 | 否 | 无 | 会话级提示词 |
-| `model_id` | `uuid` | 是 | 否 | `ai_models.id` | 无 | 当前会话模型 |
+| `model_id` | `uuid` | 是 | 否 | `model_fetched.id` | 无 | 当前会话模型 |
 | `web_search_enabled` | `boolean` | 否 | 否 | 否 | `true` | 会话级联网开关 |
 | `thinking_level` | `text` | 否 | 否 | 否 | `minimal` | 会话级思考档位，取值为 `minimal / low / medium / high` |
 | `status` | `conversation_status` | 否 | 否 | 否 | `active` | 会话状态 |
@@ -118,94 +117,67 @@
 | `content` | `text` | 否 | 否 | 否 | 无 | 消息内容 |
 | `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 发送时间 |
 
-### 5. 模型注册表父表
+### 5. 内部模型目录表
 
-- 中文表名：模型注册表
-- 英文表名：`ai_models`
-- 作用：保存跨 provider 通用的模型元数据，并作为统一 `modelId` 的来源
-
-字段以查询路径和接口契约为准：
+- 中文表名：内部模型目录
+- 英文表名：`model_catalog`
+- 作用：保存 Gemini 主流模型的能力补全参照，不直接作为用户可选模型列表
 
 | 字段名 | 类型 | 可空 | 说明 |
 | --- | --- | --- | --- |
-| `id` | `uuid` | 否 | 注册表主键，也是前后端统一使用的 `modelId` |
-| `provider` | `varchar(50)` | 否 | 当前取值为 `openai_compatible` / `gemini` |
-| `api_style` | `varchar(50)` | 否 | 当前 provider 对应的接口风格 |
-| `upstream_model_id` | `varchar(160)` | 否 | 上游真实模型标识 |
+| `id` | `uuid` | 否 | 目录主键 |
+| `provider` | `varchar(50)` | 否 | 固定为 `gemini` |
+| `api_style` | `varchar(50)` | 否 | 固定为 `gemini_native` |
+| `model_id` | `varchar(160)` | 否 | Gemini 模型唯一标识 |
+| `label` | `varchar(160)` | 否 | 模型展示名称 |
+| `description` | `text` | 是 | 模型说明 |
+| `icon` | `text` | 是 | 图标资源 |
+| `input_token_limit` | `integer` | 是 | 输入 token 上限 |
+| `output_token_limit` | `integer` | 是 | 输出 token 上限 |
+| `capabilities` | `jsonb` | 否 | 能力覆盖表 |
+| `raw_metadata` | `jsonb` | 否 | 上游原始元数据 |
+| `source` | `varchar(50)` | 否 | 来源标记 |
+| `default_enabled` | `boolean` | 否 | 用户模型列表初始化时是否默认启用 |
+| `is_default` | `boolean` | 否 | 是否作为默认模型模板 |
+| `sort_order` | `integer` | 否 | 展示排序权重 |
+
+说明：
+
+- `model_catalog` 不开放给普通用户直接维护
+- fetch 到的模型若能按 `model_id` 命中目录，就使用目录能力补全不完整的上游参数
+
+### 6. 用户拉取模型表
+
+- 中文表名：用户拉取模型
+- 英文表名：`model_fetched`
+- 作用：保存用户通过 Gemini URL / API Key 拉取到的模型，并提供启用、停用和默认模型选择
+
+| 字段名 | 类型 | 可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | 否 | 用户模型主键，也是前后端统一使用的 `modelId` |
+| `user_id` | `uuid` | 否 | 所属用户 |
+| `provider` | `varchar(50)` | 否 | 固定为 `gemini` |
+| `api_style` | `varchar(50)` | 否 | 固定为 `gemini_native` |
+| `base_url` | `text` | 否 | Gemini API Base URL，默认官方地址 |
+| `model_id` | `varchar(160)` | 否 | Gemini 上游模型标识 |
 | `label` | `varchar(160)` | 否 | 前端展示名称 |
 | `description` | `text` | 是 | 模型说明 |
 | `icon` | `text` | 是 | 图标资源 |
-| `is_enabled` | `boolean` | 否 | 是否启用 |
-| `is_default` | `boolean` | 否 | 是否为该 provider 的默认模型 |
-| `sort_order` | `integer` | 否 | 前端排序权重 |
+| `input_token_limit` | `integer` | 是 | 输入 token 上限 |
+| `output_token_limit` | `integer` | 是 | 输出 token 上限 |
+| `capabilities` | `jsonb` | 否 | 合并后的能力覆盖表 |
+| `raw_metadata` | `jsonb` | 否 | 上游原始元数据 |
+| `catalog_id` | `uuid` | 是 | 命中的内部目录记录 |
+| `source` | `varchar(50)` | 否 | `catalog` 或 `fetched` |
+| `is_enabled` | `boolean` | 否 | 是否在模型选择器中启用 |
+| `is_default` | `boolean` | 否 | 是否为该用户默认模型 |
+| `sort_order` | `integer` | 否 | 展示排序权重 |
+| `fetched_at` | `timestamptz` | 是 | 最近一次拉取时间 |
 
 说明：
 
-- `ai_models` 是当前模型注册表的统一入口
-- `src/lib/supabase/model-registry.ts` 已先读取父表，再按 provider 到子表补全细节
-
-### 6. OpenAI 兼容模型子表
-
-- 中文表名：OpenAI 兼容模型
-- 英文表名：`openai_compatible_models`
-- 作用：保存采用 OpenAI 兼容接口的 provider 专属字段与能力位
-
-字段以查询路径和接口契约为准：
-
-| 字段名 | 类型 | 可空 | 说明 |
-| --- | --- | --- | --- |
-| `ai_model_id` | `uuid` | 否 | 关联 `ai_models.id` |
-| `model_id` | `varchar(160)` | 否 | 上游兼容接口模型标识 |
-| `base_url` | `text` | 是 | 兼容接口基地址 |
-| `supports_text` | `boolean` | 否 | 文本能力 |
-| `supports_image` | `boolean` | 否 | 图像能力 |
-| `supports_audio` | `boolean` | 否 | 音频能力 |
-| `supports_video` | `boolean` | 否 | 视频能力 |
-| `supports_web_search` | `boolean` | 否 | 联网能力 |
-| `supports_function_calling` | `boolean` | 否 | 函数调用能力 |
-| `supports_tools` | `boolean` | 否 | 工具能力总开关 |
-| `supports_files` | `boolean` | 否 | 文件输入能力 |
-| `supports_structured_outputs` | `boolean` | 否 | 结构化输出能力 |
-| `supports_streaming` | `boolean` | 否 | 流式能力 |
-| `supports_reasoning` | `boolean` | 否 | 推理能力 |
-
-说明：
-
-- 模型注册表采用父子表结构
-- `base_url` 仍由该子表提供给 `OpenAI compatible` 调用层
-- 通用展示字段、启用状态与默认模型策略统一放在父表 `ai_models`
-
-### 7. Gemini 模型子表
-
-- 中文表名：Gemini 模型
-- 英文表名：`gemini_models`
-- 作用：保存 Gemini provider 专属字段与能力位
-
-字段以查询路径和接口契约为准：
-
-| 字段名 | 类型 | 可空 | 说明 |
-| --- | --- | --- | --- |
-| `ai_model_id` | `uuid` | 否 | 关联 `ai_models.id` |
-| `name` | `varchar(160)` | 否 | Gemini 官方模型名 |
-| `supports_text` | `boolean` | 否 | 文本能力 |
-| `supports_image` | `boolean` | 否 | 图像能力 |
-| `supports_audio` | `boolean` | 否 | 音频能力 |
-| `supports_video` | `boolean` | 否 | 视频能力 |
-| `supports_google_search` | `boolean` | 否 | Google Search grounding |
-| `supports_url_context` | `boolean` | 否 | URL Context |
-| `supports_code_execution` | `boolean` | 否 | Code Execution |
-| `supports_function_calling` | `boolean` | 否 | 函数调用能力 |
-| `supports_tools` | `boolean` | 否 | 工具能力总开关 |
-| `supports_files` | `boolean` | 否 | 文件输入能力 |
-| `supports_structured_outputs` | `boolean` | 否 | 结构化输出能力 |
-| `supports_streaming` | `boolean` | 否 | 流式能力 |
-| `supports_reasoning` | `boolean` | 否 | 推理能力 |
-
-说明：
-
-- 模型注册表采用父子表结构
-- `url_context`、`code_execution` 等能力位仍由该子表提供给运行时模型
-- 通用展示字段、启用状态与默认模型策略统一放在父表 `ai_models`
+- 前端模型选择只读取用户已启用的 `model_fetched`
+- 用户拉取模型时只保存模型元数据，不保存 API Key
 
 ---
 
@@ -217,25 +189,27 @@
 - `profiles.user_id`
 - `conversations.id`
 - `messages.id`
-- `ai_models.id`
-- `openai_compatible_models.id`
-- `gemini_models.id`
+- `model_catalog.id`
+- `model_fetched.id`
 
 ### 外键
 
 - `profiles.user_id -> auth.users.id`
 - `conversations.user_id -> auth.users.id`
 - `messages.conversation_id -> conversations.id`
-- `openai_compatible_models.ai_model_id -> ai_models.id`
-- `gemini_models.ai_model_id -> ai_models.id`
+- `conversations.model_id -> model_fetched.id`
+- `model_fetched.user_id -> auth.users.id`
+- `model_fetched.catalog_id -> model_catalog.id`
 
 ### 核心约束
 
-- `ai_models.provider` 取值为 `openai_compatible` / `gemini`
+- `model_catalog.provider` 与 `model_fetched.provider` 固定为 `gemini`
+- `model_catalog.api_style` 与 `model_fetched.api_style` 固定为 `gemini_native`
+- `model_catalog.model_id` 全局唯一
+- `model_fetched(user_id, base_url, model_id)` 唯一
+- 每个用户最多一个启用中的默认模型
 - `conversations.status` 取值为 `active` / `archived`
 - `messages.sender_type` 取值为 `user` / `assistant`
-- `openai_compatible_models.model_id` 仍与父表 `upstream_model_id` 一致
-- `gemini_models.name` 仍与父表 `upstream_model_id` 一致
 
 ---
 
@@ -248,16 +222,15 @@
 - `conversations.updated_at`
 - `messages.conversation_id`
 - `messages(conversation_id, created_at)`
-- `ai_models(is_enabled)`
-- `ai_models(sort_order, label)` with `is_enabled = true` 的查询模式
-- `ai_models(provider)` with `is_default = true` 的部分唯一约束
-- `openai_compatible_models.ai_model_id`
-- `gemini_models.ai_model_id`
+- `model_catalog(default_enabled, sort_order, label)`
+- `model_fetched(user_id, is_enabled, sort_order, label)`
+- `model_fetched(user_id, model_id)`
+- `model_fetched(user_id)` with `is_default = true and is_enabled = true` 的部分唯一约束
 
 说明：
 
 - 外键列索引和复合索引是当前查询路径的必要条件
-- 默认模型当前通过父表按 provider 维度约束，而不是再由两张子表各自兜底
+- 用户侧默认模型通过 `model_fetched` 的用户维度部分唯一约束保证
 
 ---
 
@@ -270,14 +243,14 @@
 
 ### 删除用户
 
-- 用户删除不是当前普通业务功能重点
-- 但从完整性角度，用户相关资料与会话数据应由系统级逻辑统一处理
+- `profiles.user_id`、`conversations.user_id` 与 `model_fetched.user_id` 都应跟随用户边界处理
+- 用户拉取模型属于用户私有配置，不应跨用户共享
 
-### 模型注册表
+### 模型目录
 
-- 模型注册表当前更偏系统配置层
-- 当前主线不是删除模型记录，而是启用 / 停用与默认模型切换
-- 当前统一入口是 `ai_models`，provider 子表跟随父表记录一起维护
+- `model_catalog` 是内部能力参照表
+- `model_fetched.catalog_id` 使用 `on delete set null`，避免目录调整直接破坏用户侧模型列表
+- `conversations.model_id` 使用 `on delete set null`，避免停用或清理用户模型时破坏会话记录
 
 ---
 
@@ -291,9 +264,8 @@
   - `conversations`
   - `messages`
 - 系统配置层：
-  - `ai_models`
-  - `openai_compatible_models`
-  - `gemini_models`
+  - `model_catalog`
+  - `model_fetched`
 
 这篇笔记不混入的扩展实体：
 
@@ -306,4 +278,4 @@
 
 ## 七、一句话总结
 
-这组核心关系模式足以支撑数据库课程设计主线和“父表 + provider 子表”的第一版模型注册表；后续扩展能力继续通过扩展层笔记推进，避免和数据库主线混写。
+这组核心关系模式足以支撑数据库课程设计主线和 Gemini-only 模型目录；后续扩展能力继续通过扩展层笔记推进，避免和数据库主线混写。

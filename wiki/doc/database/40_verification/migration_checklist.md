@@ -5,10 +5,11 @@
 - [x] `profiles`
 - [x] `conversations`
 - [x] `messages`
-- [x] `ai_models`
-- [x] `openai_compatible_models`
-- [x] `gemini_models`
+- [x] `model_catalog`
+- [x] `model_fetched`
 - [x] `conversations.web_search_enabled`
+- [x] `20260505023000_phase4_gemini_only_model_registry.sql`
+- [x] `20260505043000_phase4_model_catalog_and_fetched.sql`
 
 ## 验证项
 
@@ -16,18 +17,17 @@
 - [x] 表名、字段名和代码 `select` 字段一致
 - [x] 默认值和非空约束与业务语义一致
 - [x] 删除策略与业务语义一致
-- [x] 模型注册表父表与子表外键关系已明确
-- [x] 模型注册表默认模型约束已明确
-- [x] 若采用破坏式重建，需确认 `openai_compatible_models` 与 `gemini_models` 可直接删除重建
-- [x] 父表 `ai_models` 作为统一入口，子表仅保留 provider 专属字段
+- [x] `model_catalog` 与 `model_fetched` 的职责边界已明确
+- [x] `model_fetched` 默认模型约束已按用户维度明确
+- [x] `model_fetched.provider` 约束为 `gemini`
+- [x] `model_fetched.api_style` 约束为 `gemini_native`
 - [x] 会话级联网搜索字段位于 `conversations`
 
 ## 缺口
 
-- [ ] `OpenAI compatible` 首批 seed 仍未补齐
 - [ ] 更多 `Gemini` 常用模型 seed 仍未补齐
 - [ ] RLS advisor 与性能 advisor 的遗留项仍需单独收口
-- [ ] `Gemini URL Context` 的前端输入入口与结果展示仍未补齐
+- [ ] 用户手动编辑模型能力的交互仍未补齐
 
 ## 原则
 

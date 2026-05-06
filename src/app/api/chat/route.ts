@@ -34,7 +34,7 @@ function unauthorizedResponse() {
 
 /**
  * 聊天链路同时依赖数据库、模型注册表和环境变量。
- * 这里把不同来源的错误分开翻译，避免前端只能收到模糊的 500。
+ * 不同来源的错误需要分开翻译，避免前端只能收到模糊的 500。
  */
 function handleChatError(error: unknown) {
   if (error instanceof ConversationAccessError) {
@@ -90,7 +90,7 @@ function handleChatError(error: unknown) {
 }
 
 /**
- * 发送消息的主链路已经切换成纯流式：
+ * 发送消息的主链路采用纯流式：
  * 1. 校验请求和会话归属
  * 2. 写入用户消息
  * 3. 创建 assistant 占位记录
@@ -134,11 +134,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const { conversationId, content, modelId, thinkingLevel, urls, attachments } =
+    const {
+      conversationId,
+      content,
+      modelId,
+      thinkingLevel,
+      urls,
+      attachments,
+      geminiRuntimeConfig,
+    } =
       parsedRequest.data;
+
+    if (!geminiRuntimeConfig?.apiKey?.trim()) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "请先在 Gemini 设置中填写 API Key。",
+          },
+        },
+        { status: 400 },
+      );
+    }
 
     // 先校验会话归属关系，再允许后续消息写入，避免把消息插进不属于当前用户的会话。
     let conversation = await getConversationById(supabase, user.id, conversationId);
+
+    const effectiveModelId = modelId ?? conversation.modelId;
+    const selectedModel = effectiveModelId
+      ? await getEnabledModelById(supabase, user.id, effectiveModelId)
+      : null;
 
     if (
       (modelId && conversation.modelId !== modelId) ||
@@ -153,13 +177,8 @@ export async function POST(request: Request) {
       });
     }
 
-    const effectiveModelId = modelId ?? conversation.modelId;
-    const selectedModel = effectiveModelId
-      ? await getEnabledModelById(supabase, effectiveModelId)
-      : null;
-
-    // 附件 metadata 由前端传入，但对象本身已经在私有 Storage 中。
-    // 这里统一确认路径归属和模型能力，避免用户伪造其它用户的 storagePath。
+    // 附件 metadata 由前端传入，但对象本身保存在私有 Storage 中。
+    // 路径归属和模型能力必须在服务端确认，避免用户伪造其它用户的 storagePath。
     assertAttachmentInputAllowed({
       userId: user.id,
       attachments: attachments ?? [],
@@ -179,7 +198,7 @@ export async function POST(request: Request) {
     );
 
     conversation = await touchConversation(supabase, user.id, conversationId);
-    // messagesForModel 读取的是“用户消息已写入数据库之后”的完整上下文，
+    // messagesForModel 读取的是“用户消息写入数据库之后”的完整上下文，
     // 这样模型看到的上下文和最终持久化状态保持一致。
     const messagesForModel = await listConversationMessages(supabase, conversationId);
     return createAssistantStreamResponse({
@@ -189,6 +208,7 @@ export async function POST(request: Request) {
       messagesForModel,
       model: selectedModel,
       thinkingLevel: conversation.thinkingLevel,
+      geminiRuntimeConfig,
       urls,
       attachments,
       requestSignal: request.signal,

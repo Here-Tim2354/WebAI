@@ -1,8 +1,7 @@
-import { ChatMessage } from "@/lib/schemas/chat";
+import { ChatMessage, GeminiRuntimeConfig } from "@/lib/schemas/chat";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { RuntimeAIModel } from "@/lib/supabase/model-registry";
 import { streamWithGemini } from "./gemini";
-import { streamWithOpenAICompatible } from "./openai-compatible";
 import { ThinkingLevel } from "@/lib/schemas/thinking";
 
 type StreamAssistantReplyOptions = {
@@ -12,27 +11,18 @@ type StreamAssistantReplyOptions = {
   urls?: string[];
   supabase?: SupabaseClient;
   thinkingLevel?: ThinkingLevel;
+  geminiRuntimeConfig?: GeminiRuntimeConfig;
   abortSignal?: AbortSignal;
 };
 
 /**
- * AI 流式调用入口只做 provider 分发，不掺杂 provider 细节。
+ * AI 流式调用入口固定走 Gemini。
  * 上层聊天接口始终按“增量文本片段”消费，不再保留一次性整段返回的旧模式。
  */
 export async function* streamAssistantReply(
   messages: ChatMessage[],
   options?: StreamAssistantReplyOptions,
 ) {
-  if (options?.model?.provider === "openai_compatible") {
-    yield* streamWithOpenAICompatible(messages, {
-      model: options.model,
-      conversationSystemPrompt: options.conversationSystemPrompt,
-      abortSignal: options.abortSignal,
-    });
-
-    return;
-  }
-
   yield* streamWithGemini(messages, {
     conversationSystemPrompt: options?.conversationSystemPrompt,
     webSearchEnabled: options?.webSearchEnabled,
@@ -41,10 +31,9 @@ export async function* streamAssistantReply(
     thinkingLevel: options?.model?.capabilities.reasoning
       ? options?.thinkingLevel
       : undefined,
-    modelName:
-      options?.model?.provider === "gemini"
-        ? options.model.upstreamModelId
-        : undefined,
+    runtimeConfig: options?.geminiRuntimeConfig,
+    modelName: options?.model?.upstreamModelId,
+    modelBaseUrl: options?.model?.baseUrl,
     abortSignal: options?.abortSignal,
   });
 }

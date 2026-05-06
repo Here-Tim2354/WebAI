@@ -27,7 +27,7 @@ function unauthorizedResponse() {
 
 /**
  * 获取当前用户的会话列表。
- * 排序规则不在这里重复实现，而是交给 Supabase 查询层统一处理。
+ * 排序规则不在路由层重复实现，而是交给 Supabase 查询层统一处理。
  */
 export async function GET(request: Request) {
   const { supabase, user } = await getSupabaseAuthContext();
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     try {
       payload = await request.json();
     } catch {
-      // 空 body 在当前产品里也是合法输入，默认按“新会话”创建。
+      // 空 body 对新会话创建是合法输入，默认按“新会话”处理。
       payload = {};
     }
 
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.modelId) {
-      await getEnabledModelById(supabase, parsed.data.modelId);
+      await getEnabledModelById(supabase, user.id, parsed.data.modelId);
     }
 
     const conversation = await createConversation(

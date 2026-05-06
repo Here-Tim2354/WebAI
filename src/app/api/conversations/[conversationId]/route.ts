@@ -101,7 +101,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 /**
- * 当前 PATCH 同时承担两类会话级更新：
+ * PATCH 同时承担两类会话级更新：
  * 1. 标题重命名
  * 2. 会话级 system prompt 更新
  * 3. 模型、联网和思考档位等会话控制项更新
@@ -145,7 +145,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { conversationId } = await context.params;
 
     if (parsed.data.modelId) {
-      await getEnabledModelById(supabase, parsed.data.modelId);
+      await getEnabledModelById(supabase, user.id, parsed.data.modelId);
     }
 
     const conversation = await updateConversation(

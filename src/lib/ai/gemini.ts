@@ -5,8 +5,14 @@ import {
 } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { downloadAttachmentBuffer } from "@/lib/attachments";
+import { DEFAULT_GEMINI_BASE_URL } from "@/lib/ai/gemini-model-catalog";
+import { normalizeGeminiBaseUrl } from "@/lib/ai/gemini-base-url";
 import { getServerEnv, requireServerEnvValue } from "@/lib/env/server";
-import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
+import {
+  ChatMessage,
+  GeminiRuntimeConfig,
+  MessageAttachment,
+} from "@/lib/schemas/chat";
 import { ThinkingLevel } from "@/lib/schemas/thinking";
 import { getSystemInstruction } from "./system-instruction";
 import { AssistantStreamDelta } from "./types";
@@ -17,7 +23,9 @@ type GenerateWithGeminiOptions = {
   urls?: string[];
   supabase?: SupabaseClient;
   modelName?: string;
+  modelBaseUrl?: string;
   thinkingLevel?: ThinkingLevel;
+  runtimeConfig?: GeminiRuntimeConfig;
   abortSignal?: AbortSignal;
 };
 
@@ -62,10 +70,13 @@ function withUrlContextPrompt(messages: ChatMessage[], urls: string[]) {
   }
 
   const nextMessages = [...messages];
+  const urlContextPrompt = `请结合以下 URL 作为上下文来源：\n${urls
+    .map((url, index) => `${index + 1}. ${url}`)
+    .join("\n")}`;
   // URL Context 是请求级能力，不直接改数据库里的消息正文。
-  // 这里只在发给 Gemini 前临时增强最后一条用户消息。
+  // 发给 Gemini 前只临时增强最后一条用户消息。
   const lastUserMessageIndex = [...nextMessages].findLastIndex(
-    (message) => message.role === "user" && message.content.trim().length > 0,
+    (message) => message.role === "user",
   );
 
   if (lastUserMessageIndex === -1) {
@@ -73,18 +84,20 @@ function withUrlContextPrompt(messages: ChatMessage[], urls: string[]) {
   }
 
   const lastUserMessage = nextMessages[lastUserMessageIndex];
+  const content = lastUserMessage.content.trim()
+    ? `${lastUserMessage.content}\n\n${urlContextPrompt}`
+    : urlContextPrompt;
+
   nextMessages[lastUserMessageIndex] = {
     ...lastUserMessage,
-    content: `${lastUserMessage.content}\n\n请结合以下 URL 作为上下文来源：\n${urls
-      .map((url, index) => `${index + 1}. ${url}`)
-      .join("\n")}`,
+    content,
   };
 
   return nextMessages;
 }
 
 // Gemini SDK 的历史消息结构不是 role/content，而是 Content.parts。
-// 这里把统一消息模型转换成 Gemini 期望的 contents 格式。
+// 统一消息模型需要转换成 Gemini 期望的 contents 格式。
 async function toGeminiAttachmentParts(
   supabase: SupabaseClient | undefined,
   attachments: MessageAttachment[] | undefined,
@@ -178,8 +191,8 @@ async function toGeminiContents(
 
 /**
  * Gemini 流式调用走 @google/genai SDK。
- * SDK 的 chunk.text 在不同模型上既可能是增量，也可能是已累计文本，
- * 这里统一折算成“只向上层产出新增片段”。
+ * SDK 的 chunk.text 在不同模型上既可能是增量，也可能是累计文本，
+ * 调用层统一折算成“只向上层产出新增片段”。
  */
 export async function* streamWithGemini(
   messages: ChatMessage[],
@@ -187,8 +200,14 @@ export async function* streamWithGemini(
 ): AsyncGenerator<AssistantStreamDelta> {
   const env = getServerEnv();
   const apiKey = requireServerEnvValue(
-    env.GEMINI_API_KEY,
-    "缺少 GEMINI_API_KEY。",
+    options?.runtimeConfig?.apiKey,
+    "请先在 Gemini 设置中填写 API Key。",
+  );
+  const baseUrl = await normalizeGeminiBaseUrl(
+    options?.runtimeConfig?.baseUrl ??
+    options?.modelBaseUrl ??
+    env.GEMINI_BASE_URL ??
+    DEFAULT_GEMINI_BASE_URL,
   );
   const normalizedUrls = normalizeUrls(options?.urls);
   const messagesWithUrlContext = withUrlContextPrompt(messages, normalizedUrls);
@@ -206,10 +225,10 @@ export async function* streamWithGemini(
 
   const client = new GoogleGenAI({
     apiKey,
-    httpOptions: env.GEMINI_BASE_URL
+    httpOptions: baseUrl && baseUrl !== DEFAULT_GEMINI_BASE_URL
       ? {
-          // 预留给代理网关或兼容层的 baseUrl 覆写能力。
-          baseUrl: env.GEMINI_BASE_URL,
+          // 预留给用户自定义 Gemini 网关的 baseUrl 覆写能力。
+          baseUrl,
         }
       : undefined,
   });
@@ -306,7 +325,7 @@ export async function* streamWithGemini(
       : chunkText;
 
     // 不同 Gemini 模型可能返回“累计文本”或“增量文本”。
-    // 上层只接受 delta，这里把两种格式统一成新增片段。
+    // 上层只接受 delta，因此两种格式都要统一成新增片段。
     if (!delta) {
       continue;
     }

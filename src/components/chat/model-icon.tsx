@@ -5,7 +5,7 @@ import { AIModel } from "@/lib/schemas/model";
 import { cn } from "@/lib/utils";
 
 type ModelIconProps = {
-  model: Pick<AIModel, "provider" | "icon" | "label">;
+  model: Pick<AIModel, "icon" | "label">;
   className?: string;
 };
 
@@ -28,18 +28,14 @@ export function ModelIcon({ model, className }: ModelIconProps) {
     );
   }
 
-  // Lucide 当前没有 Gemini / OpenAI 官方品牌图标，这里先支持注册表里的通用 key。
+  // Lucide 不提供 Gemini 官方品牌图标，注册表图标 key 先映射到通用模型图标。
   if (iconKey === "sparkles" || iconKey === "gemini") {
     return <SparklesIcon className={cn("size-4", className)} aria-hidden="true" />;
   }
 
-  if (iconKey === "bot" || iconKey === "openai") {
+  if (iconKey === "bot") {
     return <BotIcon className={cn("size-4", className)} aria-hidden="true" />;
   }
 
-  if (model.provider === "gemini") {
-    return <SparklesIcon className={cn("size-4", className)} aria-hidden="true" />;
-  }
-
-  return <BotIcon className={cn("size-4", className)} aria-hidden="true" />;
+  return <SparklesIcon className={cn("size-4", className)} aria-hidden="true" />;
 }

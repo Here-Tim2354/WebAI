@@ -32,18 +32,11 @@ Excel `.xlsx` 不直接保存原文件。服务端会先通过 `read-excel-file`
 
 UI 展示时使用转换后的 `.csv` 文件名，同时保留原始 `.xlsx` 文件名用于提示“已转换”。如果 Excel 文件没有读取到有效单元格，上传接口会返回明确错误，避免保存 `0 B` 的空 CSV。
 
-Word / PPT 不直接保存原文件。服务端会先通过 `libreoffice-convert` 封装的 LibreOffice 转换链路临时转成 PDF，再把 PDF 存入 bucket。
-
-如果当前运行环境缺少 LibreOffice / soffice，上传接口会返回明确错误，并提示用户先导出为 PDF 后上传。旧的 `pandoc` 兜底不再保留，因为 `pandoc` 转 PDF 仍可能继续依赖 `pdflatex`，会让错误链路变得不清晰。
-
-部署到真实环境前，需要单独确认运行时是否存在 `soffice` / LibreOffice 可执行能力；仅依赖本地构建通过不能证明 Word / PPT 转 PDF 链路可用。`.xlsx` 转 CSV 当前不依赖 LibreOffice。
+Word / PPT 不进入上传链路。用户选择这类文件时，输入区直接提示当前支持 PDF、Excel、PNG、JPG、WEBP、TXT、Markdown 和 CSV，避免把不可用的转换工具链带到线上环境。
 
 本机工具状态：
 
-- `pandoc` 存在于 `D:\Anaconda\Scripts\pandoc.exe`
-- `soffice` / `LibreOffice` / `pdflatex` 暂未确认可用
-- `.xlsx` 转 CSV 通过外部库完成，不依赖本机 Office 或 LibreOffice
-- 本机 LibreOffice 工具链是否补齐，由后续部署验证需要决定
+- `.xlsx` 转 CSV 通过外部库完成，不依赖本机 Office
 
 ## metadata 语义
 

@@ -4,7 +4,7 @@ import { getSupabaseEnv } from "@/lib/env/supabase";
 
 /**
  * updateSession 运行在 proxy 层，用来做 Supabase SSR 登录态续期。
- * 这也是为什么很多 Route Handler 里只需要调用 auth.getUser() 就能拿到当前用户。
+ * 因此很多 Route Handler 只需要调用 auth.getUser() 就能拿到当前用户。
  */
 export async function updateSession(request: NextRequest) {
   const env = getSupabaseEnv();
@@ -22,7 +22,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           // Supabase 可能在一次 getUser/refresh 流程里返回新的 session cookie。
-          // 这里既更新 request 副本，也把它们写回真正的响应。
+          // 同时更新 request 副本，并把 cookie 写回真正的响应。
           cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
@@ -39,8 +39,16 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // 这一句看似“没用返回值”，实际上是在触发 Supabase 检查/刷新当前 session。
+  // 这一句看似“没用返回值”，实际上是在触发 Supabase 检查/刷新 session。
   await supabase.auth.getUser();
+
+  supabaseResponse.headers.set("X-Content-Type-Options", "nosniff");
+  supabaseResponse.headers.set("X-Frame-Options", "DENY");
+  supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  supabaseResponse.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=()",
+  );
 
   return supabaseResponse;
 }

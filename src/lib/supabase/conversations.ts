@@ -1,6 +1,11 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Conversation } from "@/lib/schemas/conversation";
 import {
+  cleanupUnreferencedAttachments,
+  normalizeMessageAttachments,
+} from "@/lib/attachments";
+import { type MessageAttachment } from "@/lib/schemas/chat";
+import {
   DEFAULT_THINKING_LEVEL,
   ThinkingLevel,
   thinkingLevelSchema,
@@ -22,7 +27,7 @@ type ConversationRow = {
   updated_at: string;
 };
 
-// 数据库字段采用 snake_case，前端 schema 采用 camelCase，这里统一做一次映射转换。
+// 数据库字段采用 snake_case，前端 schema 采用 camelCase，数据访问层统一做映射转换。
 function mapConversation(row: ConversationRow): Conversation {
   const favorite = row.favorites?.[0] ?? null;
 
@@ -54,7 +59,7 @@ export class ConversationAccessError extends Error {
   }
 }
 
-// 当前产品默认的“空白新会话标题”集中定义，避免前后端到处散落字面量。
+// 产品默认的“空白新会话标题”集中定义，避免前后端到处散落字面量。
 export function createDefaultConversationTitle() {
   return "新会话";
 }
@@ -300,6 +305,20 @@ export async function deleteConversation(
   userId: string,
   conversationId: string,
 ) {
+  const { data: messageRows, error: messageRowsError } = await supabase
+    .from("messages")
+    .select("metadata")
+    .eq("conversation_id", conversationId);
+
+  if (messageRowsError) {
+    throw messageRowsError;
+  }
+
+  const previousAttachments = (messageRows ?? []).flatMap((row) => {
+    const metadata = row.metadata as { attachments?: MessageAttachment[] } | null;
+    return normalizeMessageAttachments(metadata?.attachments);
+  });
+
   const { data, error } = await supabase
     .from("conversations")
     .delete()
@@ -315,6 +334,10 @@ export async function deleteConversation(
   if (!data) {
     throw new ConversationAccessError("会话不存在，或你没有访问权限。");
   }
+
+  void cleanupUnreferencedAttachments(supabase, previousAttachments).catch(
+    () => null,
+  );
 }
 
 // touchConversation 不改业务字段，只更新 updated_at。

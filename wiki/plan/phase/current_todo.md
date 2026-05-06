@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-05-05 00:00:00
+更新时间：2026-05-06 19:30:00
 
 ## 项目工作面
 
@@ -16,12 +16,13 @@
   - `profiles`
   - `conversations`
   - `messages`
-  - `ai_models`
-  - `gemini_models`
-  - `openai_compatible_models`
+  - `model_catalog`
+  - `model_fetched`
 - 会话组织能力围绕 `favorites` 与 `conversations.archived_at` 展开。
 - 附件能力围绕 `message_attachments` 私有 Storage bucket、消息级 `metadata.attachments` 和用户目录隔离策略展开。
 - 会话控制项包含模型、提示词、联网开关与 `thinking_level`。
+- Gemini Key / Base URL 作为本机运行时配置保存在浏览器，不进入数据库；聊天请求在服务端校验 Key 是否存在。
+- 模型注册表围绕 `model_catalog` 与 `model_fetched` 组织：catalog 作为能力补全参照，fetched 作为用户私有可管理模型列表。
 
 ### 聊天生成
 
@@ -46,7 +47,8 @@
 - 图片单个最多 5MB，普通文件单个最多 10MB。
 - Windows / Office 常见空 MIME 场景按扩展名识别。
 - Storage object key 使用 `userId/drafts/attachmentId/attachment.ext` 这种安全路径，原始文件名只作为展示信息保存在 metadata 中。
-- 图片、PDF 和文本类文件进入 Gemini 输入组装；Excel `.xlsx` 转为 CSV 后进入文件链路；Word / PPT 仍依赖 LibreOffice / soffice 转 PDF。
+- 图片、PDF 和文本类文件进入 Gemini 输入组装；Excel `.xlsx` 转为 CSV 后进入文件链路。
+- Word / PPT 不进入上传链路，选择时用消息提示目前支持的文件类型。
 - 编辑、重新生成与分支继续沿用消息 metadata 上下文。
 
 ### 思考档位
@@ -70,7 +72,11 @@
   - `20260428103000_phase4_message_attachments.sql`
   - `20260428113000_phase4_attachment_edit_contract.sql`
   - `20260429110000_phase4_conversation_thinking_level.sql`
+  - `20260505023000_phase4_gemini_only_model_registry.sql`
+  - `20260505043000_phase4_model_catalog_and_fetched.sql`
 - `supports_files` 表达模型是否支持文件输入。
+- 模型注册表只保留 Gemini provider；`model_catalog` 是服务端内部能力参照表，`model_fetched` 是用户通过 Gemini 设置拉取并启用 / 停用的可用模型列表。
+- 无法匹配 catalog 的模型可以展示在 Gemini 设置中，但不能启用为聊天模型，也不能设置为默认模型。
 - `message_attachments` bucket 为私有 bucket，Storage select / insert / delete policy 按用户目录隔离。
 - `messages_content_valid_check` 允许 user 消息正文为空，只要 metadata 中存在附件。
 - `edit_user_message_metadata_and_delete_following` 承担“更新目标消息 + 删除后续消息”的原子编辑语义；编辑链路保留普通 update + delete 作为兜底路径。
@@ -86,14 +92,15 @@
 
 ## 验收关注
 
-- 附件链路需要继续用真实图片、PDF、文本文件、Excel、Word 和 PPT 复测。
+- 附件链路需要继续用真实图片、PDF、文本文件和 Excel 复测。
+- Word / PPT 选择路径需要确认能稳定提示“目前仅支持上传 PDF、Excel、PNG、JPG...”这一类支持范围信息。
 - “修改附加项”窗口需要重点观察添加、删除、保存、取消、错误提示和按钮禁用状态。
 - 编辑带附件 user 消息时，要关注正文、metadata、后续消息截断、重新生成和失败回滚是否一致。
 - assistant 重新生成和分支会话需要稳定继承原 user 消息附件上下文。
-- LaTeX 渲染需要覆盖行内 `$...$`、块级 `$$...$$`、中文段落混排和流式输出。
+- LaTeX 渲染需要覆盖行内 `$...$`、块级 `$$...$$`、`\ce{}` 化学式、中文段落混排和流式输出。
+- TikZ / chemfig 不进入产品链路，避免引入 LaTeX 编译级复杂度。
 - 长回复流式输出期间，用户 wheel / touch 上移应立即暂停自动吸底；点击向下箭头后再回到底部；拖动 OverlayScrollbars 滚动条到底部时不应因向下箭头出现或消失造成滚动高度抖动。
 - 停止生成需要覆盖两种状态：尚未收到 assistant 正文的空占位，以及已经收到 thought summary 或正文的流式消息。
-- Word / PPT 转 PDF 依赖部署环境中的 LibreOffice / soffice；Excel 当前走 CSV 转换，不依赖 LibreOffice。
 - 私有 Storage 图片预览在移动端下的加载、放大和退出动效仍需观察。
 - 未引用附件自动清理失败时，后续可能需要后台补偿任务。
 - 浏览器日志中的 Supabase `42703` 需要单独排查，避免它和滚动体验问题混在一起判断。
@@ -105,6 +112,7 @@
   - 复测编辑带附件 user 消息的多种组合：只改正文、只改附件、正文和附件都改、确认时完全不改。
   - 用更复杂的 Gemini 3 Flash 提示观察 `part.thought` 的返回、流式增量、折叠区展开和历史恢复。
   - 继续打磨输入区、附件按钮、图片预览、停止状态、编辑确认语义和消息区滚动体验。
+  - 阅读模型注册表、Gemini URL 校验和模型拉取链路时，重点关注默认模型保护、能力补全和 SSRF 防护规则。
 - `Phase 4.3`：
   - 继续观察多会话数据下收藏、归档、恢复和头像菜单的稳定性。
   - 检查移动端 Sheet 下收藏区、归档区和会话菜单弹层表现。
@@ -117,4 +125,4 @@
 
 ## 一句话结论
 
-`Phase 4.4` 已进入体验打磨段。接下来最值得一起盯住的是：真实附件链路、LaTeX 流式展示、Word / PPT 转 PDF 工具链、长回复上滑与底部跳转体验、停止生成状态，以及 Gemini thought summary 在复杂提示下的稳定表现。
+`Phase 4.4` 进入体验打磨段。接下来最值得一起盯住的是：真实附件链路、LaTeX / 化学式流式展示、模型注册表能力边界、长回复上滑与底部跳转体验、停止生成状态，以及 Gemini thought summary 在复杂提示下的稳定表现。

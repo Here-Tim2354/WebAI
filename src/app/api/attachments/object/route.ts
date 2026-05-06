@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error: {
-          message: error.message,
+          message: "附件不存在，或你没有访问权限。",
         },
       },
       { status: 404 },

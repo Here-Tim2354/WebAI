@@ -23,10 +23,11 @@
 
 | 功能 | 主要表 | 说明 |
 | --- | --- | --- |
-| 模型列表读取 | `ai_models`, `openai_compatible_models`, `gemini_models` | 父表提供统一入口，子表补全实现细节 |
-| 当前模型选择 | `ai_models` | 前端持有注册表主键作为 `modelId` |
-| 按模型发起请求 | `ai_models`, `openai_compatible_models`, `gemini_models` | 服务端先解析父表，再补全 provider 子表 |
-| `Gemini URL Context` 能力判断 | `ai_models`, `gemini_models` | 由模型注册表能力字段决定是否可用 |
+| 模型列表读取 | `model_fetched` | 只返回当前用户已启用的 Gemini 模型 |
+| 当前模型选择 | `model_fetched` | 前端持有用户模型主键作为 `modelId` |
+| 按模型发起请求 | `model_fetched` | 服务端确认模型属于当前用户且已启用，再用对应 `model_id` 调 Gemini |
+| `Gemini URL Context` 能力判断 | `model_fetched` | 由用户模型记录中的能力字段决定是否可用 |
+| Gemini 模型拉取 | `model_catalog`, `model_fetched` | 内部 catalog 负责能力补全，用户可见与可开关的是 fetched 记录 |
 
 ## 当前仍在扩展层
 

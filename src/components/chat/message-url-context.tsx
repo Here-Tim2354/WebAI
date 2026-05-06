@@ -84,7 +84,7 @@ export function MessageUrlContextSummary({
           key={url}
           href={url}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="inline-flex max-w-[14rem] items-center rounded-[8px] border border-blue-100/80 bg-white/58 px-1.5 py-0.5 text-slate-500 transition-colors hover:border-blue-200 hover:text-slate-700"
           title={url}
         >

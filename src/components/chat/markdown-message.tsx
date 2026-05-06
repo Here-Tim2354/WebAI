@@ -1,6 +1,7 @@
 "use client";
 
 import { Children, isValidElement, type ReactNode } from "react";
+import "katex/contrib/mhchem";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkCjkFriendly from "remark-cjk-friendly";
@@ -70,7 +71,7 @@ function escapeCjkContaminatedSingleDollarMath(content: string) {
 
     if (containsCjkNaturalLanguage(mathCandidate)) {
       // 中文自然语言里常出现“$价格$”一类文本，直接交给 KaTeX 会被渲染成错误公式。
-      // 这里仅转义含中文/中文标点的单美元片段，正常数学公式仍保持可渲染。
+      // 仅转义含中文/中文标点的单美元片段，正常数学公式仍保持可渲染。
       nextContent += `\\$${mathCandidate}\\$`;
       index = closingIndex;
       continue;
@@ -102,7 +103,7 @@ function normalizeSingleLineDisplayMath(content: string) {
 }
 
 // ReactMarkdown 的 code/pre 回调拿到的是 ReactNode。
-// 这里先递归抽出纯文本，后面才能交给自定义 CodeBlock 处理。
+// 先递归抽出纯文本，后面才能交给自定义 CodeBlock 处理。
 function extractTextContent(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
     return String(node);
@@ -121,7 +122,7 @@ function extractTextContent(node: ReactNode): string {
 
 /**
  * MarkdownMessage 是消息内容的统一渲染入口。
- * 这里集中处理 GFM、中文排版兼容，以及代码块替换逻辑。
+ * 组件集中处理 GFM、中文排版兼容，以及代码块替换逻辑。
  */
 export function MarkdownMessage({
   content,
@@ -162,7 +163,7 @@ export function MarkdownMessage({
               "",
             );
 
-            // 默认 <pre><code> 结构在这里被替换成项目自定义的 CodeBlock。
+            // 默认 <pre><code> 结构会被替换成项目自定义的 CodeBlock。
             return (
               <CodeBlock
                 className={className}

@@ -5,12 +5,14 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   EllipsisIcon,
+  KeyRoundIcon,
   LogOutIcon,
   MessageSquareTextIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   PencilLineIcon,
   PlusIcon,
+  RefreshCwIcon,
   StarIcon,
   Trash2Icon,
   UserRoundIcon,
@@ -42,7 +44,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { GeminiRuntimeConfig } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
+import { FetchedModel } from "@/lib/schemas/model";
+import { PROTECTED_GEMINI_MODEL_IDS } from "@/lib/ai/gemini-model-catalog";
 
 type ConversationSidebarProps = {
   conversations: Conversation[];
@@ -55,8 +60,13 @@ type ConversationSidebarProps = {
   isRestoringConversationId: string | null;
   isLoadingArchivedConversations: boolean;
   isLoadingFavoriteConversations: boolean;
+  fetchedModels: FetchedModel[];
+  isLoadingFetchedModels: boolean;
+  isFetchingGeminiModels: boolean;
+  updatingFetchedModelId: string | null;
   isSigningOut: boolean;
   currentUserEmail: string | null;
+  geminiRuntimeConfig: GeminiRuntimeConfig;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
   onCreateConversation: () => Promise<void>;
@@ -67,10 +77,21 @@ type ConversationSidebarProps = {
   onRestoreConversation: (conversationId: string) => Promise<void>;
   onLoadArchivedConversations: () => Promise<void>;
   onLoadFavoriteConversations: () => Promise<void>;
+  onSaveGeminiRuntimeConfig: (config: GeminiRuntimeConfig) => void;
+  onLoadFetchedModels: () => Promise<void>;
+  onFetchGeminiModels: (config: GeminiRuntimeConfig) => Promise<void>;
+  onUpdateFetchedModel: (
+    modelId: string,
+    updates: {
+      isEnabled?: boolean;
+      isDefault?: boolean;
+    },
+  ) => Promise<void>;
+  onDeleteFetchedModel: (modelId: string) => Promise<void>;
   onSignOut: () => Promise<void>;
 };
 
-// 会话列表展示时间不需要精确到秒，这里统一收口成适合中文界面的简洁格式。
+// 会话列表展示时间不需要精确到秒，统一收口成适合中文界面的简洁格式。
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
@@ -80,9 +101,48 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
+function formatFetchedModelCapabilities(model: FetchedModel) {
+  const capabilities = model.capabilities;
+  const labels: string[] = [];
+
+  if (capabilities.webSearch || capabilities.googleSearch || capabilities.urlContext) {
+    labels.push("联网");
+  }
+
+  if (capabilities.image || capabilities.video) {
+    labels.push("视觉");
+  }
+
+  if (capabilities.audio) {
+    labels.push("音频");
+  }
+
+  if (capabilities.files) {
+    labels.push("文件");
+  }
+
+  if (capabilities.reasoning) {
+    labels.push("思考");
+  }
+
+  if (capabilities.functionCalling || capabilities.tools) {
+    labels.push("工具");
+  }
+
+  if (capabilities.structuredOutputs) {
+    labels.push("结构化");
+  }
+
+  if (capabilities.codeExecution) {
+    labels.push("代码");
+  }
+
+  return labels.length > 0 ? labels.slice(0, 4).join(" / ") : "文本";
+}
+
 /**
  * 侧栏负责“会话导航”和“会话管理”两类交互：
- * 切换、新建、重命名、删除、退出登录都从这里发起。
+ * 侧栏承接切换、新建、重命名、删除和退出登录等会话管理操作。
  */
 export function ConversationSidebar({
   conversations,
@@ -95,8 +155,13 @@ export function ConversationSidebar({
   isRestoringConversationId,
   isLoadingArchivedConversations,
   isLoadingFavoriteConversations,
+  fetchedModels,
+  isLoadingFetchedModels,
+  isFetchingGeminiModels,
+  updatingFetchedModelId,
   isSigningOut,
   currentUserEmail,
+  geminiRuntimeConfig,
   mobileOpen,
   onMobileOpenChange,
   onCreateConversation,
@@ -107,6 +172,11 @@ export function ConversationSidebar({
   onRestoreConversation,
   onLoadArchivedConversations,
   onLoadFavoriteConversations,
+  onSaveGeminiRuntimeConfig,
+  onLoadFetchedModels,
+  onFetchGeminiModels,
+  onUpdateFetchedModel,
+  onDeleteFetchedModel,
   onSignOut,
 }: ConversationSidebarProps) {
   const collapsedTrackClass =
@@ -119,6 +189,13 @@ export function ConversationSidebar({
     useState<Conversation | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [isFavoriteDialogOpen, setIsFavoriteDialogOpen] = useState(false);
+  const [isGeminiSettingsDialogOpen, setIsGeminiSettingsDialogOpen] =
+    useState(false);
+  const [geminiApiKeyDraft, setGeminiApiKeyDraft] = useState("");
+  const [geminiBaseUrlDraft, setGeminiBaseUrlDraft] = useState("");
+  const [geminiSettingsError, setGeminiSettingsError] = useState<string | null>(
+    null,
+  );
   const [titleDraft, setTitleDraft] = useState("");
 
   // 重命名采用“局部编辑态 + 提交后调用父层 API”的模式，
@@ -154,7 +231,7 @@ export function ConversationSidebar({
       await onCreateConversation();
       onMobileOpenChange(false);
     } catch {
-      // 创建失败时保留当前抽屉，方便继续操作。
+      // 创建失败时保留抽屉，方便继续操作。
     }
   }
 
@@ -180,7 +257,7 @@ export function ConversationSidebar({
     try {
       await onArchiveConversation(conversationId);
     } catch {
-      // 归档失败时保留当前列表状态，由父层错误提示说明原因。
+      // 归档失败时保留列表状态，由父层错误提示说明原因。
     }
   }
 
@@ -192,6 +269,100 @@ export function ConversationSidebar({
   async function handleOpenFavoriteDialog() {
     setIsFavoriteDialogOpen(true);
     await onLoadFavoriteConversations();
+  }
+
+  async function handleOpenGeminiSettingsDialog() {
+    setGeminiApiKeyDraft(geminiRuntimeConfig.apiKey ?? "");
+    setGeminiBaseUrlDraft(geminiRuntimeConfig.baseUrl ?? "");
+    setGeminiSettingsError(null);
+    setIsGeminiSettingsDialogOpen(true);
+    await onLoadFetchedModels();
+  }
+
+  function handleSaveGeminiSettings() {
+    const nextBaseUrl = geminiBaseUrlDraft.trim();
+
+    if (nextBaseUrl) {
+      try {
+        const parsedUrl = new URL(nextBaseUrl);
+
+        if (parsedUrl.protocol !== "https:") {
+          throw new Error("invalid protocol");
+        }
+      } catch {
+        setGeminiSettingsError("Gemini URL 需要是合法的 https 地址。");
+        return;
+      }
+    }
+
+    onSaveGeminiRuntimeConfig({
+      apiKey: geminiApiKeyDraft.trim() || undefined,
+      baseUrl: nextBaseUrl || undefined,
+    });
+    setIsGeminiSettingsDialogOpen(false);
+  }
+
+  async function handleFetchGeminiModelsClick() {
+    setGeminiSettingsError(null);
+
+    try {
+      await onFetchGeminiModels({
+        apiKey: geminiApiKeyDraft.trim() || undefined,
+        baseUrl: geminiBaseUrlDraft.trim() || undefined,
+      });
+    } catch (error) {
+      setGeminiSettingsError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "拉取模型失败。",
+      );
+    }
+  }
+
+  async function handleToggleFetchedModel(model: FetchedModel) {
+    setGeminiSettingsError(null);
+
+    try {
+      await onUpdateFetchedModel(model.id, {
+        isEnabled: !model.isEnabled,
+      });
+    } catch (error) {
+      setGeminiSettingsError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "模型状态更新失败。",
+      );
+    }
+  }
+
+  async function handleSetDefaultFetchedModel(model: FetchedModel) {
+    setGeminiSettingsError(null);
+
+    try {
+      await onUpdateFetchedModel(model.id, {
+        isDefault: true,
+      });
+    } catch (error) {
+      setGeminiSettingsError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "默认模型更新失败。",
+      );
+    }
+  }
+
+  async function handleDeleteFetchedModel(model: FetchedModel) {
+    setGeminiSettingsError(null);
+
+    try {
+      await onDeleteFetchedModel(model.id);
+    } catch (error) {
+      setGeminiSettingsError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "模型删除失败。",
+      );
+    }
   }
 
   async function handleRestoreConversationClick(conversationId: string) {
@@ -207,7 +378,7 @@ export function ConversationSidebar({
       await onSignOut();
       onMobileOpenChange(false);
     } catch {
-      // 退出失败时保留当前上下文。
+      // 退出失败时保留工作区上下文。
     }
   }
 
@@ -359,7 +530,7 @@ export function ConversationSidebar({
                         className="h-10 rounded-[8px] border-border/70 bg-background/92"
                         onChange={(event) => setTitleDraft(event.target.value)}
                         onBlur={() => {
-                          // 这里用 blur 直接收口编辑态，保证点击其它会话或空白区时不会残留半编辑状态。
+                          // blur 直接收口编辑态，保证点击其它会话或空白区时不会残留半编辑状态。
                           setEditingConversationId(null);
                           setTitleDraft("");
                         }}
@@ -497,6 +668,10 @@ export function ConversationSidebar({
               <DropdownMenuItem onClick={() => void handleOpenArchiveDialog()}>
                 <ArchiveIcon />
                 归档区
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleOpenGeminiSettingsDialog()}>
+                <KeyRoundIcon />
+                Gemini 设置
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -664,6 +839,208 @@ export function ConversationSidebar({
                 );
               })
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isGeminiSettingsDialogOpen}
+        onOpenChange={(open) => {
+          setIsGeminiSettingsDialogOpen(open);
+
+          if (!open) {
+            setGeminiSettingsError(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="flex max-h-[min(45rem,calc(100vh-2rem))] w-[68vw] max-w-[62rem] flex-col overflow-hidden rounded-[14px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)] sm:!max-w-[62rem]"
+          style={{
+            width: "min(68vw, 62rem)",
+            maxWidth: "min(68vw, 62rem)",
+          }}
+        >
+          <DialogHeader className="px-5 pt-5 pb-4">
+            <DialogTitle className="text-[1.1rem] leading-none tracking-[-0.02em] text-foreground">
+              Gemini
+            </DialogTitle>
+            <p className="text-xs leading-5 text-muted-foreground">
+              当前仅支持Gemini端点格式。非Gemini模型暂不可用
+            </p>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-hidden border-t border-border/60 bg-slate-50/55 px-5 py-4">
+            <div className="space-y-3">
+              <label className="block space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Key
+                </span>
+                <Input
+                  type="password"
+                  value={geminiApiKeyDraft}
+                  className="h-10 rounded-[10px] border-border/70 bg-white/85"
+                  placeholder="GEMINI_API_KEY"
+                  onChange={(event) => setGeminiApiKeyDraft(event.target.value)}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  URL
+                </span>
+                <Input
+                  value={geminiBaseUrlDraft}
+                  className="h-10 rounded-[10px] border-border/70 bg-white/85"
+                  placeholder="https://generativelanguage.googleapis.com"
+                  onChange={(event) => setGeminiBaseUrlDraft(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">
+                {isLoadingFetchedModels
+                  ? "读取模型中"
+                  : `${fetchedModels.length} 个模型`}
+              </span>
+              <Button
+                variant="outline"
+                className="h-9 rounded-[8px] px-3"
+                type="button"
+                onClick={() => void handleFetchGeminiModelsClick()}
+                disabled={isFetchingGeminiModels}
+              >
+                <RefreshCwIcon
+                  className={cn(
+                    "size-4",
+                    isFetchingGeminiModels && "animate-spin",
+                  )}
+                />
+                {isFetchingGeminiModels ? "拉取中" : "拉取模型"}
+              </Button>
+            </div>
+            <div className="max-h-[28rem] space-y-2 overflow-y-auto overflow-x-hidden pr-1">
+              {fetchedModels.length === 0 ? (
+                <div className="rounded-[10px] border border-dashed border-border/70 bg-white/70 px-3 py-3 text-sm text-muted-foreground">
+                  暂无模型
+                </div>
+              ) : (
+                fetchedModels.map((model) => {
+                  const isUpdating = updatingFetchedModelId === model.id;
+                  const isUnsupported = !model.catalogMatched;
+                  const isProtectedDefaultModel =
+                    PROTECTED_GEMINI_MODEL_IDS.has(model.modelId);
+
+                  return (
+                    <div
+                      key={model.id}
+                      className="group flex min-w-0 items-center gap-4 rounded-full border border-border/65 bg-white/82 px-5 py-2.5"
+                    >
+                      <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.85fr)_minmax(0,0.9fr)_5rem] items-center gap-4">
+                        <div className="min-w-0 truncate text-[0.92rem] font-medium text-foreground">
+                          {model.label}
+                        </div>
+                        <div
+                          className="min-w-0 truncate text-[0.78rem] text-muted-foreground"
+                          title={model.modelId}
+                        >
+                          {formatFetchedModelCapabilities(model)}
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[0.7rem] font-medium",
+                            model.catalogMatched
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-red-50 text-red-600",
+                          )}
+                        >
+                          {model.catalogMatched ? "支持" : "不支持"}
+                        </span>
+                      </div>
+                      <div className="flex w-36 shrink-0 items-center justify-end gap-2">
+                        {isUnsupported ? (
+                          <span className="h-6 w-12" aria-hidden="true" />
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "h-6 w-12 rounded-[7px] px-2 text-[0.7rem] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
+                              model.isDefault && "text-[#002FA7]",
+                            )}
+                            type="button"
+                            onClick={() => void handleSetDefaultFetchedModel(model)}
+                            disabled={isUpdating || model.isDefault}
+                          >
+                            默认
+                          </Button>
+                        )}
+                        <button
+                          type="button"
+                          className={cn(
+                            "inline-flex h-6 w-11 shrink-0 items-center rounded-full border p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                            model.isEnabled && !isUnsupported
+                              ? "border-[#002FA7] bg-[#002FA7]"
+                              : "border-slate-200 bg-slate-200",
+                          )}
+                          onClick={() => void handleToggleFetchedModel(model)}
+                          disabled={isUpdating || isUnsupported}
+                          aria-label={
+                            isUnsupported
+                              ? "不支持的模型不可启用"
+                              : model.isEnabled
+                                ? "停用模型"
+                                : "启用模型"
+                          }
+                        >
+                          <span
+                            className={cn(
+                              "block size-5 rounded-full bg-white shadow-sm transition-transform",
+                              model.isEnabled && !isUnsupported && "translate-x-5",
+                            )}
+                          />
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className={cn(
+                            "size-7 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-600",
+                            isProtectedDefaultModel &&
+                              "cursor-not-allowed opacity-35 hover:bg-transparent hover:text-muted-foreground",
+                          )}
+                          type="button"
+                          onClick={() => void handleDeleteFetchedModel(model)}
+                          disabled={isUpdating || isProtectedDefaultModel}
+                          aria-label={
+                            isProtectedDefaultModel ? "默认模型不可删除" : "删除模型"
+                          }
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {geminiSettingsError ? (
+              <p className="text-sm leading-6 text-red-600">
+                {geminiSettingsError}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-end gap-3 border-t border-border/50 bg-slate-50/70 px-5 py-3">
+            <Button
+              variant="outline"
+              className="h-10 rounded-[8px] px-5"
+              type="button"
+              onClick={() => setIsGeminiSettingsDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              className="h-10 rounded-[8px] px-5"
+              type="button"
+              onClick={handleSaveGeminiSettings}
+            >
+              保存
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -27,6 +27,7 @@ import {
   editUserMessageAndDeleteFollowing,
   getConversationMessage,
   listConversationMessages,
+  MessageMutationConflictError,
   updateConversationMessage,
 } from "@/lib/supabase/messages";
 
@@ -99,6 +100,17 @@ function handleMessageError(error: unknown) {
     );
   }
 
+  if (error instanceof MessageMutationConflictError) {
+    return NextResponse.json(
+      {
+        error: {
+          message: error.message,
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   const message = getErrorMessage(error, "消息操作失败，请稍后再试。");
 
   return NextResponse.json(
@@ -152,8 +164,27 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { messageId } = await context.params;
-    const { conversationId, content, modelId, thinkingLevel, urls, attachments } =
+    const {
+      conversationId,
+      content,
+      modelId,
+      thinkingLevel,
+      urls,
+      attachments,
+      geminiRuntimeConfig,
+    } =
       parsed.data;
+
+    if (!geminiRuntimeConfig?.apiKey?.trim()) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "请先在 Gemini 设置中填写 API Key。",
+          },
+        },
+        { status: 400 },
+      );
+    }
     let conversation = await getConversationById(
       supabase,
       user.id,
@@ -183,19 +214,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (
-      (modelId && conversation.modelId !== modelId) ||
-      (
-        thinkingLevel !== undefined &&
-        conversation.thinkingLevel !== thinkingLevel
-      )
-    ) {
-      conversation = await updateConversation(supabase, user.id, conversationId, {
-        modelId,
-        thinkingLevel,
-      });
-    }
-
     const currentMetadata = chatMessageMetadataSchema.parse(
       targetMessage.metadata ?? {},
     );
@@ -212,8 +230,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     // modelId 可能在编辑时一并切换，附件能力校验必须基于最终会话模型。
     const effectiveModelId = modelId ?? conversation.modelId;
     const selectedModel = effectiveModelId
-      ? await getEnabledModelById(supabase, effectiveModelId)
+      ? await getEnabledModelById(supabase, user.id, effectiveModelId)
       : null;
+
+    if (
+      (modelId && conversation.modelId !== modelId) ||
+      (
+        thinkingLevel !== undefined &&
+        conversation.thinkingLevel !== thinkingLevel
+      )
+    ) {
+      conversation = await updateConversation(supabase, user.id, conversationId, {
+        modelId,
+        thinkingLevel,
+      });
+    }
 
     // 编辑带附件消息时，前端传回的是 metadata 引用。
     // 服务端必须重新确认路径归属和模型能力，不能只信任已上传成功。
@@ -286,6 +317,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       messagesForModel,
       model: selectedModel,
       thinkingLevel: conversation.thinkingLevel,
+      geminiRuntimeConfig,
       urls: nextMetadata.urls,
       attachments: nextMetadata.attachments,
       requestSignal: request.signal,

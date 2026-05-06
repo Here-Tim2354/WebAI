@@ -53,7 +53,7 @@ function sortConversations(conversations: Conversation[]) {
 
 /**
  * useChatWorkspace 专门负责“聊天工作区里的会话编排语义”：
- * 会话列表、当前激活会话、草稿控制项、模型列表同步以及会话级 patch 都集中收在这里。
+ * 会话列表、激活会话、草稿控制项、模型列表同步以及会话级 patch 都集中收在工作区层。
  */
 export function useChatWorkspace({
   initialConversations,
@@ -107,29 +107,18 @@ export function useChatWorkspace({
   ) ?? favoriteConversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
-  const selectedModelId = activeConversation?.modelId ?? draftModelId;
+  const requestedModelId = activeConversation?.modelId ?? draftModelId;
   const currentSystemPrompt = activeConversation?.systemPrompt ?? draftSystemPrompt;
   const currentWebSearchEnabled =
     activeConversation?.webSearchEnabled ?? draftWebSearchEnabled;
   const currentThinkingLevel =
     activeConversation?.thinkingLevel ?? draftThinkingLevel;
   const selectedModel = availableModels.find(
-    (model) => model.id === selectedModelId,
+    (model) => model.id === requestedModelId,
   ) ?? (
     availableModels.find((model) => model.isDefault) ?? availableModels[0] ?? null
   );
-  const groupedModels = availableModels.reduce<Record<string, AIModel[]>>(
-    (groups, model) => {
-      const key = model.provider === "gemini" ? "Gemini" : "OpenAI Compatible";
-
-      // ??= 是“若不存在则初始化”，这里把平铺的模型数组整理成按 provider 分组的结构。
-      groups[key] ??= [];
-      groups[key].push(model);
-
-      return groups;
-    },
-    {},
-  );
+  const selectedModelId = selectedModel?.id ?? null;
 
   const resetDraftConversationControls = useCallback((models = availableModels) => {
     setDraftModelId(getDefaultModelId(models));
@@ -137,6 +126,15 @@ export function useChatWorkspace({
     setDraftWebSearchEnabled(true);
     setDraftThinkingLevel(DEFAULT_THINKING_LEVEL);
   }, [availableModels]);
+
+  const syncAvailableModels = useCallback((models: AIModel[]) => {
+    setAvailableModels(models);
+    setDraftModelId((currentModelId) =>
+      currentModelId && models.some((model) => model.id === currentModelId)
+        ? currentModelId
+        : getDefaultModelId(models),
+    );
+  }, []);
 
   // upsert 的目标是“有则更新，无则插入”，这样重命名、拉取详情、发送消息后都能复用同一入口刷新列表。
   const upsertConversation = useCallback((nextConversation: Conversation) => {
@@ -168,8 +166,8 @@ export function useChatWorkspace({
   }, []);
 
   /**
-   * 当前新建会话仍走“空参数快速创建”模式：
-   * 但首条消息发送前如果已有草稿控制项，会在这里把 model / system prompt 一并落进去。
+   * 新建会话采用“空参数快速创建”模式：
+   * 首条消息发送前如果存在草稿控制项，model / system prompt 会一并落库。
    */
   const createConversation = useCallback(async (
     options?: CreateConversationOptions,
@@ -198,7 +196,7 @@ export function useChatWorkspace({
 
       const parsed = conversationResponseSchema.parse(payload);
 
-      // 新会话刚创建时数据库里还没有消息，这里提前同步空数组，
+      // 新会话刚创建时数据库里还没有消息，需要提前同步空数组，
       // 后续切换到它时就不会误读到旧会话残留状态。
       upsertConversation(parsed.conversation);
       syncConversationMessages(parsed.conversation.id, []);
@@ -217,13 +215,12 @@ export function useChatWorkspace({
     }
   }, [resetDraftConversationControls, syncConversationMessages, upsertConversation]);
 
-  // 管理客户端挂载后的模型列表同步。
-  // 当前实现只在首次挂载时请求 /api/models，并在结果返回后校正可用模型和草稿默认值。
+  // 客户端挂载后同步模型列表，并用返回结果校正可用模型和草稿默认值。
   useEffect(() => {
     let cancelled = false;
 
-    // 模型列表即便服务端已经首屏注入过，也仍然在客户端再拉一遍，
-    // 这样进入工作区后能尽量同步到“当前数据库里最新启用”的模型集合。
+    // 模型列表即便服务端首屏注入过，也仍然在客户端再拉一遍，
+    // 进入工作区后尽量同步到数据库中最新启用的模型集合。
     async function loadModels() {
       try {
         const response = await fetch("/api/models");
@@ -261,8 +258,7 @@ export function useChatWorkspace({
     };
   }, []);
 
-  // 管理当前激活会话的详情加载。
-  // 当前实现会在 activeConversationId 变化时拉取会话快照，并在卸载或切换时通过 cancelled 防止过期回写。
+  // 激活会话变化时拉取会话快照；切换过快时用 cancelled 阻止过期请求回写。
   useEffect(() => {
     if (!activeConversationId) {
       setIsLoadingConversation(false);
@@ -492,7 +488,7 @@ export function useChatWorkspace({
           (conversation) => conversation.id !== conversationId,
         );
 
-        // 如果删掉的是当前会话，就把焦点切到列表中的下一条，
+        // 如果删掉的是激活会话，就把焦点切到列表中的下一条，
         // 避免主面板仍停留在一个已不存在的 conversationId 上。
         setActiveConversationId((activeId) => {
           if (activeId !== conversationId) {
@@ -709,7 +705,7 @@ export function useChatWorkspace({
           (conversation) => conversation.id !== conversationId,
         );
 
-        // 如果归档的是当前会话，自动切到下一条 active 会话；
+        // 如果归档的是激活会话，自动切到下一条 active 会话；
         // 没有下一条时回到空白草稿态。
         setActiveConversationId((activeId) => {
           if (activeId !== conversationId) {
@@ -869,7 +865,8 @@ export function useChatWorkspace({
     currentSystemPrompt,
     currentWebSearchEnabled,
     currentThinkingLevel,
-    groupedModels,
+    availableModels,
+    syncAvailableModels,
     workspaceError,
     isCreatingConversation,
     isDeletingConversationId,

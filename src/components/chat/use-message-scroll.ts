@@ -190,8 +190,7 @@ export function useMessageScroll({
     lastTouchYRef.current = currentTouchY;
   }, [getOverlayViewport, pauseAutoScroll]);
 
-  // 管理消息流的自动吸底行为。
-  // 当前实现会在 messages 变化后判断是否仍应吸底，并根据“是否是新消息”决定 smooth 还是 auto 滚动。
+  // 消息变化后判断是否仍应吸底，并根据“新消息”或“流式增量”选择滚动节奏。
   useEffect(() => {
     const container = scrollContainerRef.current;
 

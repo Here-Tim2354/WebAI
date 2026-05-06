@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto";
-import { convertWithOptions } from "libreoffice-convert";
 import readXlsxFile from "read-excel-file/universal";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -10,8 +9,8 @@ import {
   MAX_MESSAGE_ATTACHMENTS_SIZE,
   MESSAGE_ATTACHMENTS_BUCKET,
   SUPPORTED_IMAGE_MIME_TYPE_SET,
-  SUPPORTED_OFFICE_MIME_TYPE_SET,
   SUPPORTED_SPREADSHEET_MIME_TYPE_SET,
+  SUPPORTED_ATTACHMENT_DESCRIPTION,
   SUPPORTED_STORED_FILE_MIME_TYPE_SET,
   formatAttachmentSize,
   getAttachmentFileExtension,
@@ -46,10 +45,6 @@ export function isSupportedStoredFileMimeType(mimeType: string) {
   return SUPPORTED_STORED_FILE_MIME_TYPE_SET.has(mimeType);
 }
 
-export function isSupportedOfficeMimeType(mimeType: string) {
-  return SUPPORTED_OFFICE_MIME_TYPE_SET.has(mimeType);
-}
-
 export function isSupportedSpreadsheetMimeType(mimeType: string) {
   return SUPPORTED_SPREADSHEET_MIME_TYPE_SET.has(mimeType);
 }
@@ -58,7 +53,6 @@ export function isSupportedAttachmentMimeType(mimeType: string) {
   return (
     isSupportedImageMimeType(mimeType) ||
     isSupportedStoredFileMimeType(mimeType) ||
-    isSupportedOfficeMimeType(mimeType) ||
     isSupportedSpreadsheetMimeType(mimeType)
   );
 }
@@ -100,36 +94,6 @@ function createStoragePath(userId: string, fileName: string) {
     // 目录前缀必须是 userId，后续 RLS / Storage policy 都依赖这个路径隔离用户文件。
     storagePath: `${userId}/drafts/${attachmentId}/attachment${extension}`,
   };
-}
-
-async function convertOfficeBufferToPdf(
-  buffer: Buffer,
-  fileName: string,
-): Promise<Buffer> {
-  try {
-    return await new Promise<Buffer>((resolve, reject) => {
-      // libreoffice-convert 会委托本机 LibreOffice/soffice。
-      // asyncOptions 用来等待 soffice 进程启动，减少首次转换时的偶发失败。
-      convertWithOptions(buffer, "pdf", undefined, {
-        fileName: sanitizeFileName(fileName),
-        asyncOptions: {
-          times: 4,
-          interval: 250,
-        },
-      }, (error, data) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(data);
-      });
-    });
-  } catch {
-    throw new Error(
-      "Office 转 PDF 失败：当前运行环境缺少 LibreOffice/soffice 或转换失败。请先导出为 PDF 后上传。",
-    );
-  }
 }
 
 function getCsvCellValue(value: unknown) {
@@ -198,7 +162,7 @@ export async function prepareAttachmentUpload(file: File) {
   const sourceMimeType = getSupportedMimeType(file);
 
   if (!isSupportedAttachmentMimeType(sourceMimeType)) {
-    throw new AttachmentValidationError("当前文件类型暂不支持。");
+    throw new AttachmentValidationError(SUPPORTED_ATTACHMENT_DESCRIPTION);
   }
 
   if (file.size > getAttachmentSizeLimit(sourceMimeType)) {
@@ -210,7 +174,7 @@ export async function prepareAttachmentUpload(file: File) {
   const sourceBuffer = Buffer.from(await file.arrayBuffer());
 
   if (isSupportedSpreadsheetMimeType(sourceMimeType)) {
-    // xlsx 不走 LibreOffice，直接转 CSV：更稳定，也更适合传给文本模型理解表格内容。
+    // xlsx 直接转 CSV：更稳定，也更适合传给文本模型理解表格内容。
     const csvBuffer = await convertXlsxBufferToCsv(sourceBuffer);
     const csvFileName = `${sanitizeFileName(file.name).replace(/\.[^.]+$/, "")}.csv`;
 
@@ -218,21 +182,6 @@ export async function prepareAttachmentUpload(file: File) {
       buffer: csvBuffer,
       fileName: csvFileName,
       mimeType: "text/csv",
-      kind: "file" as const,
-      originalFileName: file.name,
-      originalMimeType: sourceMimeType,
-    };
-  }
-
-  if (isSupportedOfficeMimeType(sourceMimeType)) {
-    // Word / PPT 云端只保存转换后的 PDF，避免后续模型输入阶段重复转换同一份文件。
-    const pdfBuffer = await convertOfficeBufferToPdf(sourceBuffer, file.name);
-    const pdfFileName = `${sanitizeFileName(file.name).replace(/\.[^.]+$/, "")}.pdf`;
-
-    return {
-      buffer: pdfBuffer,
-      fileName: pdfFileName,
-      mimeType: "application/pdf",
       kind: "file" as const,
       originalFileName: file.name,
       originalMimeType: sourceMimeType,
@@ -305,7 +254,7 @@ export function isAttachmentStoragePathOwnedByUser(
   storagePath: string,
 ) {
   return (
-    // 只允许当前用户 draft 目录；禁止用 ../ 这类片段越过目录边界。
+    // 只允许请求用户的 draft 目录；禁止用 ../ 这类片段越过目录边界。
     storagePath.startsWith(`${userId}/drafts/`) &&
     !storagePath.split("/").includes("..")
   );

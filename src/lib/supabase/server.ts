@@ -4,7 +4,7 @@ import { getSupabaseEnv } from "@/lib/env/supabase";
 
 /**
  * Server Component / Route Handler 共用的 Supabase SSR client。
- * 关键点不是“新建一个 client”，而是把当前请求的 cookie 上下文接进去。
+ * 关键点不是“新建一个 client”，而是接入请求的 cookie 上下文。
  */
 export async function createSupabaseServerClient() {
   const env = getSupabaseEnv();
@@ -26,7 +26,7 @@ export async function createSupabaseServerClient() {
             });
           } catch {
             // Server Components 中不能稳定写出响应 cookie。
-            // 这里保留兼容写入；真正的 session 刷新与持久化由 proxy.ts 负责。
+            // 兼容写入只处理可写上下文；session 刷新与持久化由 proxy.ts 负责。
           }
         },
       },

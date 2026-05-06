@@ -93,8 +93,7 @@ function MessageListComponent({
   );
   const [typedTitle, setTypedTitle] = useState("");
 
-  // 管理空会话欢迎标题的逐字动画。
-  // 当前实现只在 messages 为空时启动定时器，逐步把 emptyTitle 切片写入 typedTitle。
+  // 空会话欢迎标题只在没有消息时播放逐字动画，避免历史会话切换时重复打扰阅读。
   useEffect(() => {
     if (messages.length > 0) {
       return;

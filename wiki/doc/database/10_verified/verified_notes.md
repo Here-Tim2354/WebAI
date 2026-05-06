@@ -7,11 +7,11 @@
 - 会话 CRUD
 - 消息持久化与恢复
 - `profiles` 作为用户资料扩展表
-- `ai_models` 作为模型注册表父表
-- `openai_compatible_models` / `gemini_models` 作为 provider 子表
+- `model_catalog` 作为内部 Gemini 能力目录
+- `model_fetched` 作为用户可启用 / 停用的 Gemini 模型列表
 - 前端模型选择读取已启用模型列表
-- 服务端按 `modelId` 分发到对应 provider
-- Supabase 环境采用模型注册表父子表结构
+- 服务端按 `model_fetched.id` 解析 Gemini 上游模型名
+- Supabase 环境采用 Gemini-only `model_catalog + model_fetched` 模型结构
 - 首个模型 seed 为 `Gemini 3 Flash Preview`
 
 ## 暂不进入数据库主线

@@ -19,14 +19,14 @@ export function assertAttachmentInputAllowed({
   }
 
   // metadata 来自浏览器请求，不能只信任前端传回的 storagePath。
-  // 先确认对象路径落在当前用户目录下，再继续做模型能力判断。
+  // 对象路径必须落在请求用户目录下，才允许继续进入模型能力判断。
   assertAttachmentsOwnedByUser(userId, attachments);
 
   if (!model) {
     return;
   }
 
-  // 附件能力是模型注册表的一部分。这里集中守住 API 边界，
+  // 附件能力是模型注册表的一部分。API 边界集中守住这条规则，
   // 避免发送、编辑、重新生成三条链路各自复制一套判断。
   const hasImageAttachment = attachments.some(
     (attachment) => attachment.kind === "image",
