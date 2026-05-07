@@ -9,10 +9,12 @@ aliases:
 这篇笔记帮助我们理解 `ChatShell` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
-- `src/components/chat/chat-shell.tsx`
-- `src/components/chat/use-chat-workspace.ts`
-- `src/components/chat/use-chat-session.ts`
-- `src/components/chat/use-message-scroll.ts`
+- `src/features/chat/components/chat-shell.tsx`
+- `src/features/chat/hooks/use-chat-workspace.ts`
+- `src/features/chat/hooks/use-chat-session.ts`
+- `src/features/chat/hooks/use-message-scroll.ts`
+- `src/features/chat/hooks/use-fetched-models.ts`
+- `src/features/chat/lib/chat-stream.ts`
 
 关联笔记：
 - [[chatshell]]
@@ -47,6 +49,8 @@ aliases:
 - `useChatWorkspace` 负责工作区编排状态
 - `useChatSession` 负责消息交互状态
 - `useMessageScroll` 负责滚动状态
+- `useFetchedModels` 负责 Gemini 设置中的模型拉取、启停、默认项和删除请求
+- `chat-stream.ts` 负责前端消费 NDJSON 事件、合并 assistant 增量内容和生成本地 cancelled 快照
 
 所以它们四者共同构成聊天工作区的前端状态机，而不是再由 `ChatShell` 一处包办。
 
@@ -172,7 +176,7 @@ const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 
 `ChatShell` 自己没有直接保存消息数组，而是把消息相关状态委托给：
 
-- `src/components/chat/use-chat-session.ts`
+- `src/features/chat/hooks/use-chat-session.ts`
 
 它主要维护这几个状态。
 
@@ -263,7 +267,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 滚动逻辑没有放在 `ChatShell` 本体，而是委托给：
 
-- `src/components/chat/use-message-scroll.ts`
+- `src/features/chat/hooks/use-message-scroll.ts`
 
 它主要管理：
 
@@ -363,7 +367,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 ### 9.1 ChatInput 的三个 effect
 
 对应文件：
-- `src/components/chat/chat-input.tsx`
+- `src/features/chat/components/chat-input.tsx`
 
 #### effect 1：输入框高度自适应
 
@@ -397,7 +401,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 ### 9.2 MessageList 的 effect
 
 对应文件：
-- `src/components/chat/message-list.tsx`
+- `src/features/chat/components/message-list.tsx`
 
 作用：
 - 管理空会话欢迎标题的逐字动画
@@ -412,7 +416,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 ### 9.3 AuthPanel 的 effect
 
 对应文件：
-- `src/components/chat/auth-panel.tsx`
+- `src/features/chat/components/auth-panel.tsx`
 
 作用：
 - 登录页首次挂载时做本地状态恢复
@@ -429,7 +433,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 ### 9.4 useMessageScroll 的 effect
 
 对应文件：
-- `src/components/chat/use-message-scroll.ts`
+- `src/features/chat/hooks/use-message-scroll.ts`
 
 作用：
 - 管理消息变化后的自动吸底行为
@@ -591,6 +595,11 @@ useChatSession
   -> 管 URL Context 输入与已确认 URL
   -> 管发送中状态
   -> 管停止生成后的本地 cancelled 状态
+  -> 调用 chat-stream.ts 消费服务端 NDJSON 事件
+
+useFetchedModels
+  -> 管 Gemini 设置里的 fetched model 列表
+  -> 管拉取、启停、默认模型和删除状态
 
 useMessageScroll
   -> 管自动吸底

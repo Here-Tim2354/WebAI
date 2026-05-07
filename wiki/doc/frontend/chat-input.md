@@ -9,7 +9,7 @@ aliases:
 这篇笔记帮助我们快速理解 `ChatInput` 组件在页面中的职责，以及它在页面底部展示什么。
 
 代码入口：
-- `src/components/chat/chat-input.tsx`
+- `src/features/chat/components/chat-input.tsx`
 
 关联笔记：
 - [[chat-input-stateflow]]

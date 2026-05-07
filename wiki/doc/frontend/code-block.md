@@ -9,7 +9,7 @@ aliases:
 这篇笔记帮助我们理解 `CodeBlock` 如何渲染高亮代码块，以及它当前的复制按钮实现。
 
 代码入口：
-- `src/components/chat/code-block.tsx`
+- `src/features/chat/components/code-block.tsx`
 
 关联笔记：
 - [[markdown-message]]

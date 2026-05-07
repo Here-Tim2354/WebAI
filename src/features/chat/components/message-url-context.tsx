@@ -8,47 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import {
+  areUrlListsEqual,
+  getUrlDisplayText,
+  MAX_URL_CONTEXT_ITEMS,
+  normalizeUrlCandidate,
+} from "../lib/url-context";
 
-export const MAX_EDIT_URL_CONTEXT_ITEMS = 4;
-
-export function getUrlDisplayText(url: string) {
-  try {
-    const parsedUrl = new URL(url);
-    return `${parsedUrl.hostname}${parsedUrl.pathname === "/" ? "" : parsedUrl.pathname}`;
-  } catch {
-    return url;
-  }
-}
-
-export function normalizeUrlCandidate(url: string) {
-  const trimmedUrl = url.trim();
-
-  if (!trimmedUrl) {
-    return null;
-  }
-
-  try {
-    const candidateUrl = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmedUrl)
-      ? trimmedUrl
-      : `https://${trimmedUrl}`;
-    const normalizedUrl = new URL(candidateUrl);
-
-    if (
-      normalizedUrl.protocol !== "http:" &&
-      normalizedUrl.protocol !== "https:"
-    ) {
-      return null;
-    }
-
-    return normalizedUrl.toString();
-  } catch {
-    return null;
-  }
-}
-
-export function areUrlListsEqual(left: string[], right: string[]) {
-  return left.length === right.length && left.every((url, index) => url === right[index]);
-}
+export const MAX_EDIT_URL_CONTEXT_ITEMS = MAX_URL_CONTEXT_ITEMS;
+export { areUrlListsEqual, getUrlDisplayText, normalizeUrlCandidate };
 
 type MessageUrlContextSummaryProps = {
   urls: string[];

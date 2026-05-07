@@ -5,11 +5,19 @@ import {
   ChatMessage,
   GeminiRuntimeConfig,
   MessageAttachment,
-  chatStreamEventSchema,
   createChatMessage,
 } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
 import { ThinkingLevel } from "@/lib/schemas/thinking";
+import {
+  MAX_URL_CONTEXT_ITEMS,
+  normalizeUrlCandidate,
+} from "../lib/url-context";
+import {
+  consumeAssistantStream,
+  createCancelledAssistantMessage,
+  isAbortError,
+} from "../lib/chat-stream";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -17,118 +25,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return "消息发送失败，请稍后再试。";
-}
-
-function isAbortError(error: unknown) {
-  return (
-    (error instanceof DOMException && error.name === "AbortError") ||
-    (error instanceof Error && error.name === "AbortError")
-  );
-}
-
-function mergeAssistantMessageParts(
-  previousMessage: ChatMessage | null,
-  nextMessage: ChatMessage,
-) {
-  if (nextMessage.role !== "assistant") {
-    return nextMessage;
-  }
-
-  if (!previousMessage || previousMessage.role !== "assistant") {
-    return {
-      ...nextMessage,
-      parts: nextMessage.content
-        ? [
-            {
-              type: "text" as const,
-              text: nextMessage.content,
-            },
-          ]
-        : [],
-    };
-  }
-
-  if (!nextMessage.content) {
-    return {
-      ...nextMessage,
-      parts: [],
-    };
-  }
-
-  if (!previousMessage.content) {
-    return {
-      ...nextMessage,
-      parts: [
-        {
-          type: "text" as const,
-          text: nextMessage.content,
-        },
-      ],
-    };
-  }
-
-  if (nextMessage.content === previousMessage.content) {
-    return {
-      ...nextMessage,
-      parts: previousMessage.parts,
-    };
-  }
-
-  if (nextMessage.content.startsWith(previousMessage.content)) {
-    const appendedText = nextMessage.content.slice(previousMessage.content.length);
-
-    if (!appendedText) {
-      return {
-        ...nextMessage,
-        parts: previousMessage.parts,
-      };
-    }
-
-    return {
-      ...nextMessage,
-      // parts 保留“每次服务端新增的片段”，MessageBubble 可以据此做更自然的局部 reveal。
-      // 如果直接覆盖为完整 content，前端会失去本次新增内容的边界。
-      parts: [
-        ...previousMessage.parts,
-        {
-          type: "text" as const,
-          text: appendedText,
-        },
-      ],
-    };
-  }
-
-  return {
-    ...nextMessage,
-    // 如果服务端返回的内容不是旧内容的前缀，说明发生了重算或回退。
-    // 此时放弃增量拼接，直接用完整文本重建 parts，避免展示错位。
-    parts: [
-      {
-        type: "text" as const,
-        text: nextMessage.content,
-      },
-    ],
-  };
-}
-
-function createCancelledAssistantMessage(message: ChatMessage) {
-  return createChatMessage({
-    id: message.id,
-    role: "assistant",
-    content: message.content,
-    status: "cancelled",
-    metadata: {
-      ...message.metadata,
-      ...(message.metadata.thinking
-        ? {
-            thinking: {
-              ...message.metadata.thinking,
-              status: "cancelled" as const,
-            },
-          }
-        : {}),
-    },
-  });
 }
 
 type SubmitOptions = {
@@ -161,34 +57,6 @@ export type AddUrlContextResult =
   | "duplicate"
   | "invalid"
   | "limit";
-
-const MAX_URL_CONTEXT_ITEMS = 4;
-
-function normalizeUrlCandidate(url: string) {
-  const trimmedUrl = url.trim();
-
-  if (!trimmedUrl) {
-    return null;
-  }
-
-  try {
-    const candidateUrl = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmedUrl)
-      ? trimmedUrl
-      : `https://${trimmedUrl}`;
-    const normalizedUrl = new URL(candidateUrl);
-
-    if (
-      normalizedUrl.protocol !== "http:" &&
-      normalizedUrl.protocol !== "https:"
-    ) {
-      return null;
-    }
-
-    return normalizedUrl.toString();
-  } catch {
-    return null;
-  }
-}
 
 /**
  * useChatSession 管的是“消息交互状态”，不是整个页面状态：
@@ -395,141 +263,6 @@ export function useChatSession() {
     abortControllerRef.current?.abort();
   }, []);
 
-  const consumeAssistantStream = useCallback(async ({
-    response,
-    conversationId,
-    assistantPlaceholder,
-    onConversationSynced,
-  }: {
-    response: Response;
-    conversationId: string;
-    assistantPlaceholder: ChatMessage;
-    onConversationSynced: (conversation: Conversation) => void;
-  }) => {
-    if (!response.body) {
-      throw new Error("聊天接口未返回流式响应。");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    // 流可能把一条 JSON 事件切成多个 Uint8Array，这个 buffer 专门保存未读完的半行。
-    let buffer = "";
-    let currentAssistantMessageId = assistantPlaceholder.id;
-    let latestAssistantMessage = assistantPlaceholder;
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-
-          if (!trimmedLine) {
-            continue;
-          }
-
-          const parsedEvent = chatStreamEventSchema.parse(
-            JSON.parse(trimmedLine),
-          );
-
-          // 服务端事件只表达“消息/会话的新快照”，本地通过 replaceMessage 合并到当前缓存。
-          // 这样发送、编辑、重新生成三条链路可以共用同一个流消费器。
-          switch (parsedEvent.type) {
-            case "assistant-message-created": {
-              const nextAssistantMessage = mergeAssistantMessageParts(
-                latestAssistantMessage,
-                parsedEvent.message,
-              );
-              currentAssistantMessageId = nextAssistantMessage.id;
-              latestAssistantMessage = nextAssistantMessage;
-              replaceMessage(
-                conversationId,
-                assistantPlaceholder.id,
-                nextAssistantMessage,
-              );
-              break;
-            }
-            case "assistant-message-updated": {
-              const nextAssistantMessage = mergeAssistantMessageParts(
-                latestAssistantMessage,
-                parsedEvent.message,
-              );
-              const previousAssistantMessageId = currentAssistantMessageId;
-              currentAssistantMessageId = nextAssistantMessage.id;
-              latestAssistantMessage = nextAssistantMessage;
-              replaceMessage(
-                conversationId,
-                previousAssistantMessageId,
-                nextAssistantMessage,
-              );
-              break;
-            }
-            case "conversation-updated": {
-              onConversationSynced(parsedEvent.conversation);
-              break;
-            }
-            case "done": {
-              const nextAssistantMessage = mergeAssistantMessageParts(
-                latestAssistantMessage,
-                parsedEvent.message,
-              );
-              const previousAssistantMessageId = currentAssistantMessageId;
-              currentAssistantMessageId = nextAssistantMessage.id;
-              latestAssistantMessage = nextAssistantMessage;
-              replaceMessage(
-                conversationId,
-                previousAssistantMessageId,
-                nextAssistantMessage,
-              );
-              onConversationSynced(parsedEvent.conversation);
-              break;
-            }
-          }
-        }
-      }
-
-      const trailingLine = buffer.trim();
-
-      if (trailingLine) {
-        // 正常情况下事件都以换行结束；最后一行没带换行时仍需要兜底处理。
-        const parsedEvent = chatStreamEventSchema.parse(
-          JSON.parse(trailingLine),
-        );
-
-        if (parsedEvent.type === "done") {
-          const nextAssistantMessage = mergeAssistantMessageParts(
-            latestAssistantMessage,
-            parsedEvent.message,
-          );
-          const previousAssistantMessageId = currentAssistantMessageId;
-          currentAssistantMessageId = nextAssistantMessage.id;
-          latestAssistantMessage = nextAssistantMessage;
-          replaceMessage(
-            conversationId,
-            previousAssistantMessageId,
-            nextAssistantMessage,
-          );
-          onConversationSynced(parsedEvent.conversation);
-        }
-      }
-
-      return {
-        currentAssistantMessageId,
-        latestAssistantMessage,
-      };
-    } finally {
-      reader.releaseLock();
-    }
-  }, [replaceMessage]);
-
   const handleSubmit = useCallback(async ({
     conversationId,
     content: submittedContent,
@@ -627,6 +360,7 @@ export function useChatSession() {
         response,
         conversationId,
         assistantPlaceholder,
+        replaceMessage,
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
@@ -662,7 +396,6 @@ export function useChatSession() {
       streamingConversationIdRef.current = null;
     }
   }, [
-    consumeAssistantStream,
     isSubmitting,
     markAssistantMessageCancelled,
     replaceMessage,
@@ -786,6 +519,7 @@ export function useChatSession() {
         response,
         conversationId,
         assistantPlaceholder,
+        replaceMessage,
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
@@ -828,7 +562,6 @@ export function useChatSession() {
       streamingConversationIdRef.current = null;
     }
   }, [
-    consumeAssistantStream,
     conversationMessages,
     isSubmitting,
     markAssistantMessageCancelled,
@@ -950,6 +683,7 @@ export function useChatSession() {
         response,
         conversationId,
         assistantPlaceholder,
+        replaceMessage,
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
@@ -996,7 +730,6 @@ export function useChatSession() {
       streamingConversationIdRef.current = null;
     }
   }, [
-    consumeAssistantStream,
     conversationMessages,
     isSubmitting,
     markAssistantMessageCancelled,

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { softSpring } from "./motion-presets";
+import { softSpring } from "../lib/motion-presets";
 
 export type WorkspaceNoticeState = {
   id: number;

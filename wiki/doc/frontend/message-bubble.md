@@ -9,7 +9,7 @@ aliases:
 这篇笔记帮助我们理解 `MessageBubble` 如何决定单条消息的视觉语义，以及它和 `MarkdownMessage` 的关系。
 
 代码入口：
-- `src/components/chat/message-bubble.tsx`
+- `src/features/chat/components/message-bubble.tsx`
 
 关联笔记：
 - [[message-list]]

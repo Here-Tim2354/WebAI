@@ -1,128 +1,81 @@
 # Current Todo
 
-更新时间：2026-05-06 19:30:00
+更新时间：2026-05-07 22:46:43
 
-## 项目工作面
+## 项目状态
 
-- 主线：`Phase 4.4` 文件与图片输入扩展
-- 并行：`Phase 3.6` 课程材料、RLS 与数据库说明
-- 方向：让聊天主链路保持自然顺手，同时把附件、思考档位、联网和消息操作逐步收口成稳定体验。
+- 阶段：公网部署准备
+- 主线：将 WebAI 部署到 Vercel，并通过 Cloudflare 接入公网域名。
+- 状态：核心产品流程、数据库主线、聊天生成、会话管理、附件输入、模型注册表和前端结构整理已经基本完成。
+- 当前重点：部署配置、环境变量、域名解析、线上回归与答辩展示路径。
 
-## 系统能力
+## 当前架构边界
 
-### 数据库主线
+- 前端采用 Next.js App Router。
+- 聊天能力按 feature-first 组织在 `src/features/chat`：
+  - `components/`：聊天可见组件
+  - `hooks/`：聊天状态与业务流程
+  - `lib/`：聊天局部工具、流消费、附件客户端与 URL 上下文
+- `src/components` 保留通用 UI primitive。
+- `src/lib` 保留跨功能共享的 schema、Supabase、AI、附件规则、环境与安全边界工具。
+- Supabase 继续作为核心数据库与私有 Storage。
+- Gemini Key / Base URL 仍由服务端接口和浏览器运行时配置共同约束，不进入数据库。
 
-- 用户、会话、消息和模型注册表已经形成基础数据骨架：
-  - `profiles`
-  - `conversations`
-  - `messages`
-  - `model_catalog`
-  - `model_fetched`
-- 会话组织能力围绕 `favorites` 与 `conversations.archived_at` 展开。
-- 附件能力围绕 `message_attachments` 私有 Storage bucket、消息级 `metadata.attachments` 和用户目录隔离策略展开。
-- 会话控制项包含模型、提示词、联网开关与 `thinking_level`。
-- Gemini Key / Base URL 作为本机运行时配置保存在浏览器，不进入数据库；聊天请求在服务端校验 Key 是否存在。
-- 模型注册表围绕 `model_catalog` 与 `model_fetched` 组织：catalog 作为能力补全参照，fetched 作为用户私有可管理模型列表。
+## 上线前任务
 
-### 聊天生成
+### Vercel
 
-- 消息支持流式输出、中断生成、状态细分、持久化保存与历史恢复。
-- 停止生成后，本次 assistant 占位或流式消息会进入 `cancelled`，thought summary 也会同步进入停止语义。
-- 会话能够记住模型、提示词、联网开关和思考档位。
-- Gemini URL Context 作为请求级输入进入模型，同时以消息级 metadata 留下上下文线索。
-- 用户在长回复中上移阅读时，消息区应暂停自动吸底；圆形向下箭头负责把用户带回底部，并作为滚动区外侧悬浮层展示。
+- 检查生产环境变量是否齐全：
+  - Supabase URL / anon key / service role key
+  - Gemini 相关服务端配置
+  - GitHub OAuth / Magic Link 所需配置
+  - 应用公网 origin / redirect URL
+- 确认 `npm run build` 在部署环境通过。
+- 检查 Next.js API route 在生产环境下的动态路由、鉴权和文件上传链路。
+- 确认私有 Storage 文件读取接口在生产域名下可正常返回。
 
-### 消息操作
+### Cloudflare
 
-- user 消息支持覆盖式编辑并重新生成；点击编辑确认即表达重新生成意图，即使正文、URL 和附件都没有变化也会触发编辑链路。
-- 最新 assistant 消息支持重新生成。
-- assistant 消息可以分支到新会话，分支继承模型、提示词、联网开关和消息 metadata。
-- 复制、编辑、重新生成和分支都应保持清楚的操作反馈，不让用户猜系统是否接住了动作。
+- 配置公网域名 DNS。
+- 将域名指向 Vercel 项目。
+- 检查 SSL / HTTPS 状态。
+- 确认 Cloudflare 代理模式不会影响 Vercel 域名校验、OAuth 回调和 Supabase 回调。
 
-### 文件与图片输入
+### Supabase
 
-- 输入区支持上传、粘贴和拖拽图片或文件。
-- URL、图片和文件统一进入“修改附加项”窗口，但输入框左下角的加号只表达“添加文件”的语义。
-- 模型能力会限制图片 / 文件输入；单条消息最多 5 个附件，总大小最多 20MB。
-- 图片单个最多 5MB，普通文件单个最多 10MB。
-- Windows / Office 常见空 MIME 场景按扩展名识别。
-- Storage object key 使用 `userId/drafts/attachmentId/attachment.ext` 这种安全路径，原始文件名只作为展示信息保存在 metadata 中。
-- 图片、PDF 和文本类文件进入 Gemini 输入组装；Excel `.xlsx` 转为 CSV 后进入文件链路。
-- Word / PPT 不进入上传链路，选择时用消息提示目前支持的文件类型。
-- 编辑、重新生成与分支继续沿用消息 metadata 上下文。
+- 检查生产环境允许的 Site URL 与 Redirect URLs。
+- 复查 RLS 策略、Storage bucket policy 与用户目录隔离。
+- 准备用于演示的种子数据或测试账号。
+- 保留 migration 与表设计说明，方便课程答辩引用。
 
-### 思考档位
+## 上线回归范围
 
-- Gemini 3 Flash 的 thinking 能力以会话级 `thinking_level` 保存，取值为 `minimal / low / medium / high`。
-- 输入区左下角提供思考档位按钮，菜单原样展示英文档位。
-- assistant 的 thought summary 作为独立折叠区展示，不混入最终回答正文。
-- thought summary 是否出现取决于模型在该次请求中是否返回 `part.thought`。
+- 登录、退出、Magic Link / GitHub OAuth 回调。
+- 新建会话、恢复历史会话、重命名、收藏、归档和恢复。
+- 发送普通文本消息，确认流式输出、中断生成和历史持久化。
+- 模型选择、Gemini 设置、默认模型保护和模型能力识别。
+- 图片、PDF、文本文件、Excel 上传与发送。
+- Word / PPT 选择时给出支持范围提示。
+- 编辑带附件 user 消息，确认后续消息截断和重新生成语义。
+- assistant 重新生成与分支会话。
+- LaTeX / 化学式混排与长回复滚动体验。
+- 移动端侧栏、输入区、附件预览和会话菜单。
 
-### 会话组织
+## 文档与答辩材料
 
-- 会话支持收藏、取消收藏、归档和恢复。
-- 头像菜单承接收藏区、归档区和退出登录。
-- 侧栏菜单提供会话归档入口。
-
-## 数据库与接口边界
-
-- 数据库对象包括：
-  - `20260427083000_phase4_conversation_organization.sql`
-  - `20260427091000_remove_conversation_search.sql`
-  - `20260428103000_phase4_message_attachments.sql`
-  - `20260428113000_phase4_attachment_edit_contract.sql`
-  - `20260429110000_phase4_conversation_thinking_level.sql`
-  - `20260505023000_phase4_gemini_only_model_registry.sql`
-  - `20260505043000_phase4_model_catalog_and_fetched.sql`
-- `supports_files` 表达模型是否支持文件输入。
-- 模型注册表只保留 Gemini provider；`model_catalog` 是服务端内部能力参照表，`model_fetched` 是用户通过 Gemini 设置拉取并启用 / 停用的可用模型列表。
-- 无法匹配 catalog 的模型可以展示在 Gemini 设置中，但不能启用为聊天模型，也不能设置为默认模型。
-- `message_attachments` bucket 为私有 bucket，Storage select / insert / delete policy 按用户目录隔离。
-- `messages_content_valid_check` 允许 user 消息正文为空，只要 metadata 中存在附件。
-- `edit_user_message_metadata_and_delete_following` 承担“更新目标消息 + 删除后续消息”的原子编辑语义；编辑链路保留普通 update + delete 作为兜底路径。
-- 主要 API：
-  - `/api/conversations?status=active`
-  - `/api/conversations?status=archived`
-  - `/api/conversations?favorite=true`
-  - `/api/conversations/[conversationId]/favorite`
-  - `PATCH /api/conversations/[conversationId]`
-  - `POST /api/attachments/upload`
-  - `GET /api/attachments/object?path=...`
-  - `PATCH /api/messages/[messageId]`
-
-## 验收关注
-
-- 附件链路需要继续用真实图片、PDF、文本文件和 Excel 复测。
-- Word / PPT 选择路径需要确认能稳定提示“目前仅支持上传 PDF、Excel、PNG、JPG...”这一类支持范围信息。
-- “修改附加项”窗口需要重点观察添加、删除、保存、取消、错误提示和按钮禁用状态。
-- 编辑带附件 user 消息时，要关注正文、metadata、后续消息截断、重新生成和失败回滚是否一致。
-- assistant 重新生成和分支会话需要稳定继承原 user 消息附件上下文。
-- LaTeX 渲染需要覆盖行内 `$...$`、块级 `$$...$$`、`\ce{}` 化学式、中文段落混排和流式输出。
-- TikZ / chemfig 不进入产品链路，避免引入 LaTeX 编译级复杂度。
-- 长回复流式输出期间，用户 wheel / touch 上移应立即暂停自动吸底；点击向下箭头后再回到底部；拖动 OverlayScrollbars 滚动条到底部时不应因向下箭头出现或消失造成滚动高度抖动。
-- 停止生成需要覆盖两种状态：尚未收到 assistant 正文的空占位，以及已经收到 thought summary 或正文的流式消息。
-- 私有 Storage 图片预览在移动端下的加载、放大和退出动效仍需观察。
-- 未引用附件自动清理失败时，后续可能需要后台补偿任务。
-- 浏览器日志中的 Supabase `42703` 需要单独排查，避免它和滚动体验问题混在一起判断。
+- 保持 `wiki/doc/frontend/GUIDE.md` 与 feature-first 结构一致。
+- 整理部署说明：Vercel、Cloudflare、Supabase 回调 URL、环境变量。
+- 整理数据库说明：核心表、关系、RLS、Storage policy、migration 对应关系。
+- 整理演示路径：登录、发起对话、附件输入、会话管理、模型选择、历史恢复。
 
 ## 下一步
 
-- `Phase 4.4`：
-  - 复测真实附件上传、发送、AI 识别、历史恢复、重新生成和分支。
-  - 复测编辑带附件 user 消息的多种组合：只改正文、只改附件、正文和附件都改、确认时完全不改。
-  - 用更复杂的 Gemini 3 Flash 提示观察 `part.thought` 的返回、流式增量、折叠区展开和历史恢复。
-  - 继续打磨输入区、附件按钮、图片预览、停止状态、编辑确认语义和消息区滚动体验。
-  - 阅读模型注册表、Gemini URL 校验和模型拉取链路时，重点关注默认模型保护、能力补全和 SSRF 防护规则。
-- `Phase 4.3`：
-  - 继续观察多会话数据下收藏、归档、恢复和头像菜单的稳定性。
-  - 检查移动端 Sheet 下收藏区、归档区和会话菜单弹层表现。
-  - 观察 CSS-only Tooltip 是否在特殊容器里被裁切。
-- `Phase 3.6`：
-  - 补齐 RLS 验证。
-  - 整理数据库说明、migration 与表设计说明。
-  - 整理页面功能与数据库操作映射关系。
-  - 准备答辩支撑材料。
+1. 准备 Vercel 生产环境变量。
+2. 部署 Vercel 预览环境并完成线上 smoke test。
+3. 接入 Cloudflare 域名并确认 HTTPS / 回调链路。
+4. 做一轮完整线上回归。
+5. 收口部署文档与课程答辩材料。
 
 ## 一句话结论
 
-`Phase 4.4` 进入体验打磨段。接下来最值得一起盯住的是：真实附件链路、LaTeX / 化学式流式展示、模型注册表能力边界、长回复上滑与底部跳转体验、停止生成状态，以及 Gemini thought summary 在复杂提示下的稳定表现。
+WebAI 已经从功能扩展段进入公网部署准备段。接下来优先保证 Vercel + Cloudflare 上线链路稳定，再围绕线上环境完成最后一轮产品回归和课程答辩材料整理。

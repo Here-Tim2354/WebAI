@@ -8,7 +8,7 @@ aliases:
 这篇笔记帮助我们理解 `MessageBubble` 如何根据消息角色、消息状态和流式内容变化决定单条消息的展示。
 
 代码入口：
-- `src/components/chat/message-bubble.tsx`
+- `src/features/chat/components/message-bubble.tsx`
 
 关联笔记：
 - [[message-bubble]]

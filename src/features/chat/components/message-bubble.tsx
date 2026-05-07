@@ -27,7 +27,7 @@ import {
   AttachmentPreviewList,
 } from "./message-attachments";
 import { MessageUrlContextSummary } from "./message-url-context";
-import { softSpring, smoothEase } from "./motion-presets";
+import { softSpring, smoothEase } from "../lib/motion-presets";
 
 export type EditMessageUpdate = {
   content: string;

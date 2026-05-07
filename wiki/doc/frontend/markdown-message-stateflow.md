@@ -8,7 +8,7 @@ aliases:
 这篇笔记帮助我们理解 `MarkdownMessage` 如何把文本内容送进不同的渲染分支。
 
 代码入口：
-- `src/components/chat/markdown-message.tsx`
+- `src/features/chat/components/markdown-message.tsx`
 
 关联笔记：
 - [[markdown-message]]

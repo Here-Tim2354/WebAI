@@ -7,34 +7,36 @@
 1. [[plan/phase/phase_overview|phase_overview]]
 2. [[plan/phase/current_todo|current_todo]]
 3. `src/app/page.tsx`
-4. `src/components/chat/chat-shell.tsx`
-5. `src/components/chat/use-chat-workspace.ts`
-6. `src/components/chat/use-chat-session.ts`
-7. `src/app/api/chat/route.ts`
-8. `src/lib/supabase/server.ts`
-9. `src/lib/supabase/proxy.ts`
-10. `src/lib/supabase/auth.ts`
-11. `src/lib/supabase/conversations.ts`
-12. `src/lib/supabase/messages.ts`
-13. `src/lib/supabase/model-registry.ts`
-14. `src/lib/ai/gemini-model-catalog.ts`
-15. `src/lib/ai/gemini-model-normalizer.ts`
-16. `src/lib/ai/gemini-base-url.ts`
-17. `src/lib/ai/index.ts`
-18. `src/lib/ai/gemini.ts`
-19. `src/lib/schemas/*.ts`
-20. `src/components/chat`
-21. `src/components/ui`
-22. [[doc/database/GUIDE|database docs]]
-23. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
+4. `src/features/chat/components/chat-shell.tsx`
+5. `src/features/chat/components/chat-header.tsx`
+6. `src/features/chat/hooks/use-chat-workspace.ts`
+7. `src/features/chat/hooks/use-chat-session.ts`
+8. `src/features/chat/lib/chat-stream.ts`
+9. `src/app/api/chat/route.ts`
+10. `src/lib/supabase/server.ts`
+11. `src/lib/supabase/proxy.ts`
+12. `src/lib/supabase/auth.ts`
+13. `src/lib/supabase/conversations.ts`
+14. `src/lib/supabase/messages.ts`
+15. `src/lib/supabase/model-registry.ts`
+16. `src/lib/ai/gemini-model-catalog.ts`
+17. `src/lib/ai/gemini-model-normalizer.ts`
+18. `src/lib/ai/gemini-base-url.ts`
+19. `src/lib/ai/index.ts`
+20. `src/lib/ai/gemini.ts`
+21. `src/lib/schemas/*.ts`
+22. `src/features/chat`
+23. `src/components/ui`
+24. [[doc/database/GUIDE|database docs]]
+25. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
 
 ## 先看什么
 
 如果你只想先恢复主线，不需要整仓库重读，建议按下面的优先级：
 
 1. 先看项目当前阶段和待办，确认现在处于 `Phase 4`，并了解当前主线。
-2. 再看 `page.tsx`、`chat-shell.tsx` 和 `use-chat-workspace.ts`，因为它们共同决定页面入口、登录态、会话列表、模型控制项和聊天主工作区。
-3. 接着看 `use-chat-session.ts` 和 `/api/chat`，把“发送消息到 AI 回复”这条链路串起来。
+2. 再看 `page.tsx`、`chat-shell.tsx`、`chat-header.tsx` 和 `hooks/use-chat-workspace.ts`，因为它们共同决定页面入口、登录态、会话列表、模型控制项和聊天主工作区。
+3. 接着看 `hooks/use-chat-session.ts`、`lib/chat-stream.ts` 和 `/api/chat`，把“发送消息到 AI 回复”这条链路串起来。
 4. 然后看 Supabase 相关封装，理解“用户、会话、消息、模型列表”怎么从数据库读写。
 5. 最后再看消息展示链路：`message-list.tsx -> message-bubble.tsx -> markdown-message.tsx -> code-block.tsx`，补齐细节实现方式。
 

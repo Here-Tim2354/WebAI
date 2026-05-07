@@ -8,7 +8,7 @@ aliases:
 这篇笔记帮助我们理解 `useChatWorkspace` 如何协调会话、模型、草稿控制项与工作区错误状态。
 
 代码入口：
-- `src/components/chat/use-chat-workspace.ts`
+- `src/features/chat/hooks/use-chat-workspace.ts`
 
 关联笔记：
 - [[use-chat-workspace]]
@@ -40,6 +40,7 @@ aliases:
 - `draftModelId`
 - `draftSystemPrompt`
 - `draftWebSearchEnabled`
+- `draftThinkingLevel`
 - `workspaceError`
 - `isCreatingConversation`
 - `isDeletingConversationId`
@@ -61,17 +62,19 @@ aliases:
 - `selectedModelId`
 - `currentSystemPrompt`
 - `currentWebSearchEnabled`
+- `currentThinkingLevel`
 
 推导规则是：
 
 - 如果当前已进入真实会话，则优先用当前会话上的配置
-- 如果当前还是空白工作区，则回退到草稿模型、草稿提示词和草稿联网开关
+- 如果当前还是空白工作区，则回退到草稿模型、草稿提示词、草稿联网开关和草稿思考档位
 
 这个规则决定了：
 
 - 为什么首页试选模型和提示词不会立刻写库
 - 为什么发送第一条消息后这些控制项会自然变成会话级配置
 - 为什么首页先切联网开关，也会在建会话时一并落库
+- 为什么首页先选思考档位，也会在建会话时一并落库
 
 ---
 
@@ -98,7 +101,7 @@ aliases:
 作用：
 
 - 同步消息快照
-- 同步标题、`modelId`、`systemPrompt`、`webSearchEnabled`
+- 同步标题、`modelId`、`systemPrompt`、`webSearchEnabled`、`thinkingLevel`
 - 更新当前会话在列表里的真实状态
 
 ---
@@ -141,12 +144,21 @@ aliases:
    - 再 `PATCH /api/conversations/:id`
    - 失败则回滚
 
-### 5.5 首条消息前确保会话存在
+### 5.5 思考档位切换
+
+1. 如果当前还没有真实会话：
+   - 只更新 `draftThinkingLevel`
+2. 如果当前已有会话：
+   - 先乐观更新当前会话上的 `thinkingLevel`
+   - 再 `PATCH /api/conversations/:id`
+   - 失败则回滚
+
+### 5.6 首条消息前确保会话存在
 
 `ensureConversationId()` 的语义是：
 
 - 如果已经有 `activeConversationId`，直接返回
-- 如果没有，则带上草稿模型、草稿提示词和草稿联网开关先建会话
+- 如果没有，则带上草稿模型、草稿提示词、草稿联网开关和草稿思考档位先建会话
 
 这就是当前“先选控制项，后发首条消息”的前端前置条件。
 
@@ -154,4 +166,4 @@ aliases:
 
 ## 6. 一句话总结
 
-`useChatWorkspace` 的状态流本质上是：用“真实会话配置”和“空白页草稿配置”两套状态，拼出一个连续的聊天工作区编排层；现在这套配置已经不只包含模型和提示词，也包含会话级联网偏好。
+`useChatWorkspace` 的状态流本质上是：用“真实会话配置”和“空白页草稿配置”两套状态，拼出一个连续的聊天工作区编排层；现在这套配置已经不只包含模型和提示词，也包含会话级联网偏好和思考档位。

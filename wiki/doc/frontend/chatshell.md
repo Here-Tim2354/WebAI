@@ -10,8 +10,10 @@ aliases:
 当前版本需要和 `useChatWorkspace` 一起阅读，因为工作区编排逻辑已不再全部堆在 `ChatShell` 本体中。
 
 代码入口：
-- `src/components/chat/chat-shell.tsx`
-- `src/components/chat/use-chat-workspace.ts`
+- `src/features/chat/components/chat-shell.tsx`
+- `src/features/chat/components/chat-header.tsx`
+- `src/features/chat/hooks/use-chat-workspace.ts`
+- `src/features/chat/hooks/use-chat-session.ts`
 
 关联笔记：
 - [[chatshell-stateflow]]
@@ -32,6 +34,15 @@ aliases:
 - 左侧会话管理区
 - 负责展示历史会话、新建、切换、重命名、删除和退出登录
 
+### ChatHeader
+
+对应文件：
+- `src/features/chat/components/chat-header.tsx`
+
+简短介绍：
+- 负责顶部栏中的移动端侧栏入口、模型选择、收藏按钮和会话级提示词入口
+- 让 `ChatShell` 保持页面装配职责，不把顶部栏的菜单结构继续塞在入口组件里
+
 ### [[message-list|MessageList]]
 
 - 聊天主区域中的消息展示容器
@@ -45,7 +56,7 @@ aliases:
 ### ModelIcon
 
 对应文件：
-- `src/components/chat/model-icon.tsx`
+- `src/features/chat/components/model-icon.tsx`
 
 简短介绍：
 - 用于模型选择器中的模型图标展示
@@ -72,6 +83,12 @@ aliases:
 而会话列表、模型列表、草稿控制项和会话同步这类“工作区编排逻辑”，已经抽到 `useChatWorkspace`。
 
 真正的具体界面，则由多个子组件共同完成。
+
+当前 `features/chat` 内部按三层摆放：
+
+- `components/`：页面和可见组件，例如 `chat-shell.tsx`、`chat-header.tsx`、`message-list.tsx`
+- `hooks/`：工作区、消息流、滚动、模型设置等状态逻辑
+- `lib/`：剪贴板、Gemini 本机配置、流式事件消费、动画参数等局部工具
 
 ---
 
@@ -129,7 +146,7 @@ if (!user) {
 
 对应组件：
 
-- `src/components/chat/conversation-sidebar.tsx`
+- `src/features/chat/components/conversation-sidebar.tsx`
 
 这一块负责展示和管理会话列表，具体包括：
 
@@ -166,38 +183,33 @@ if (!user) {
 
 ---
 
-### 5.2 header 顶部栏
+### 5.2 ChatHeader 顶部栏
 
-顶部栏大致是这样：
+顶部栏现在由 `ChatHeader` 渲染，大致承接这些入口：
 
 ```tsx
-<header ...>
-  <div className="flex items-start justify-between gap-4">
-    <div>
-      品牌标识 + 模型选择器
-    </div>
-    <Button ...>
-      会话级提示词入口图标
-    </Button>
-  </div>
-</header>
+<ChatHeader
+  availableModels={availableModels}
+  selectedModel={selectedModel}
+  onSelectModel={handleSelectModel}
+  onOpenPromptDialog={...}
+/>
 ```
 
 这一块在页面里承担三类作用：
 
 - 移动端打开侧栏按钮
-- 页面品牌标识
+- 当前会话概览
 - 模型选择入口
 - 会话级提示词入口
 
-#### 头部左上角
+#### 头部左侧
 
 包含：
 
 - 移动端打开侧栏按钮
-- `Tim2354-WebAI` 标识
 
-这部分主要承担“页面身份”和“移动端导航”的作用。
+这部分主要承担移动端导航作用。
 
 #### 头部中间/左下：模型选择器
 
@@ -293,7 +305,7 @@ if (!user) {
 
 对应组件：
 
-- `src/components/chat/message-list.tsx`
+- `src/features/chat/components/message-list.tsx`
 
 它负责两种界面状态。
 
@@ -329,7 +341,7 @@ if (!user) {
 
 对应组件：
 
-- `src/components/chat/message-bubble.tsx`
+- `src/features/chat/components/message-bubble.tsx`
 
 它负责决定一条消息如何显示，包括：
 
@@ -349,7 +361,7 @@ if (!user) {
 
 对应组件：
 
-- `src/components/chat/markdown-message.tsx`
+- `src/features/chat/components/markdown-message.tsx`
 
 它负责消息正文内容的渲染，包括：
 
@@ -373,7 +385,7 @@ if (!user) {
 
 对应组件：
 
-- `src/components/chat/chat-input.tsx`
+- `src/features/chat/components/chat-input.tsx`
 
 这一块就是页面底部的消息输入区，负责：
 
@@ -403,10 +415,10 @@ ChatShell
    │  ├─ ConversationSidebar
    │  └─ main
    │     ├─ 背景层
-   │     ├─ header
+   │     ├─ ChatHeader
    │     │  ├─ 移动端侧栏按钮
-   │     │  ├─ 品牌标识
    │     │  ├─ 模型选择器
+   │     │  ├─ 收藏按钮
    │     │  └─ 会话级提示词入口按钮
    │     ├─ 错误提示区（条件渲染）
    │     └─ section

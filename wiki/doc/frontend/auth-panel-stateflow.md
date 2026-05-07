@@ -8,7 +8,7 @@ aliases:
 这篇笔记帮助我们理解 `AuthPanel` 的前端运行机制，而不是页面展示结构。
 
 代码入口：
-- `src/components/chat/auth-panel.tsx`
+- `src/features/chat/components/auth-panel.tsx`
 
 关联笔记：
 - [[auth-panel]]

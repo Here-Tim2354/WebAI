@@ -9,7 +9,7 @@ aliases:
 这篇笔记帮助我们快速理解 `MessageList` 组件在页面中的职责，以及它具体展示什么内容。
 
 代码入口：
-- `src/components/chat/message-list.tsx`
+- `src/features/chat/components/message-list.tsx`
 
 关联笔记：
 - [[message-list-stateflow]]

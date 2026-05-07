@@ -1,16 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircleIcon,
-  BotIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  NotebookPenIcon,
-  PanelLeftOpenIcon,
-  StarIcon,
-} from "lucide-react";
+import { AlertCircleIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,30 +16,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { AuthUser } from "@/lib/schemas/auth";
 import { GeminiRuntimeConfig, MessageAttachment } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
-import {
-  AIModel,
-  FetchedModel,
-  fetchedModelListResponseSchema,
-  fetchGeminiModelsResponseSchema,
-} from "@/lib/schemas/model";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip } from "@/components/ui/tooltip";
+import { AIModel } from "@/lib/schemas/model";
 import { AuthPanel } from "./auth-panel";
+import { ChatHeader } from "./chat-header";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ChatInput } from "./chat-input";
+import { useChatSession } from "../hooks/use-chat-session";
+import { useFetchedModels } from "../hooks/use-fetched-models";
+import { useChatWorkspace } from "../hooks/use-chat-workspace";
+import { useMessageScroll } from "../hooks/use-message-scroll";
+import { copyTextToClipboard } from "../lib/clipboard";
+import { useGeminiRuntimeConfig } from "../lib/gemini-runtime-config";
 import type { EditMessageUpdate } from "./message-bubble";
 import { MessageList } from "./message-list";
-import { ModelIcon } from "./model-icon";
-import { useChatSession } from "./use-chat-session";
-import { useChatWorkspace } from "./use-chat-workspace";
-import { useMessageScroll } from "./use-message-scroll";
 import {
   WorkspaceNotice,
   WorkspaceNoticeState,
@@ -61,12 +42,6 @@ type ChatShellProps = {
   initialAuthMessageType?: "info" | "error";
 };
 
-const LEGACY_GEMINI_RUNTIME_CONFIG_STORAGE_KEY = "webai.gemini.runtimeConfig";
-
-function getGeminiRuntimeConfigStorageKey(userId: string) {
-  return `webai.gemini.runtimeConfig.${userId}`;
-}
-
 // 前端链路既可能抛 Error，也可能抛非 Error 值，需要统一收口成人类可读消息。
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
@@ -74,67 +49,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return "暂时无法完成操作，请稍后再试。";
-}
-
-function normalizeGeminiRuntimeConfig(config: GeminiRuntimeConfig) {
-  const apiKey = config.apiKey?.trim();
-  const baseUrl = config.baseUrl?.trim();
-
-  return {
-    ...(apiKey ? { apiKey } : {}),
-    ...(baseUrl ? { baseUrl } : {}),
-  };
-}
-
-function loadStoredGeminiRuntimeConfig(userId: string): GeminiRuntimeConfig {
-  try {
-    const rawConfig = window.localStorage.getItem(
-      getGeminiRuntimeConfigStorageKey(userId),
-    );
-
-    if (!rawConfig) {
-      return {};
-    }
-
-    const parsedConfig = JSON.parse(rawConfig) as GeminiRuntimeConfig;
-
-    return normalizeGeminiRuntimeConfig({
-      apiKey:
-        typeof parsedConfig.apiKey === "string"
-          ? parsedConfig.apiKey
-          : undefined,
-      baseUrl:
-        typeof parsedConfig.baseUrl === "string"
-          ? parsedConfig.baseUrl
-          : undefined,
-    });
-  } catch {
-    return {};
-  }
-}
-
-function copyTextWithFallback(text: string) {
-  const textarea = document.createElement("textarea");
-
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "0";
-  textarea.style.left = "0";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-
-  try {
-    const copied = document.execCommand("copy");
-
-    if (!copied) {
-      throw new Error("复制失败，当前浏览器没有开放剪贴板权限。");
-    }
-  } finally {
-    textarea.parentNode?.removeChild(textarea);
-  }
 }
 
 /**
@@ -155,13 +69,11 @@ export function ChatShell({
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptEditorValue, setPromptEditorValue] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
-  const [geminiRuntimeConfig, setGeminiRuntimeConfig] =
-    useState<GeminiRuntimeConfig>({});
-  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([]);
-  const [isLoadingFetchedModels, setIsLoadingFetchedModels] = useState(false);
-  const [isFetchingGeminiModels, setIsFetchingGeminiModels] = useState(false);
-  const [updatingFetchedModelId, setUpdatingFetchedModelId] =
-    useState<string | null>(null);
+  const {
+    geminiRuntimeConfig,
+    saveGeminiRuntimeConfig,
+    clearGeminiRuntimeConfig,
+  } = useGeminiRuntimeConfig(user?.id);
   const [workspaceNotice, setWorkspaceNotice] =
     useState<WorkspaceNoticeState>(null);
   const {
@@ -244,29 +156,10 @@ export function ChatShell({
   } = useMessageScroll({ messages });
   const hasMessages = messages.length > 0;
 
-  useEffect(() => {
-    if (!user?.id) {
-      setGeminiRuntimeConfig({});
-      return;
-    }
-
-    // Gemini Key / URL 属于用户本机运行时配置，只保存在浏览器 localStorage。
-    // storage key 按用户隔离，避免多人共用同一浏览器时沿用上一个账号的端点配置。
-    window.localStorage.removeItem(LEGACY_GEMINI_RUNTIME_CONFIG_STORAGE_KEY);
-    setGeminiRuntimeConfig(loadStoredGeminiRuntimeConfig(user.id));
-  }, [user?.id]);
-
   const activeGeminiRuntimeConfig =
     Object.keys(geminiRuntimeConfig).length > 0
       ? geminiRuntimeConfig
       : undefined;
-
-  const syncFetchedModelState = useCallback((models: FetchedModel[]) => {
-    // Gemini 设置弹窗看到的是完整列表；聊天顶部模型选择只接收已启用模型。
-    // 两层状态在同一个入口同步，避免 UI 勾选状态和实际可调用模型产生漂移。
-    setFetchedModels(models);
-    syncAvailableModels(models.filter((model) => model.isEnabled));
-  }, [syncAvailableModels]);
 
   const showWorkspaceNotice = useCallback((
     notice: NonNullable<WorkspaceNoticeState>,
@@ -284,6 +177,23 @@ export function ChatShell({
       );
     }, duration);
   }, []);
+
+  const {
+    fetchedModels,
+    isLoadingFetchedModels,
+    isFetchingGeminiModels,
+    updatingFetchedModelId,
+    loadFetchedModels,
+    fetchGeminiModels,
+    updateFetchedModel,
+    deleteFetchedModel,
+  } = useFetchedModels({
+    enabled: Boolean(user),
+    onAvailableModelsSynced: syncAvailableModels,
+    onRuntimeConfigSaved: saveGeminiRuntimeConfig,
+    onWorkspaceError: setWorkspaceError,
+    onWorkspaceNotice: showWorkspaceNotice,
+  });
 
   function handlePromptDialogOpenChange(nextOpen: boolean) {
     setIsPromptDialogOpen(nextOpen);
@@ -316,91 +226,11 @@ export function ChatShell({
   }
 
   function handleSaveGeminiRuntimeConfig(nextConfig: GeminiRuntimeConfig) {
-    const normalizedConfig = normalizeGeminiRuntimeConfig(nextConfig);
-
-    setGeminiRuntimeConfig(normalizedConfig);
-
-    if (!user?.id) {
-      return;
-    }
-
-    const storageKey = getGeminiRuntimeConfigStorageKey(user.id);
-
-    if (Object.keys(normalizedConfig).length === 0) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify(normalizedConfig),
-    );
+    saveGeminiRuntimeConfig(nextConfig);
   }
 
-  const loadFetchedModels = useCallback(async () => {
-    setIsLoadingFetchedModels(true);
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch("/api/models/fetched");
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "模型列表读取失败。");
-      }
-
-      const parsed = fetchedModelListResponseSchema.parse(payload);
-      syncFetchedModelState(parsed.models);
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    } finally {
-      setIsLoadingFetchedModels(false);
-    }
-  }, [setWorkspaceError, syncFetchedModelState]);
-
   async function handleFetchGeminiModels(config: GeminiRuntimeConfig) {
-    const normalizedConfig = normalizeGeminiRuntimeConfig(config);
-
-    if (!normalizedConfig.apiKey) {
-      throw new Error("请先填写 API Key。");
-    }
-
-    // 拉取动作同时保存本机配置，后续聊天请求可以继续使用同一组 Key / URL。
-    handleSaveGeminiRuntimeConfig(normalizedConfig);
-    setIsFetchingGeminiModels(true);
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch("/api/models/gemini/fetch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(normalizedConfig),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "拉取 Gemini 模型失败。");
-      }
-
-      const parsed = fetchGeminiModelsResponseSchema.parse(payload);
-      syncFetchedModelState(parsed.models);
-      showWorkspaceNotice({
-        id: Date.now(),
-        type: "success",
-        title: "模型已更新",
-        description: `拉取 ${parsed.summary.fetched} 个，写入 ${parsed.summary.upserted} 个，跳过 ${parsed.summary.skipped} 个。`,
-      }, 3600);
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    } finally {
-      setIsFetchingGeminiModels(false);
-    }
+    await fetchGeminiModels(config);
   }
 
   async function handleUpdateFetchedModel(
@@ -410,68 +240,12 @@ export function ChatShell({
       isDefault?: boolean;
     },
   ) {
-    setUpdatingFetchedModelId(modelId);
-    setWorkspaceError(null);
-
-    try {
-      // 启用、默认与删除都让服务端返回完整模型列表。
-      // 前端不局部猜测结果，避免浏览器重复实现默认项唯一约束和不支持模型规则。
-      const response = await fetch(`/api/models/fetched/${modelId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "模型更新失败。");
-      }
-
-      const parsed = fetchedModelListResponseSchema.parse(payload);
-      syncFetchedModelState(parsed.models);
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    } finally {
-      setUpdatingFetchedModelId(null);
-    }
+    await updateFetchedModel(modelId, updates);
   }
 
   async function handleDeleteFetchedModel(modelId: string) {
-    setUpdatingFetchedModelId(modelId);
-    setWorkspaceError(null);
-
-    try {
-      const response = await fetch(`/api/models/fetched/${modelId}`, {
-        method: "DELETE",
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "模型删除失败。");
-      }
-
-      const parsed = fetchedModelListResponseSchema.parse(payload);
-      syncFetchedModelState(parsed.models);
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setWorkspaceError(message);
-      throw new Error(message);
-    } finally {
-      setUpdatingFetchedModelId(null);
-    }
+    await deleteFetchedModel(modelId);
   }
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    void loadFetchedModels().catch(() => null);
-  }, [loadFetchedModels, user]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -487,14 +261,8 @@ export function ChatShell({
         throw new Error(payload?.error?.message ?? "退出登录失败。");
       }
 
-      if (user?.id) {
-        window.localStorage.removeItem(
-          getGeminiRuntimeConfigStorageKey(user.id),
-        );
-      }
-      window.localStorage.removeItem(LEGACY_GEMINI_RUNTIME_CONFIG_STORAGE_KEY);
+      clearGeminiRuntimeConfig();
       setUser(null);
-      setGeminiRuntimeConfig({});
       resetAfterSignOut();
       router.refresh();
     } catch (error) {
@@ -547,17 +315,7 @@ export function ChatShell({
     setWorkspaceError(null);
 
     try {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(message.content);
-          return;
-        } catch {
-          copyTextWithFallback(message.content);
-          return;
-        }
-      }
-
-      copyTextWithFallback(message.content);
+      await copyTextToClipboard(message.content);
     } catch (error) {
       setWorkspaceError(getErrorMessage(error));
       throw error;
@@ -731,154 +489,19 @@ export function ChatShell({
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(193,225,255,0.54),transparent_24%),radial-gradient(circle_at_top_center,rgba(158,204,255,0.2),transparent_28%),linear-gradient(180deg,rgba(238,247,255,0.96),rgba(244,249,255,0.98)_32%,rgba(244,249,255,0.98))]" />
 
-          <header className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">
-            <div className="mx-auto grid min-h-9 w-full max-w-4xl grid-cols-[auto_1fr_auto] items-center gap-3">
-              <div className="flex items-center justify-start">
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="h-9 w-10 shrink-0 rounded-[12px] border-border/70 bg-background/88 shadow-none lg:hidden"
-                  type="button"
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                  aria-label="打开会话侧栏"
-                >
-                  <PanelLeftOpenIcon className="size-4" />
-                </Button>
-              </div>
-
-              <div className="flex min-w-0 justify-start">
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <button
-                        type="button"
-                        className="inline-flex h-9 w-[min(62vw,15rem)] items-center justify-between gap-2.5 rounded-[13px] border border-slate-300/70 bg-white/26 px-3 text-left text-[0.8rem] font-medium text-slate-600 transition-colors hover:border-slate-400/80 hover:bg-white/42 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
-                        aria-label="选择模型"
-                      />
-                    }
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      {selectedModel ? (
-                        <ModelIcon
-                          model={selectedModel}
-                          className="size-4 shrink-0 text-slate-500"
-                        />
-                      ) : (
-                        <BotIcon className="size-4 shrink-0 text-slate-400" />
-                      )}
-                      <span className="truncate text-[0.84rem]">
-                        {selectedModel?.label ?? "默认模型"}
-                      </span>
-                    </span>
-                    <ChevronDownIcon className="size-3.5 shrink-0 text-slate-400" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={9}
-                    className="w-[22rem] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
-                  >
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
-                        Gemini
-                      </DropdownMenuLabel>
-                      {availableModels.map((model) => {
-                        const isActive = model.id === selectedModelId;
-                        const capabilitySummary = [
-                          model.capabilities.reasoning ? "推理" : null,
-                          model.capabilities.image ? "图像" : null,
-                          model.capabilities.files ? "文件" : null,
-                          model.capabilities.webSearch ? "联网" : null,
-                          model.capabilities.functionCalling ? "工具" : null,
-                        ].filter(Boolean);
-
-                        return (
-                          <DropdownMenuItem
-                            key={model.id}
-                            className="items-start rounded-xl px-3 py-2.5"
-                            onClick={() => {
-                              void handleSelectModel(model.id);
-                            }}
-                          >
-                            <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                              <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                                <ModelIcon
-                                  model={model}
-                                  className="mt-0.5 size-5 shrink-0 text-slate-500"
-                                />
-                                <div className="min-w-0 space-y-1">
-                                  <div className="truncate text-sm font-medium text-foreground">
-                                    {model.label}
-                                  </div>
-                                  <div className="text-xs leading-5 text-muted-foreground">
-                                    {capabilitySummary.length > 0
-                                      ? capabilitySummary.join(" · ")
-                                      : "Gemini 原生模型"}
-                                  </div>
-                                </div>
-                              </div>
-                              {isActive ? (
-                                <span className="inline-flex size-5 items-center justify-center rounded-[10px] bg-slate-900 text-white">
-                                  <CheckIcon className="size-3.5" />
-                                </span>
-                              ) : null}
-                            </div>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
-                <Tooltip
-                  side="bottom"
-                  content="收藏"
-                >
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className={`h-9 w-10 rounded-[12px] shadow-none ${
-                      activeConversation?.isFavorite
-                        ? "border-amber-200/90 bg-amber-50/88 text-amber-600 hover:bg-amber-100/82"
-                        : "border-border/70 bg-background/82 text-muted-foreground"
-                    }`}
-                    type="button"
-                    onClick={() => void handleToggleFavoriteConversation()}
-                    disabled={!activeConversationId || isTogglingFavorite}
-                    aria-label={
-                      activeConversation?.isFavorite ? "取消收藏会话" : "收藏会话"
-                    }
-                  >
-                    <StarIcon
-                      className="size-4"
-                      fill={activeConversation?.isFavorite ? "currentColor" : "none"}
-                    />
-                  </Button>
-                </Tooltip>
-                <Tooltip
-                  side="bottom"
-                  content="修改提示词"
-                >
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className={`h-9 w-10 rounded-[12px] shadow-none ${
-                      currentSystemPrompt?.trim()
-                        ? "border-sky-200/90 bg-sky-50/88 text-sky-700 hover:bg-sky-100/82"
-                        : "border-border/70 bg-background/82 text-muted-foreground"
-                    }`}
-                    type="button"
-                    onClick={() => handlePromptDialogOpenChange(true)}
-                    aria-label="编辑会话级提示词"
-                  >
-                    <NotebookPenIcon className="size-4" />
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
-          </header>
+          <ChatHeader
+            activeConversation={activeConversation}
+            activeConversationId={activeConversationId}
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            selectedModelId={selectedModelId}
+            currentSystemPrompt={currentSystemPrompt}
+            isTogglingFavorite={isTogglingFavorite}
+            onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+            onSelectModel={handleSelectModel}
+            onToggleFavoriteConversation={handleToggleFavoriteConversation}
+            onOpenPromptDialog={() => handlePromptDialogOpenChange(true)}
+          />
 
           {workspaceError ? (
             <div className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">

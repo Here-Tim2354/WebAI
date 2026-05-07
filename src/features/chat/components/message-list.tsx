@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage, MessageAttachment } from "@/lib/schemas/chat";
 import type { EditMessageUpdate } from "./message-bubble";
 import { MessageBubble } from "./message-bubble";
-import { smoothEase } from "./motion-presets";
+import { smoothEase } from "../lib/motion-presets";
 
 type MessageListProps = {
   messages: ChatMessage[];

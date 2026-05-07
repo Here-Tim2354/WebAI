@@ -9,7 +9,7 @@ aliases:
 这篇笔记帮助我们理解 `useChatWorkspace` 在当前前端架构里的位置，以及它具体负责哪些工作区编排逻辑。
 
 代码入口：
-- `src/components/chat/use-chat-workspace.ts`
+- `src/features/chat/hooks/use-chat-workspace.ts`
 
 关联笔记：
 - [[chatshell]]
@@ -36,6 +36,7 @@ aliases:
 - `ChatShell` 管页面壳
 - `useChatWorkspace` 管工作区编排
 - `useChatSession` 管消息交互
+- `useFetchedModels` 管 Gemini 设置中的用户模型列表同步
 
 ---
 

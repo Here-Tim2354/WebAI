@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ChatShell } from "@/components/chat/chat-shell";
+import { ChatShell } from "@/features/chat/components/chat-shell";
 import { mapAuthUser } from "@/lib/supabase/auth";
 import { listConversations } from "@/lib/supabase/conversations";
 import { listEnabledModels } from "@/lib/supabase/model-registry";

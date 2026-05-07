@@ -30,20 +30,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
+import {
+  getAttachmentAcceptMimeTypes,
+  getAttachmentFileValidationError,
+} from "../lib/attachment-client";
 import { cn } from "@/lib/utils";
 import { MessageAttachment } from "@/lib/schemas/chat";
 import {
   ThinkingLevel,
   thinkingLevelLabelMap,
 } from "@/lib/schemas/thinking";
-import { panelSpring, smoothEase } from "./motion-presets";
-import type { AddUrlContextResult } from "./use-chat-session";
-import {
-  AttachmentPreviewList,
-  getAttachmentAcceptMimeTypes,
-  getAttachmentFileValidationError,
-} from "./message-attachments";
-import { normalizeUrlCandidate } from "./message-url-context";
+import { normalizeUrlCandidate } from "../lib/url-context";
+import type { AddUrlContextResult } from "../hooks/use-chat-session";
+import { panelSpring, smoothEase } from "../lib/motion-presets";
+import { AttachmentPreviewList } from "./message-attachments";
 
 const MotionTextarea = motion.create(Textarea);
 
