@@ -6,6 +6,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "WebAI",
   description: "A modern Gemini-powered chat workspace.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 /**

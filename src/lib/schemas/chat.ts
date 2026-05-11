@@ -120,6 +120,7 @@ export const sendMessageRequestSchema = z.object({
 
 export const cancelChatRequestSchema = z.object({
   conversationId: z.string().uuid("会话标识不正确。"),
+  assistantMessageId: z.string().uuid("消息标识不正确。"),
 });
 
 export const editMessageRequestSchema = z.object({

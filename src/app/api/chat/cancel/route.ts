@@ -6,6 +6,7 @@ import {
   ConversationAccessError,
   getConversationById,
 } from "@/lib/supabase/conversations";
+import { cancelAssistantMessage } from "@/lib/supabase/messages";
 
 function unauthorizedResponse() {
   return NextResponse.json(
@@ -56,6 +57,13 @@ export async function POST(request: Request) {
     }
 
     await getConversationById(supabase, user.id, parsed.data.conversationId);
+    // 线上环境可能由不同运行实例分别处理生成流和取消请求。
+    // 因此取消必须先写数据库状态，再尝试中断当前进程内的模型流。
+    await cancelAssistantMessage(
+      supabase,
+      parsed.data.conversationId,
+      parsed.data.assistantMessageId,
+    );
     cancelConversationStream(parsed.data.conversationId);
 
     return new NextResponse(null, { status: 204 });

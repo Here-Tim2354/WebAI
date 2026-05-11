@@ -21,6 +21,7 @@ aliases:
 它自己管理：
 
 - 邮箱输入
+- 密码输入
 - 提交中状态
 - 页面反馈文案
 - 回跳错误码
@@ -39,10 +40,30 @@ aliases:
 作用：
 - 保存当前邮箱输入框内容
 
-### `isSubmitting`
+### `password`
 
 作用：
-- 当前是否正在发送魔法链接请求
+- 保存当前密码输入框内容
+
+### `isPasswordSubmitting`
+
+作用：
+- 当前是否正在进行邮箱密码登录
+
+### `isMagicLinkSubmitting`
+
+作用：
+- 当前是否正在发送 Magic Link
+
+### `isGithubSubmitting`
+
+作用：
+- 当前是否正在跳转 GitHub OAuth
+
+### `isAuthSubmitting`
+
+作用：
+- 合并三类登录提交状态，避免重复提交
 
 ### `feedback`
 
@@ -87,30 +108,48 @@ aliases:
 
 ---
 
-## 4. 表单提交流程
+## 4. 密码登录流程
 
 链路：
 
 1. 用户提交表单
 2. `handleSubmit` 阻止默认提交
-3. 如果邮箱为空或正在提交，则直接返回
+3. 如果邮箱、密码为空或正在提交，则直接返回
 4. 设置：
-   - `isSubmitting = true`
+   - `isPasswordSubmitting = true`
    - 清空旧 `feedback`
    - 清空旧 `feedbackCode`
 5. 把邮箱写进 `localStorage`
-6. `POST /api/auth/magic-link`
+6. `POST /api/auth/password`
 7. 成功后：
    - 写入成功提示
    - `feedbackType = "info"`
+   - 跳转回 `/`
 8. 失败后：
    - 写入错误提示
    - `feedbackType = "error"`
-9. 最终把 `isSubmitting` 还原为 `false`
+9. 最终把 `isPasswordSubmitting` 还原为 `false`
 
 ---
 
-## 5. 为什么要读 URL 和 hash
+## 5. Magic Link 备用流程
+
+链路：
+
+1. 用户点击发送 Magic Link
+2. `handleSendMagicLinkClick()`
+3. 如果邮箱为空或正在提交，则直接返回
+4. 设置：
+   - `isMagicLinkSubmitting = true`
+   - 清空旧反馈
+5. `POST /api/auth/magic-link`
+6. 成功后提示用户查看邮箱
+7. 失败后展示错误提示
+8. 最终把 `isMagicLinkSubmitting` 还原为 `false`
+
+---
+
+## 6. 为什么要读 URL 和 hash
 
 因为 Supabase 的登录回跳结果不一定只放在 query string。
 
@@ -129,6 +168,6 @@ aliases:
 
 ---
 
-## 6. 一句话总结
+## 7. 一句话总结
 
-`AuthPanel` 的状态流本质上是在管理一条登录漏斗：输入邮箱、发送链接、消费回跳结果，再把用户引导回工作区。
+`AuthPanel` 的状态流本质上是在管理一条登录漏斗：默认用邮箱密码建立 session，同时保留 Magic Link 和 OAuth 回跳处理，把用户引导回工作区。

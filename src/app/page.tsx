@@ -3,6 +3,7 @@ import { ChatShell } from "@/features/chat/components/chat-shell";
 import { mapAuthUser } from "@/lib/supabase/auth";
 import { listConversations } from "@/lib/supabase/conversations";
 import { listEnabledModels } from "@/lib/supabase/model-registry";
+import { getUserProfile } from "@/lib/supabase/profiles";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type HomePageProps = {
@@ -40,6 +41,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     ? await listConversations(supabase, user.id)
     : [];
   const models = user ? await listEnabledModels(supabase, user.id) : [];
+  const profile = user ? await getUserProfile(supabase, user.id) : null;
   // auth 查询参数由邮箱确认页回跳时带上，用来在首页给出一次性的登录结果提示。
   const initialAuthMessage =
     resolvedSearchParams.auth === "error"
@@ -52,7 +54,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <ChatShell
-      initialUser={user ? mapAuthUser(user) : null}
+      initialUser={user ? mapAuthUser(user, profile) : null}
       initialConversations={conversations}
       initialModels={models}
       initialAuthMessage={initialAuthMessage}

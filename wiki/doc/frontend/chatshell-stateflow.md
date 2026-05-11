@@ -564,6 +564,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 结果：
 - `ChatShell` 重新走 `if (!user)` 分支
 - 页面切回 `AuthPanel`
+- Gemini Key / Base URL 保留在浏览器本地配置中，便于同一用户重新登录后恢复使用
 
 ---
 
@@ -585,6 +586,8 @@ ChatShell
 useChatWorkspace
   -> 管会话与模型编排状态
   -> 管联网草稿与会话级持久化切换
+  -> 管收藏、归档和二级菜单所需列表
+  -> 登录后静默预取收藏区与归档区
   -> 触发会话与模型请求
   -> 把消息状态委托给 useChatSession
   -> 把滚动状态委托给 useMessageScroll
@@ -594,7 +597,7 @@ useChatSession
   -> 管输入框文本
   -> 管 URL Context 输入与已确认 URL
   -> 管发送中状态
-  -> 管停止生成后的本地 cancelled 状态
+  -> 管停止生成后的本地 cancelled 状态和服务端精确取消请求
   -> 调用 chat-stream.ts 消费服务端 NDJSON 事件
 
 useFetchedModels

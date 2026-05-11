@@ -515,9 +515,16 @@ export function useChatWorkspace({
     }
   }, [removeConversationMessages, resetDraftConversationControls]);
 
-  const loadArchivedConversations = useCallback(async () => {
+  const loadArchivedConversations = useCallback(async (
+    options?: {
+      silent?: boolean;
+    },
+  ) => {
     setIsLoadingArchivedConversations(true);
-    setWorkspaceError(null);
+
+    if (!options?.silent) {
+      setWorkspaceError(null);
+    }
 
     try {
       const response = await fetch("/api/conversations?status=archived");
@@ -530,15 +537,24 @@ export function useChatWorkspace({
       const parsed = conversationListResponseSchema.parse(payload);
       setArchivedConversations(sortConversations(parsed.conversations));
     } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      if (!options?.silent) {
+        setWorkspaceError(getErrorMessage(error));
+      }
     } finally {
       setIsLoadingArchivedConversations(false);
     }
   }, []);
 
-  const loadFavoriteConversations = useCallback(async () => {
+  const loadFavoriteConversations = useCallback(async (
+    options?: {
+      silent?: boolean;
+    },
+  ) => {
     setIsLoadingFavoriteConversations(true);
-    setWorkspaceError(null);
+
+    if (!options?.silent) {
+      setWorkspaceError(null);
+    }
 
     try {
       const response = await fetch("/api/conversations?favorite=true");
@@ -551,11 +567,19 @@ export function useChatWorkspace({
       const parsed = conversationListResponseSchema.parse(payload);
       setFavoriteConversations(parsed.conversations);
     } catch (error) {
-      setWorkspaceError(getErrorMessage(error));
+      if (!options?.silent) {
+        setWorkspaceError(getErrorMessage(error));
+      }
     } finally {
       setIsLoadingFavoriteConversations(false);
     }
   }, []);
+
+  // 登录进入工作区后后台预取二级菜单数据，避免用户第一次打开收藏或归档区时才看到空白加载。
+  useEffect(() => {
+    void loadArchivedConversations({ silent: true });
+    void loadFavoriteConversations({ silent: true });
+  }, [loadArchivedConversations, loadFavoriteConversations]);
 
   const handleToggleFavoriteConversation = useCallback(async () => {
     if (!activeConversationId || !activeConversation) {

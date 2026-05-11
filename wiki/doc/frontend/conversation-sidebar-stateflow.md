@@ -36,14 +36,30 @@ aliases:
 - `activeConversationId`
 - `isCreating`
 - `isDeletingConversationId`
+- `isArchivingConversationId`
+- `isRestoringConversationId`
+- `isLoadingArchivedConversations`
+- `isLoadingFavoriteConversations`
 - `isSigningOut`
-- `currentUserEmail`
+- `currentUser`
+- `geminiRuntimeConfig`
+- `fetchedModels`
+- `isFetchingGeminiModels`
 - `mobileOpen`
 - `onMobileOpenChange`
 - `onCreateConversation`
 - `onSelectConversation`
 - `onRenameConversation`
 - `onDeleteConversation`
+- `onArchiveConversation`
+- `onRestoreConversation`
+- `onLoadArchivedConversations`
+- `onLoadFavoriteConversations`
+- `onSaveGeminiRuntimeConfig`
+- `onFetchGeminiModels`
+- `onUpdateProfile`
+- `onUploadAvatar`
+- `onUpdatePassword`
 - `onSignOut`
 
 这些输入决定了：
@@ -118,6 +134,12 @@ const [titleDraft, setTitleDraft] = useState("");
 - 只在编辑态使用
 - 提交成功或失焦时会清空
 
+### 3.5 二级面板状态
+
+侧栏还维护个人账户、收藏区、归档区和 Gemini 设置面板的开关状态。
+
+这些状态只影响弹窗显示，不直接拥有业务数据。
+
 ---
 
 ## 4. 核心交互流
@@ -191,7 +213,40 @@ const [titleDraft, setTitleDraft] = useState("");
 
 ---
 
-### 4.5 退出登录
+### 4.5 收藏与归档
+
+收藏链路：
+
+1. 用户在会话菜单中点击收藏或取消收藏
+2. 调用父层会话收藏回调
+3. 成功后由父层刷新列表和收藏区数据
+
+归档链路：
+
+1. 用户在会话菜单中点击归档
+2. 调用 `onArchiveConversation(conversation.id)`
+3. 成功后该会话离开最近列表
+4. 用户可在归档区中调用 `onRestoreConversation()` 恢复
+
+收藏区和归档区打开时会触发对应加载回调；登录后父层也会尝试静默预取，减少用户第一次打开时的等待。
+
+---
+
+### 4.6 个人账户
+
+链路：
+
+1. 用户从底部用户菜单打开个人账户
+2. 修改昵称时调用 `onUpdateProfile(displayName)`
+3. 上传头像时调用 `onUploadAvatar(file)`
+4. 修改密码时调用 `onUpdatePassword(password)`
+5. 成功后父层更新当前用户展示资料
+
+个人账户面板只负责收集输入和展示反馈，资料写入由父层接口完成。
+
+---
+
+### 4.7 退出登录
 
 链路：
 
@@ -216,10 +271,16 @@ const [titleDraft, setTitleDraft] = useState("");
   - 决定某条会话是输入框还是普通项
 - `pendingDeleteConversation`
   - 决定删除弹窗是否打开
+- 二级面板开关
+  - 决定个人账户、收藏区、归档区和 Gemini 设置是否打开
 - `activeConversationId`
   - 决定哪一项是当前激活态
 - `isDeletingConversationId`
   - 决定哪一项显示删除中
+- `isArchivingConversationId`
+  - 决定哪一项显示归档中
+- `isRestoringConversationId`
+  - 决定归档区恢复按钮状态
 - `isCreating`
   - 决定新建按钮是否显示“创建中...”
 - `isSigningOut`
@@ -237,11 +298,12 @@ const [titleDraft, setTitleDraft] = useState("");
 
 - 侧栏不直接 `fetch`
 - 侧栏不直接管理会话持久化
-- 侧栏只处理局部 UI 状态
+- 侧栏不直接管理个人资料持久化
+- 侧栏只处理局部 UI 状态和面板输入
 
 这样做的好处是：
 
-- 页面级数据集中在 `ChatShell`
+- 页面级数据集中在 `ChatShell` / `useChatWorkspace`
 - 侧栏可以保持更纯粹
 - 会话逻辑不会分散在多个组件里
 
@@ -257,4 +319,4 @@ const [titleDraft, setTitleDraft] = useState("");
 
 ## 7. 一句话总结
 
-`ConversationSidebar` 的状态流本质是：父层提供会话状态，本组件维护局部 UI 态，再把用户点击、编辑、删除、退出这些动作回抛给父层执行。
+`ConversationSidebar` 的状态流本质是：父层提供会话、用户、模型和加载状态，本组件维护局部 UI 态，再把用户点击、编辑、收藏、归档、账户管理和退出这些动作回抛给父层执行。

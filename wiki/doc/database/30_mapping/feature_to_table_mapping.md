@@ -9,6 +9,10 @@
 | 功能 | 主要表 | 说明 |
 | --- | --- | --- |
 | 用户登录与身份恢复 | `auth.users`, `profiles` | 认证与展示资料 |
+| 邮箱密码登录 | `auth.users` | 由 Supabase Auth 建立 session |
+| 修改登录密码 | `auth.users` | 登录后通过 Auth 更新密码 |
+| 修改昵称 | `profiles` | 更新用户展示名称 |
+| 上传头像 | `profile_avatars`, `profiles` | Storage 保存头像对象，`profiles.avatar_url` 保存路径 |
 | 查看会话列表 | `conversations` | 按用户读取并排序 |
 | 新建会话 | `conversations` | 首次发送前可先建空会话 |
 | 重命名会话 | `conversations` | 修改标题 |
@@ -33,6 +37,6 @@
 
 | 功能 | 目标表 | 状态 |
 | --- | --- | --- |
-| 收藏消息 | `favorites` | `planned` |
+| 收藏会话 | `favorites` | 已用于会话收藏入口 |
 | 搜索记录 | `search_records` | `planned` |
-| 归档区管理增强 | `conversations` 或额外扩展表 | 需求存在，未完整验证 |
+| 归档区管理增强 | `conversations.archived_at` | 已用于归档区入口 |

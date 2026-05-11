@@ -44,6 +44,10 @@ aliases:
 - `workspaceError`
 - `isCreatingConversation`
 - `isDeletingConversationId`
+- `isArchivingConversationId`
+- `isRestoringConversationId`
+- `isLoadingArchivedConversations`
+- `isLoadingFavoriteConversations`
 - `isLoadingConversation`
 
 这些状态共同描述的是：
@@ -104,6 +108,16 @@ aliases:
 - 同步标题、`modelId`、`systemPrompt`、`webSearchEnabled`、`thinkingLevel`
 - 更新当前会话在列表里的真实状态
 
+### 4.3 收藏区和归档区静默预取
+
+登录后的工作区会尝试在后台加载收藏会话和归档会话。
+
+作用：
+
+- 用户第一次打开收藏区或归档区时更快看到内容
+- 静默加载失败时不打断聊天主链路
+- 用户主动打开二级菜单时仍会触发一次带反馈的刷新
+
 ---
 
 ## 5. 关键行为链路
@@ -162,8 +176,28 @@ aliases:
 
 这就是当前“先选控制项，后发首条消息”的前端前置条件。
 
+### 5.7 收藏和归档
+
+收藏会话：
+
+- 调用会话收藏接口
+- 更新当前列表中的收藏状态
+- 收藏区已加载时同步刷新收藏区
+
+归档会话：
+
+- 调用会话归档接口
+- 从最近列表移除会话
+- 如果归档的是当前会话，则切换到剩余会话或空白工作区
+
+恢复归档：
+
+- 调用归档恢复接口
+- 从归档区移除会话
+- 重新加入最近会话列表
+
 ---
 
 ## 6. 一句话总结
 
-`useChatWorkspace` 的状态流本质上是：用“真实会话配置”和“空白页草稿配置”两套状态，拼出一个连续的聊天工作区编排层；现在这套配置已经不只包含模型和提示词，也包含会话级联网偏好和思考档位。
+`useChatWorkspace` 的状态流本质上是：用“真实会话配置”和“空白页草稿配置”两套状态，拼出一个连续的聊天工作区编排层；同时把收藏、归档和后台预取纳入工作区层统一协调。

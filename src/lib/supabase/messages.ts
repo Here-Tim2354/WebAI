@@ -212,6 +212,7 @@ export async function updateConversationMessage(
     .update(nextMessageUpdate)
     .eq("id", messageId)
     .eq("conversation_id", conversationId)
+    .neq("status", "cancelled")
     .select(messageSelectFields)
     .maybeSingle();
 
@@ -224,6 +225,27 @@ export async function updateConversationMessage(
   }
 
   return mapMessageRow(data as MessageRow);
+}
+
+export async function cancelAssistantMessage(
+  supabase: SupabaseClient,
+  conversationId: string,
+  messageId: string,
+) {
+  const { error } = await supabase
+    .from("messages")
+    .update({
+      content: "",
+      status: "cancelled",
+    })
+    .eq("conversation_id", conversationId)
+    .eq("id", messageId)
+    .eq("sender_type", "assistant")
+    .in("status", ["pending", "streaming"]);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function deleteConversationMessagesById(

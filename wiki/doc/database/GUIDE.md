@@ -23,6 +23,7 @@
 - [[doc/database/20_extension/search_records_extension|search_records_extension]]
 - [[doc/database/20_extension/model_registry_extension|model_registry_extension]]
 - [[doc/database/20_extension/message_attachments_extension|message_attachments_extension]]
+- [[doc/database/20_extension/profile_avatars_extension|profile_avatars_extension]]
 
 ## 映射
 
@@ -52,3 +53,4 @@
 - `model_catalog` 是服务端内部能力参照表，不作为用户模型列表直接暴露
 - `model_fetched` 是用户通过 Gemini 设置拉取后的模型列表，支持启用 / 停用和默认模型选择
 - 默认能力目录覆盖 Gemini 2.5 到 Gemini 3.1 的主流文本 / 多模态模型，不包含图片生成、视频生成、Live 和 TTS 模型
+- 用户头像使用私有 Storage bucket `profile_avatars`，展示资料仍落在 `profiles`

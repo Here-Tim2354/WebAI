@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircleIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -65,6 +65,7 @@ export function ChatShell({
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const autoFetchedGeminiModelsForUserRef = useRef<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptEditorValue, setPromptEditorValue] = useState("");
@@ -72,7 +73,6 @@ export function ChatShell({
   const {
     geminiRuntimeConfig,
     saveGeminiRuntimeConfig,
-    clearGeminiRuntimeConfig,
   } = useGeminiRuntimeConfig(user?.id);
   const [workspaceNotice, setWorkspaceNotice] =
     useState<WorkspaceNoticeState>(null);
@@ -261,7 +261,6 @@ export function ChatShell({
         throw new Error(payload?.error?.message ?? "退出登录失败。");
       }
 
-      clearGeminiRuntimeConfig();
       setUser(null);
       resetAfterSignOut();
       router.refresh();
@@ -437,6 +436,103 @@ export function ChatShell({
     scrollToLatest();
   }, [scrollToLatest]);
 
+  useEffect(() => {
+    if (
+      !user?.id ||
+      !geminiRuntimeConfig.apiKey ||
+      fetchedModels.length > 0 ||
+      isLoadingFetchedModels ||
+      isFetchingGeminiModels ||
+      autoFetchedGeminiModelsForUserRef.current === user.id
+    ) {
+      return;
+    }
+
+    autoFetchedGeminiModelsForUserRef.current = user.id;
+    void fetchGeminiModels(geminiRuntimeConfig).catch((error) => {
+      autoFetchedGeminiModelsForUserRef.current = null;
+      showWorkspaceNotice({
+        id: Date.now(),
+        type: "error",
+        title: "模型同步失败",
+        description: getErrorMessage(error),
+      }, 4200);
+    });
+  }, [
+    fetchedModels.length,
+    fetchGeminiModels,
+    geminiRuntimeConfig,
+    isFetchingGeminiModels,
+    isLoadingFetchedModels,
+    showWorkspaceNotice,
+    user?.id,
+  ]);
+
+  const updateCurrentUser = useCallback((nextUser: AuthUser) => {
+    setUser(nextUser);
+  }, []);
+
+  async function handleUpdateProfile(displayName: string) {
+    const response = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        displayName,
+      }),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload?.error?.message ?? "资料保存失败。");
+    }
+
+    const nextUser = payload?.user;
+
+    if (nextUser) {
+      updateCurrentUser(nextUser);
+    }
+  }
+
+  async function handleUploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const response = await fetch("/api/profile/avatar", {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload?.error?.message ?? "头像上传失败。");
+    }
+
+    const nextUser = payload?.user;
+
+    if (nextUser) {
+      updateCurrentUser(nextUser);
+    }
+  }
+
+  async function handleUpdatePassword(password: string) {
+    const response = await fetch("/api/profile/password", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        password,
+      }),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload?.error?.message ?? "密码修改失败。");
+    }
+  }
+
   if (!user) {
     return (
       <AuthPanel
@@ -466,7 +562,7 @@ export function ChatShell({
           isFetchingGeminiModels={isFetchingGeminiModels}
           updatingFetchedModelId={updatingFetchedModelId}
           isSigningOut={isSigningOut}
-          currentUserEmail={user.email}
+          currentUser={user}
           geminiRuntimeConfig={geminiRuntimeConfig}
           mobileOpen={isMobileSidebarOpen}
           onMobileOpenChange={setIsMobileSidebarOpen}
@@ -483,6 +579,9 @@ export function ChatShell({
           onFetchGeminiModels={handleFetchGeminiModels}
           onUpdateFetchedModel={handleUpdateFetchedModel}
           onDeleteFetchedModel={handleDeleteFetchedModel}
+          onUpdateProfile={handleUpdateProfile}
+          onUploadAvatar={handleUploadAvatar}
+          onUpdatePassword={handleUpdatePassword}
           onSignOut={handleSignOut}
         />
 

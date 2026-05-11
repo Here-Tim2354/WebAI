@@ -16,19 +16,21 @@
 10. `src/lib/supabase/server.ts`
 11. `src/lib/supabase/proxy.ts`
 12. `src/lib/supabase/auth.ts`
-13. `src/lib/supabase/conversations.ts`
-14. `src/lib/supabase/messages.ts`
-15. `src/lib/supabase/model-registry.ts`
-16. `src/lib/ai/gemini-model-catalog.ts`
-17. `src/lib/ai/gemini-model-normalizer.ts`
-18. `src/lib/ai/gemini-base-url.ts`
-19. `src/lib/ai/index.ts`
-20. `src/lib/ai/gemini.ts`
-21. `src/lib/schemas/*.ts`
-22. `src/features/chat`
-23. `src/components/ui`
-24. [[doc/database/GUIDE|database docs]]
-25. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
+13. `src/lib/supabase/profiles.ts`
+14. `src/lib/supabase/conversations.ts`
+15. `src/lib/supabase/messages.ts`
+16. `src/lib/supabase/model-registry.ts`
+17. `src/lib/ai/gemini-model-catalog.ts`
+18. `src/lib/ai/gemini-model-normalizer.ts`
+19. `src/lib/ai/gemini-base-url.ts`
+20. `src/lib/ai/index.ts`
+21. `src/lib/ai/gemini.ts`
+22. `src/lib/schemas/*.ts`
+23. `src/features/chat`
+24. `src/components/ui`
+25. [[doc/database/GUIDE|database docs]]
+26. [[doc/developer/deployment|deployment docs]]
+27. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
 
 ## 先看什么
 
@@ -47,6 +49,7 @@
 - `Supabase server client`：服务端读取用户 session、访问数据库的入口。
 - `proxy.ts`：负责请求级 session 刷新和 cookie 同步。
 - `AuthUser`：项目内部使用的轻量用户对象，不等同于 Supabase 原生 `User`。
+- `profiles`：用户展示资料扩展表，用于昵称和头像路径。
 - `AIModel`：前端选择器和聊天 API 之间的统一模型描述。
 - `modelId`：当前传递的是模型注册表主键，不直接等于上游模型名。
 - `model_catalog`：系统内部维护的 Gemini 能力参照表，不直接作为用户模型列表展示。
@@ -70,10 +73,14 @@
 
 1. 首页 `page.tsx`
 2. 登录面板 `auth-panel.tsx`
-3. `/api/auth/magic-link`
-4. `/auth/confirm`
-5. `src/lib/supabase/server.ts`
-6. `src/lib/supabase/proxy.ts`
+3. `/api/auth/password`
+4. `/api/auth/magic-link`
+5. `/auth/confirm`
+6. `/api/profile`
+7. `/api/profile/avatar`
+8. `/api/profile/password`
+9. `src/lib/supabase/server.ts`
+10. `src/lib/supabase/proxy.ts`
 
 如果你是在本地开发时遇到 IAB 登录问题，优先检查：
 
@@ -81,6 +88,19 @@
 - `.env` 是否包含 `DEV_AUTH_EMAIL`
 - `SUPABASE_SECRET_KEY` 是否已配置
 - Supabase Dashboard 的 `Site URL` 和 `Redirect URLs` 是否允许本地回调
+
+## 公网部署
+
+当前公网入口是 `https://webai.tim2354.bytecola.cn`。
+
+部署与域名配置记录集中在 [[doc/developer/deployment|deployment]]。如果你在排查线上问题，先确认：
+
+- Vercel production 部署是否为 Ready
+- Cloudflare DNS 是否仍指向 `cname.vercel-dns.com`
+- `APP_ORIGIN` 是否等于当前公网域名
+- Supabase Auth 是否允许 `https://webai.tim2354.bytecola.cn/auth/confirm`
+- GitHub provider 是否已在 Supabase Dashboard 启用
+- `profile_avatars` bucket 与 policy 是否存在
 
 ## 数据库主线
 

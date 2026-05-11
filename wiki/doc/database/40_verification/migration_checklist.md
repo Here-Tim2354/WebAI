@@ -8,8 +8,12 @@
 - [x] `model_catalog`
 - [x] `model_fetched`
 - [x] `conversations.web_search_enabled`
+- [x] `favorites`
+- [x] `conversations.archived_at`
+- [x] `profile_avatars`
 - [x] `20260505023000_phase4_gemini_only_model_registry.sql`
 - [x] `20260505043000_phase4_model_catalog_and_fetched.sql`
+- [x] `20260511193000_phase5_profile_avatars.sql`
 
 ## 验证项
 
@@ -22,12 +26,15 @@
 - [x] `model_fetched.provider` 约束为 `gemini`
 - [x] `model_fetched.api_style` 约束为 `gemini_native`
 - [x] 会话级联网搜索字段位于 `conversations`
+- [x] 头像 Storage bucket 为私有 bucket
+- [x] 头像 Storage policy 按用户 ID 一级目录隔离
 
 ## 缺口
 
 - [ ] 更多 `Gemini` 常用模型 seed 仍未补齐
 - [ ] RLS advisor 与性能 advisor 的遗留项仍需单独收口
 - [ ] 用户手动编辑模型能力的交互仍未补齐
+- [ ] 头像替换后的旧对象清理策略仍可后续补充
 
 ## 原则
 

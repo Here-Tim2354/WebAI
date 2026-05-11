@@ -77,6 +77,7 @@ export function useChatSession() {
   >(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingConversationIdRef = useRef<string | null>(null);
+  const streamingAssistantMessageIdRef = useRef<string | null>(null);
 
   const getMessages = useCallback((conversationId: string | null) => {
     if (!conversationId) {
@@ -245,8 +246,9 @@ export function useChatSession() {
 
   const stopStreaming = useCallback(() => {
     const conversationId = streamingConversationIdRef.current;
+    const assistantMessageId = streamingAssistantMessageIdRef.current;
 
-    if (conversationId) {
+    if (conversationId && assistantMessageId) {
       // 同时通知服务端和中断浏览器 fetch：
       // 服务端负责停止模型流与写 cancelled，前端 abort 负责尽快结束本地 reader。
       void fetch("/api/chat/cancel", {
@@ -256,6 +258,7 @@ export function useChatSession() {
         },
         body: JSON.stringify({
           conversationId,
+          assistantMessageId,
         }),
       }).catch(() => null);
     }
@@ -327,6 +330,7 @@ export function useChatSession() {
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
     streamingConversationIdRef.current = conversationId;
+    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
     abortControllerRef.current = abortController;
 
     try {
@@ -364,6 +368,7 @@ export function useChatSession() {
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
+      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (isAbortError(error)) {
@@ -394,6 +399,7 @@ export function useChatSession() {
       setIsSubmitting(false);
       setStreamingConversationId(null);
       streamingConversationIdRef.current = null;
+      streamingAssistantMessageIdRef.current = null;
     }
   }, [
     isSubmitting,
@@ -486,6 +492,7 @@ export function useChatSession() {
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
     streamingConversationIdRef.current = conversationId;
+    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
     abortControllerRef.current = abortController;
 
     try {
@@ -523,6 +530,7 @@ export function useChatSession() {
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
+      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (isAbortError(error)) {
@@ -560,6 +568,7 @@ export function useChatSession() {
       setIsSubmitting(false);
       setStreamingConversationId(null);
       streamingConversationIdRef.current = null;
+      streamingAssistantMessageIdRef.current = null;
     }
   }, [
     conversationMessages,
@@ -646,6 +655,7 @@ export function useChatSession() {
     setIsSubmitting(true);
     setStreamingConversationId(conversationId);
     streamingConversationIdRef.current = conversationId;
+    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
     abortControllerRef.current = abortController;
 
     try {
@@ -687,6 +697,7 @@ export function useChatSession() {
         onConversationSynced,
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
+      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (restoredPreviousMessages) {
@@ -728,6 +739,7 @@ export function useChatSession() {
       setIsSubmitting(false);
       setStreamingConversationId(null);
       streamingConversationIdRef.current = null;
+      streamingAssistantMessageIdRef.current = null;
     }
   }, [
     conversationMessages,

@@ -6,6 +6,7 @@ import {
   AlertCircleIcon,
   ArrowRightIcon,
   GitBranchIcon,
+  LockKeyholeIcon,
   MailIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -33,7 +34,7 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "发送登录链接失败，请稍后再试。";
+  return "登录失败，请稍后再试。";
 }
 
 /**
@@ -97,11 +98,15 @@ export function AuthPanel({
 }: AuthPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [email, setEmail] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [isMagicLinkSubmitting, setIsMagicLinkSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(initialMessage);
   const [feedbackType, setFeedbackType] = useState<"info" | "error">(initialMessageType);
   const [feedbackCode, setFeedbackCode] = useState<string | null>(null);
   const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
+  const isAuthSubmitting =
+    isPasswordSubmitting || isMagicLinkSubmitting || isGithubSubmitting;
 
   // 登录页首次挂载时需要恢复本机邮箱，并解析 URL / hash 中的登录回跳结果。
   // 这能让过期链接、OAuth 失败和邮件发送成功都落到同一个提示区域。
@@ -134,11 +139,50 @@ export function AuthPanel({
   ) => {
     event.preventDefault();
 
-    if (!email.trim() || isSubmitting) {
+    if (!email.trim() || !password || isAuthSubmitting) {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsPasswordSubmitting(true);
+    setFeedback(null);
+    setFeedbackCode(null);
+
+    try {
+      window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
+
+      const response = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "邮箱或密码不正确。");
+      }
+
+      setFeedback("登录成功，正在进入你的会话工作区。");
+      setFeedbackType("info");
+      window.location.assign("/");
+    } catch (error) {
+      setFeedback(getErrorMessage(error));
+      setFeedbackType("error");
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  };
+
+  async function handleSendMagicLinkClick() {
+    if (!email.trim() || isAuthSubmitting) {
+      return;
+    }
+
+    setIsMagicLinkSubmitting(true);
     setFeedback(null);
     setFeedbackCode(null);
 
@@ -166,9 +210,9 @@ export function AuthPanel({
       setFeedback(getErrorMessage(error));
       setFeedbackType("error");
     } finally {
-      setIsSubmitting(false);
+      setIsMagicLinkSubmitting(false);
     }
-  };
+  }
 
   return (
     <motion.main
@@ -188,7 +232,7 @@ export function AuthPanel({
               登录
             </h1>
             <p className="max-w-[42ch] text-sm leading-6 text-muted-foreground sm:text-[0.95rem]">
-              输入你的邮箱
+              使用邮箱和密码进入你的会话工作区
             </p>
           </div>
 
@@ -207,27 +251,49 @@ export function AuthPanel({
                 />
               </div>
             </label>
+            <label className="block space-y-2">
+              <div className="relative">
+                <LockKeyholeIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="password"
+                  value={password}
+                  placeholder="密码"
+                  className="h-11 border-border/70 bg-background/88 pl-10 text-sm shadow-none"
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
+            </label>
 
             <Button
               className="h-12 w-full rounded-[14px] bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
               type="submit"
-              disabled={isSubmitting}
+              disabled={isAuthSubmitting || !email.trim() || !password}
             >
               <ArrowRightIcon data-icon="inline-end" />
-              {isSubmitting
-                ? "发送中..."
-                : feedbackCode === "otp_expired"
-                  ? "重新发送"
-                  : "发送链接"}
+              {isPasswordSubmitting ? "登录中..." : "登录"}
             </Button>
           </form>
 
-          <div className="mt-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Button
               variant="outline"
               className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
               type="button"
-              disabled={isSubmitting || isGithubSubmitting}
+              disabled={isAuthSubmitting || !email.trim()}
+              onClick={() => void handleSendMagicLinkClick()}
+            >
+              <MailIcon data-icon="inline-start" />
+              {isMagicLinkSubmitting
+                ? "发送中..."
+                : feedbackCode === "otp_expired"
+                  ? "重新发送"
+                  : "邮件链接"}
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
+              type="button"
+              disabled={isAuthSubmitting}
               onClick={() => {
                 setIsGithubSubmitting(true);
                 window.location.assign("/api/auth/github");
