@@ -8,6 +8,29 @@ import {
 import { sendMagicLinkRequestSchema } from "@/lib/schemas/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+function getMagicLinkErrorMessage(error: unknown) {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String(error.code)
+      : "";
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? Number(error.status)
+      : null;
+
+  if (status === 429 || code === "over_email_send_rate_limit") {
+    return {
+      message: "邮箱链接发送过于频繁，请稍后再试。",
+      status: 429,
+    };
+  }
+
+  return {
+    message: "登录链接暂时无法发送，请稍后再试。",
+    status: 500,
+  };
+}
+
 /**
  * 发送邮箱魔法链接。
  * Route Handler 放在服务端执行，可以安全地调用 Supabase Auth，而不把登录细节暴露给客户端。
@@ -85,13 +108,15 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    const authError = getMagicLinkErrorMessage(error);
+
     return NextResponse.json(
       {
         error: {
-          message: "登录链接暂时无法发送，请稍后再试。",
+          message: authError.message,
         },
       },
-      { status: 500 },
+      { status: authError.status },
     );
   }
 

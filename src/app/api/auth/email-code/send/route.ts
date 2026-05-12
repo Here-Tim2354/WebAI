@@ -8,6 +8,29 @@ import {
 import { sendEmailCodeRequestSchema } from "@/lib/schemas/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+function getEmailCodeErrorMessage(error: unknown) {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String(error.code)
+      : "";
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? Number(error.status)
+      : null;
+
+  if (status === 429 || code === "over_email_send_rate_limit") {
+    return {
+      message: "验证码发送过于频繁，请稍后再试。",
+      status: 429,
+    };
+  }
+
+  return {
+    message: "验证码暂时无法发送，请稍后再试。",
+    status: 500,
+  };
+}
+
 /**
  * 发送邮箱验证码。
  * Supabase 的邮箱 OTP 长度由 Auth 配置决定，前端只做 6-10 位兼容输入。
@@ -81,13 +104,15 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    const authError = getEmailCodeErrorMessage(error);
+
     return NextResponse.json(
       {
         error: {
-          message: "验证码暂时无法发送，请稍后再试。",
+          message: authError.message,
         },
       },
-      { status: 500 },
+      { status: authError.status },
     );
   }
 
