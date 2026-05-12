@@ -15,6 +15,18 @@ export const sendMagicLinkRequestSchema = z.object({
   email: z.string().trim().email("请输入合法的邮箱地址。"),
 });
 
+export const sendEmailCodeRequestSchema = z.object({
+  email: z.string().trim().email("请输入合法的邮箱地址。"),
+});
+
+export const verifyEmailCodeRequestSchema = z.object({
+  email: z.string().trim().email("请输入合法的邮箱地址。"),
+  token: z
+    .string()
+    .trim()
+    .regex(/^\d{6,10}$/, "请输入邮件中的数字验证码。"),
+});
+
 export const signInWithPasswordRequestSchema = z.object({
   email: z.string().trim().email("请输入合法的邮箱地址。"),
   password: z.string().min(1, "请输入密码。"),

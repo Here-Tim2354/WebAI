@@ -10,6 +10,9 @@
 | --- | --- | --- |
 | 用户登录与身份恢复 | `auth.users`, `profiles` | 认证与展示资料 |
 | 邮箱密码登录 | `auth.users` | 由 Supabase Auth 建立 session |
+| 邮箱验证码登录 | `auth.users` | 由 Supabase Auth 发送并校验邮箱 OTP 后建立 session |
+| 邮箱链接登录 | `auth.users` | 由 Supabase Auth 发送登录链接，回跳确认后建立 session |
+| GitHub OAuth 登录 | `auth.users` | 由 Supabase Auth provider 建立外部登录 session |
 | 修改登录密码 | `auth.users` | 登录后通过 Auth 更新密码 |
 | 修改昵称 | `profiles` | 更新用户展示名称 |
 | 上传头像 | `profile_avatars`, `profiles` | Storage 保存头像对象，`profiles.avatar_url` 保存路径 |

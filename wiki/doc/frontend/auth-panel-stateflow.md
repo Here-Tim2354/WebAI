@@ -20,8 +20,10 @@ aliases:
 
 它自己管理：
 
+- 当前登录方式
 - 邮箱输入
 - 密码输入
+- 邮箱验证码输入
 - 提交中状态
 - 页面反馈文案
 - 回跳错误码
@@ -35,6 +37,13 @@ aliases:
 
 ## 2. 本组件维护的状态
 
+### `authMode`
+
+作用：
+- 保存当前选中的主登录方式
+- 可选值为 `password` 和 `email-code`
+- 决定页面展示密码表单还是邮箱验证码表单
+
 ### `email`
 
 作用：
@@ -45,15 +54,31 @@ aliases:
 作用：
 - 保存当前密码输入框内容
 
+### `emailCode`
+
+作用：
+- 保存当前邮箱验证码输入框内容
+- 输入时只保留数字，并限制最多 10 位
+
 ### `isPasswordSubmitting`
 
 作用：
 - 当前是否正在进行邮箱密码登录
 
+### `isEmailCodeSending`
+
+作用：
+- 当前是否正在发送邮箱验证码
+
+### `isEmailCodeVerifying`
+
+作用：
+- 当前是否正在校验邮箱验证码并登录
+
 ### `isMagicLinkSubmitting`
 
 作用：
-- 当前是否正在发送 Magic Link
+- 当前是否正在发送邮箱链接
 
 ### `isGithubSubmitting`
 
@@ -63,7 +88,7 @@ aliases:
 ### `isAuthSubmitting`
 
 作用：
-- 合并三类登录提交状态，避免重复提交
+- 合并密码、邮箱验证码、邮箱链接和 GitHub 登录状态，避免重复提交
 
 ### `feedback`
 
@@ -132,11 +157,11 @@ aliases:
 
 ---
 
-## 5. Magic Link 备用流程
+## 5. 邮箱链接备用流程
 
 链路：
 
-1. 用户点击发送 Magic Link
+1. 用户点击使用邮箱链接登录
 2. `handleSendMagicLinkClick()`
 3. 如果邮箱为空或正在提交，则直接返回
 4. 设置：
@@ -149,7 +174,43 @@ aliases:
 
 ---
 
-## 6. 为什么要读 URL 和 hash
+## 6. 邮箱验证码流程
+
+发送验证码链路：
+
+1. 用户切换到 `邮箱验证码` 选项卡
+2. 输入邮箱
+3. 点击发送验证码
+4. `handleSendEmailCodeClick()` 检查邮箱和提交状态
+5. 设置：
+   - `isEmailCodeSending = true`
+   - 清空旧反馈
+6. `POST /api/auth/email-code/send`
+7. 成功后提示用户查看邮箱
+8. 失败后展示错误提示
+9. 最终把 `isEmailCodeSending` 还原为 `false`
+
+验证码登录链路：
+
+1. 用户输入邮箱验证码
+2. 提交验证码表单
+3. `handleVerifyEmailCodeClick()` 检查邮箱、验证码和提交状态
+4. 设置：
+   - `isEmailCodeVerifying = true`
+   - 清空旧反馈
+5. `POST /api/auth/email-code/verify`
+6. 成功后：
+   - 写入成功提示
+   - `feedbackType = "info"`
+   - 跳转回 `/`
+7. 失败后：
+   - 写入错误提示
+   - `feedbackType = "error"`
+8. 最终把 `isEmailCodeVerifying` 还原为 `false`
+
+---
+
+## 7. 为什么要读 URL 和 hash
 
 因为 Supabase 的登录回跳结果不一定只放在 query string。
 
@@ -168,6 +229,6 @@ aliases:
 
 ---
 
-## 7. 一句话总结
+## 8. 一句话总结
 
-`AuthPanel` 的状态流本质上是在管理一条登录漏斗：默认用邮箱密码建立 session，同时保留 Magic Link 和 OAuth 回跳处理，把用户引导回工作区。
+`AuthPanel` 的状态流本质上是在管理未登录态入口：密码和邮箱验证码作为主登录方式互斥切换，邮箱链接与 GitHub OAuth 作为备用入口，把用户引导回工作区。

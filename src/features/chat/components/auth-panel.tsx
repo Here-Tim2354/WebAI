@@ -6,6 +6,7 @@ import {
   AlertCircleIcon,
   ArrowRightIcon,
   GitBranchIcon,
+  KeyRoundIcon,
   LockKeyholeIcon,
   MailIcon,
   SparklesIcon,
@@ -27,6 +28,8 @@ type AuthFeedbackState = {
   type: "info" | "error";
   code?: string | null;
 };
+
+type AuthMode = "password" | "email-code";
 
 // 登录相关报错可能来自 fetch、Supabase callback 或手动抛错，需要统一转换成前端提示。
 function getErrorMessage(error: unknown) {
@@ -97,16 +100,24 @@ export function AuthPanel({
   initialMessageType = "info",
 }: AuthPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailCode, setEmailCode] = useState("");
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [isEmailCodeSending, setIsEmailCodeSending] = useState(false);
+  const [isEmailCodeVerifying, setIsEmailCodeVerifying] = useState(false);
   const [isMagicLinkSubmitting, setIsMagicLinkSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(initialMessage);
   const [feedbackType, setFeedbackType] = useState<"info" | "error">(initialMessageType);
   const [feedbackCode, setFeedbackCode] = useState<string | null>(null);
   const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
   const isAuthSubmitting =
-    isPasswordSubmitting || isMagicLinkSubmitting || isGithubSubmitting;
+    isPasswordSubmitting ||
+    isEmailCodeSending ||
+    isEmailCodeVerifying ||
+    isMagicLinkSubmitting ||
+    isGithubSubmitting;
 
   // 登录页首次挂载时需要恢复本机邮箱，并解析 URL / hash 中的登录回跳结果。
   // 这能让过期链接、OAuth 失败和邮件发送成功都落到同一个提示区域。
@@ -214,6 +225,82 @@ export function AuthPanel({
     }
   }
 
+  async function handleSendEmailCodeClick() {
+    if (!email.trim() || isAuthSubmitting) {
+      return;
+    }
+
+    setIsEmailCodeSending(true);
+    setFeedback(null);
+    setFeedbackCode(null);
+
+    try {
+      window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
+
+      const response = await fetch("/api/auth/email-code/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "发送验证码失败。");
+      }
+
+      setFeedback(payload?.message ?? "验证码已发送，请查看邮箱。");
+      setFeedbackType("info");
+    } catch (error) {
+      setFeedback(getErrorMessage(error));
+      setFeedbackType("error");
+    } finally {
+      setIsEmailCodeSending(false);
+    }
+  }
+
+  async function handleVerifyEmailCodeClick() {
+    if (!email.trim() || !emailCode.trim() || isAuthSubmitting) {
+      return;
+    }
+
+    setIsEmailCodeVerifying(true);
+    setFeedback(null);
+    setFeedbackCode(null);
+
+    try {
+      window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
+
+      const response = await fetch("/api/auth/email-code/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          token: emailCode,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "验证码不正确或已过期。");
+      }
+
+      setFeedback("登录成功，正在进入你的会话工作区。");
+      setFeedbackType("info");
+      window.location.assign("/");
+    } catch (error) {
+      setFeedback(getErrorMessage(error));
+      setFeedbackType("error");
+    } finally {
+      setIsEmailCodeVerifying(false);
+    }
+  }
+
   return (
     <motion.main
       className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6"
@@ -232,11 +319,46 @@ export function AuthPanel({
               登录
             </h1>
             <p className="max-w-[42ch] text-sm leading-6 text-muted-foreground sm:text-[0.95rem]">
-              使用邮箱和密码进入你的会话工作区
+              使用密码或邮箱验证码进入你的会话工作区
             </p>
           </div>
 
-          <form className="mt-8 space-y-3" onSubmit={handleSubmit}>
+          <div
+            className="mt-8 grid grid-cols-2 gap-1 rounded-[14px] border border-border/65 bg-background/70 p-1"
+            role="tablist"
+            aria-label="登录方式"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authMode === "password"}
+              className={cn(
+                "h-10 rounded-[11px] text-sm font-medium transition-colors",
+                authMode === "password"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setAuthMode("password")}
+            >
+              密码
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authMode === "email-code"}
+              className={cn(
+                "h-10 rounded-[11px] text-sm font-medium transition-colors",
+                authMode === "email-code"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setAuthMode("email-code")}
+            >
+              邮箱验证码
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
             <label className="block space-y-2">
               <div className="relative">
                 <MailIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -251,30 +373,82 @@ export function AuthPanel({
                 />
               </div>
             </label>
-            <label className="block space-y-2">
-              <div className="relative">
-                <LockKeyholeIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="password"
-                  value={password}
-                  placeholder="密码"
-                  className="h-11 border-border/70 bg-background/88 pl-10 text-sm shadow-none"
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </div>
-            </label>
+          </div>
 
-            <Button
-              className="h-12 w-full rounded-[14px] bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
-              type="submit"
-              disabled={isAuthSubmitting || !email.trim() || !password}
+          {authMode === "password" ? (
+            <form className="mt-3 space-y-3" onSubmit={handleSubmit} role="tabpanel">
+              <label className="block space-y-2">
+                <div className="relative">
+                  <LockKeyholeIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    value={password}
+                    placeholder="密码"
+                    className="h-11 border-border/70 bg-background/88 pl-10 text-sm shadow-none"
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </div>
+              </label>
+
+              <Button
+                className="h-12 w-full rounded-[14px] bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
+                type="submit"
+                disabled={isAuthSubmitting || !email.trim() || !password}
+              >
+                <ArrowRightIcon data-icon="inline-end" />
+                {isPasswordSubmitting ? "登录中..." : "密码登录"}
+              </Button>
+            </form>
+          ) : (
+            <form
+              className="mt-3 space-y-3"
+              role="tabpanel"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleVerifyEmailCodeClick();
+              }}
             >
-              <ArrowRightIcon data-icon="inline-end" />
-              {isPasswordSubmitting ? "登录中..." : "登录"}
-            </Button>
-          </form>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <div className="relative">
+                    <KeyRoundIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={emailCode}
+                      placeholder="输入邮箱验证码"
+                      className="h-11 border-border/70 bg-background/88 pl-10 text-sm shadow-none"
+                      onChange={(event) =>
+                        setEmailCode(event.target.value.replace(/\D/g, "").slice(0, 10))
+                      }
+                    />
+                  </div>
+                </label>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-[14px] border-border/70 bg-background/82 px-4 shadow-none"
+                  type="button"
+                  disabled={isAuthSubmitting || !email.trim()}
+                  onClick={() => void handleSendEmailCodeClick()}
+                >
+                  <KeyRoundIcon data-icon="inline-start" />
+                  {isEmailCodeSending ? "发送中..." : "发送验证码"}
+                </Button>
+              </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Button
+                className="h-12 w-full rounded-[14px] bg-primary text-primary-foreground shadow-[0_18px_36px_rgba(72,115,195,0.24)] hover:bg-primary/92"
+                type="submit"
+                disabled={isAuthSubmitting || !email.trim() || !emailCode.trim()}
+              >
+                <ArrowRightIcon data-icon="inline-end" />
+                {isEmailCodeVerifying ? "验证中..." : "验证码登录"}
+              </Button>
+            </form>
+          )}
+
+          <div className="mt-3">
             <Button
               variant="outline"
               className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
@@ -286,9 +460,12 @@ export function AuthPanel({
               {isMagicLinkSubmitting
                 ? "发送中..."
                 : feedbackCode === "otp_expired"
-                  ? "重新发送"
-                  : "邮件链接"}
+                  ? "重新发送邮箱链接"
+                  : "使用邮箱链接登录"}
             </Button>
+          </div>
+
+          <div className="mt-3">
             <Button
               variant="outline"
               className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
@@ -300,7 +477,7 @@ export function AuthPanel({
               }}
             >
               <GitBranchIcon data-icon="inline-start" />
-              {isGithubSubmitting ? "跳转中..." : "GitHub"}
+              {isGithubSubmitting ? "跳转中..." : "使用 Github 登陆"}
             </Button>
           </div>
 
