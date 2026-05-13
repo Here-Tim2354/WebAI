@@ -137,6 +137,7 @@ aliases:
 
 - 调用 `/api/auth/email-code/send`
 - 发送由 Supabase Auth 生成的邮箱验证码
+- 该入口依赖 Supabase Magic Link 邮件模板按 `auth_mode=email-code` 展示 `{{ .Token }}`
 
 验证码登录按钮：
 

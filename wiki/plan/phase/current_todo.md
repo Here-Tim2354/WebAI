@@ -8,7 +8,7 @@
 - 主线：WebAI 已部署到 Vercel，并通过 Cloudflare 接入公网域名。
 - 公网入口：`https://webai.tim2354.bytecola.cn`
 - 状态：Vercel production build 通过，Cloudflare CNAME 已指向 Vercel，公网首页可访问；邮箱密码登录、邮箱验证码登录、邮箱链接备用入口、个人账户入口、头像上传、修改密码和会话二级菜单进入上线回归范围。
-- 当前重点：登录后完整产品回归、邮箱验证码邮件模板与发送链路验证、个人资料与头像 Storage 验证、取消生成可靠性验证、GitHub provider 配置和答辩展示路径。
+- 当前重点：登录后完整产品回归、Supabase 邮件模板分支配置、邮箱验证码发送与验证链路回归、个人资料与头像 Storage 验证、取消生成可靠性验证、GitHub provider 配置和答辩展示路径。
 
 ## 当前架构边界
 
@@ -53,7 +53,7 @@
 
 - 检查生产环境允许的 Site URL 与 Redirect URLs。
 - 邮箱链接发送接口在线上返回成功。
-- 邮箱验证码发送与校验接口使用 Supabase Auth OTP 链路，验证码位数按 6-10 位数字兼容。
+- 邮箱验证码发送与校验接口使用 Supabase Auth OTP 链路，验证码位数按 6-10 位数字兼容；发送验证码入口会标记 `auth_mode=email-code`，Supabase Magic Link 邮件模板需要按该值展示 `{{ .Token }}`。
 - 密码登录接口通过 `/api/auth/password` 建立 Supabase session，并按邮箱和 IP 做限流。
 - `profile_avatars` bucket migration 已推送到 Supabase。
 - GitHub OAuth 发起路由可跳到 Supabase authorize，但 Supabase 当前未启用 GitHub provider。
@@ -88,7 +88,7 @@
 ## 下一步
 
 1. 做一次公网邮箱密码登录、邮箱验证码登录、邮箱链接回调、退出重登和修改密码回归。
-2. 检查 Supabase 邮件模板是否同时展示登录链接与验证码 token。
+2. 在 Supabase Dashboard 配置 Magic Link 邮件模板分支：`auth_mode=email-code` 展示 `{{ .Token }}`，邮箱链接入口展示 `{{ .ConfirmationURL }}`。
 3. 上传头像并确认生产域名下 `/api/profile/avatar` 能读取私有对象。
 4. 复测中断生成、退出重登和历史恢复，确认 cancelled 消息不会被后续流覆盖。
 5. 如需 GitHub 登录，在 Supabase Dashboard 启用 GitHub provider 并配置 GitHub OAuth App。

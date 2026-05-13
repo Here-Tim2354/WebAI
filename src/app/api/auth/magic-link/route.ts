@@ -101,8 +101,11 @@ export async function POST(request: Request) {
   const redirectTo = createAppUrl("/auth/confirm", request.url);
 
   const { error } = await supabase.auth.signInWithOtp({
-    email: parsed.data.email,
+    email: parsed.data.email.toLowerCase(),
     options: {
+      data: {
+        auth_mode: "magic-link",
+      },
       emailRedirectTo: redirectTo.toString(),
     },
   });

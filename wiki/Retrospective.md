@@ -191,10 +191,11 @@ catch (uploadError) {
 ```
 之后就把`attachements`作为`Response`返回。若上传文件本身发生错误，也有对应的处理机制。
 
-#### auth
+### auth
 
 包含了一系列的登陆鉴权的router。
 
+#### dev-login
 `dev-login/route.ts`。这是一个专门用于开发者环境的登陆路由。
 在简单的鉴权后，会尝试直接读取Supabase的Secret和RoleKey，以及开发者环境下的Email。之后调用`lib/env/app-origin.ts`文件中的`createUrl`来组建回跳URL和`tokenHash,verification_type`:
 ```ts
@@ -226,7 +227,20 @@ Location: http://localhost:4000/auth/confirm?token_hash=...&type=magiclink
 
 #### email-code
 
-#### chat
+### chat
 
-一个是该文件夹的直接子router，用于负责处理发送消息并流式生成assistant恢回复，而`cancel/route.ts`下的是处理取消正在生成的回复
+一个是该文件夹的直接子router，用于负责处理发送消息并流式生成assistant回复。
 
+定义了针对不同错误类型返回不同错误码的`handleChatError`之后，定义GET，简单鉴权和校验json后，获取：
+```ts
+const {
+  conversationId,
+  content,
+  modelId,
+  thinkingLevel,
+  urls,
+  attachments,
+  geminiRuntimeConfig,
+} = parsedRequest.data;
+```
+这一系列前端发送的数据。并进一步校验`geminiRuntimeConfig`

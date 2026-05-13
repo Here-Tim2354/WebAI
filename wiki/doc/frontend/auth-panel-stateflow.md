@@ -186,9 +186,11 @@ aliases:
    - `isEmailCodeSending = true`
    - 清空旧反馈
 6. `POST /api/auth/email-code/send`
-7. 成功后提示用户查看邮箱
-8. 失败后展示错误提示
-9. 最终把 `isEmailCodeSending` 还原为 `false`
+7. 服务端调用 Supabase `signInWithOtp`，并在 metadata 中标记 `auth_mode=email-code`
+8. Supabase Magic Link 邮件模板按该标记展示 `{{ .Token }}`
+9. 成功后提示用户查看邮箱
+10. 失败后展示错误提示
+11. 最终把 `isEmailCodeSending` 还原为 `false`
 
 验证码登录链路：
 
