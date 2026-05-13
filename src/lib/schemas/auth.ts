@@ -11,10 +11,6 @@ export const authUserResponseSchema = z.object({
   user: authUserSchema.nullable(),
 });
 
-export const sendMagicLinkRequestSchema = z.object({
-  email: z.string().trim().email("请输入合法的邮箱地址。"),
-});
-
 export const sendEmailCodeRequestSchema = z.object({
   email: z.string().trim().email("请输入合法的邮箱地址。"),
 });

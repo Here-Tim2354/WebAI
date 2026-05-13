@@ -5,7 +5,6 @@
 | 接口 | 涉及表 | 说明 |
 | --- | --- | --- |
 | `POST /api/auth/password` | `auth.users` | 通过 Supabase Auth 校验邮箱密码并建立 session |
-| `POST /api/auth/magic-link` | `auth.users` | 通过 Supabase Auth 发送邮箱链接，回跳到 `/auth/confirm` 后建立 session |
 | `POST /api/auth/email-code/send` | `auth.users` | 通过 Supabase Auth 发送邮箱验证码 |
 | `POST /api/auth/email-code/verify` | `auth.users` | 通过 Supabase Auth 校验邮箱验证码并建立 session |
 | `GET /api/auth/github` | `auth.users` | 发起 Supabase GitHub OAuth 授权 |

@@ -27,7 +27,7 @@ aliases:
 ### [[auth-panel|AuthPanel]]
 
 - 未登录时展示的登录面板
-- 负责邮箱输入、发送魔法链接和登录回跳提示
+- 负责邮箱输入、密码登录、验证码登录和登录反馈
 
 ### [[conversation-sidebar|ConversationSidebar]]
 
@@ -505,8 +505,10 @@ ChatShell
 负责未登录页面：
 
 - 邮箱输入
-- 发送登录链接
-- 回跳状态提示
+- 密码登录
+- 邮箱验证码登录
+- GitHub OAuth 入口
+- 登录反馈提示
 
 ---
 

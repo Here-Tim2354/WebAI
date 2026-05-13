@@ -70,15 +70,17 @@ aliases:
 作用：
 - 当前是否正在发送邮箱验证码
 
+### `emailCodeCooldown`
+
+作用：
+- 保存验证码再次发送前的冷却秒数
+- 发送成功或发送失败后进入 60 秒冷却
+- 冷却期间禁用发送验证码按钮，减少连续点击触发上游限流
+
 ### `isEmailCodeVerifying`
 
 作用：
 - 当前是否正在校验邮箱验证码并登录
-
-### `isMagicLinkSubmitting`
-
-作用：
-- 当前是否正在发送邮箱链接
 
 ### `isGithubSubmitting`
 
@@ -88,7 +90,7 @@ aliases:
 ### `isAuthSubmitting`
 
 作用：
-- 合并密码、邮箱验证码、邮箱链接和 GitHub 登录状态，避免重复提交
+- 合并密码、邮箱验证码和 GitHub 登录状态，避免重复提交
 
 ### `feedback`
 
@@ -99,11 +101,6 @@ aliases:
 
 作用：
 - 当前反馈是 `info` 还是 `error`
-
-### `feedbackCode`
-
-作用：
-- 保存额外的错误码，比如 `otp_expired`
 
 ---
 
@@ -122,7 +119,6 @@ aliases:
 3. 如果 URL 或 hash 中存在回跳结果：
    - 设置 `feedback`
    - 设置 `feedbackType`
-   - 设置 `feedbackCode`
 4. 如果错误码是 `otp_expired`
    - 自动聚焦输入框
    - 自动选中邮箱内容
@@ -143,7 +139,6 @@ aliases:
 4. 设置：
    - `isPasswordSubmitting = true`
    - 清空旧 `feedback`
-   - 清空旧 `feedbackCode`
 5. 把邮箱写进 `localStorage`
 6. `POST /api/auth/password`
 7. 成功后：
@@ -157,24 +152,7 @@ aliases:
 
 ---
 
-## 5. 邮箱链接备用流程
-
-链路：
-
-1. 用户点击使用邮箱链接登录
-2. `handleSendMagicLinkClick()`
-3. 如果邮箱为空或正在提交，则直接返回
-4. 设置：
-   - `isMagicLinkSubmitting = true`
-   - 清空旧反馈
-5. `POST /api/auth/magic-link`
-6. 成功后提示用户查看邮箱
-7. 失败后展示错误提示
-8. 最终把 `isMagicLinkSubmitting` 还原为 `false`
-
----
-
-## 6. 邮箱验证码流程
+## 5. 邮箱验证码流程
 
 发送验证码链路：
 
@@ -186,10 +164,10 @@ aliases:
    - `isEmailCodeSending = true`
    - 清空旧反馈
 6. `POST /api/auth/email-code/send`
-7. 服务端调用 Supabase `signInWithOtp`，并在 metadata 中标记 `auth_mode=email-code`
-8. Supabase Magic Link 邮件模板按该标记展示 `{{ .Token }}`
-9. 成功后提示用户查看邮箱
-10. 失败后展示错误提示
+7. 服务端调用 Supabase `signInWithOtp`
+8. Supabase 登录邮件模板展示 `{{ .Token }}`
+9. 成功后提示用户查看邮箱，并启动 60 秒冷却
+10. 失败后展示错误提示，并启动 60 秒冷却
 11. 最终把 `isEmailCodeSending` 还原为 `false`
 
 验证码登录链路：
@@ -212,7 +190,7 @@ aliases:
 
 ---
 
-## 7. 为什么要读 URL 和 hash
+## 6. 为什么要读 URL 和 hash
 
 因为 Supabase 的登录回跳结果不一定只放在 query string。
 
@@ -231,6 +209,6 @@ aliases:
 
 ---
 
-## 8. 一句话总结
+## 7. 一句话总结
 
-`AuthPanel` 的状态流本质上是在管理未登录态入口：密码和邮箱验证码作为主登录方式互斥切换，邮箱链接与 GitHub OAuth 作为备用入口，把用户引导回工作区。
+`AuthPanel` 的状态流本质上是在管理未登录态入口：密码和邮箱验证码作为主登录方式互斥切换，GitHub OAuth 作为备用入口，把用户引导回工作区。

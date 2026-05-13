@@ -22,6 +22,7 @@ type AuthPanelProps = {
 };
 
 const LAST_AUTH_EMAIL_KEY = "webai:last-auth-email";
+const EMAIL_CODE_COOLDOWN_SECONDS = 60;
 
 type AuthFeedbackState = {
   message: string;
@@ -65,7 +66,7 @@ function parseAuthFeedbackFromLocation(): AuthFeedbackState | null {
 
   if (errorCode === "otp_expired") {
     return {
-      message: "登录链接已过期或已失效，请重新发送登录邮件后尽快打开。",
+      message: "登录邮件已过期或已失效，请重新发送验证码后尽快使用。",
       type: "error",
       code: errorCode,
     };
@@ -93,7 +94,7 @@ function parseAuthFeedbackFromLocation(): AuthFeedbackState | null {
 
 /**
  * AuthPanel 是未登录用户的入口面板：
- * 负责邮箱输入、发送魔法链接，以及消费回跳后的登录反馈。
+ * 负责邮箱、密码、邮箱验证码和 OAuth 入口，以及消费回跳后的登录反馈。
  */
 export function AuthPanel({
   initialMessage = null,
@@ -107,16 +108,14 @@ export function AuthPanel({
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [isEmailCodeSending, setIsEmailCodeSending] = useState(false);
   const [isEmailCodeVerifying, setIsEmailCodeVerifying] = useState(false);
-  const [isMagicLinkSubmitting, setIsMagicLinkSubmitting] = useState(false);
+  const [emailCodeCooldown, setEmailCodeCooldown] = useState(0);
   const [feedback, setFeedback] = useState(initialMessage);
   const [feedbackType, setFeedbackType] = useState<"info" | "error">(initialMessageType);
-  const [feedbackCode, setFeedbackCode] = useState<string | null>(null);
   const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
   const isAuthSubmitting =
     isPasswordSubmitting ||
     isEmailCodeSending ||
     isEmailCodeVerifying ||
-    isMagicLinkSubmitting ||
     isGithubSubmitting;
 
   // 登录页首次挂载时需要恢复本机邮箱，并解析 URL / hash 中的登录回跳结果。
@@ -133,7 +132,6 @@ export function AuthPanel({
     if (locationFeedback) {
       setFeedback(locationFeedback.message);
       setFeedbackType(locationFeedback.type);
-      setFeedbackCode(locationFeedback.code ?? null);
 
       if (locationFeedback.code === "otp_expired") {
         // 链接过期时把焦点拉回邮箱框，减少用户重新发送的操作成本。
@@ -144,6 +142,20 @@ export function AuthPanel({
       }
     }
   }, []);
+
+  // Supabase Auth 仍会限制同一邮箱短时间内重复发送 OTP。
+  // 前端先做 60 秒冷却，避免用户连续点击后直接撞到服务端限流。
+  useEffect(() => {
+    if (emailCodeCooldown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setEmailCodeCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [emailCodeCooldown]);
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (
     event,
@@ -156,7 +168,6 @@ export function AuthPanel({
 
     setIsPasswordSubmitting(true);
     setFeedback(null);
-    setFeedbackCode(null);
 
     try {
       window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
@@ -188,51 +199,13 @@ export function AuthPanel({
     }
   };
 
-  async function handleSendMagicLinkClick() {
-    if (!email.trim() || isAuthSubmitting) {
-      return;
-    }
-
-    setIsMagicLinkSubmitting(true);
-    setFeedback(null);
-    setFeedbackCode(null);
-
-    try {
-      window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
-
-      const response = await fetch("/api/auth/magic-link", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error?.message ?? "发送登录链接失败。");
-      }
-
-      setFeedback(payload?.message ?? "登录链接已发送，请去邮箱确认。");
-      setFeedbackType("info");
-    } catch (error) {
-      setFeedback(getErrorMessage(error));
-      setFeedbackType("error");
-    } finally {
-      setIsMagicLinkSubmitting(false);
-    }
-  }
-
   async function handleSendEmailCodeClick() {
-    if (!email.trim() || isAuthSubmitting) {
+    if (!email.trim() || isAuthSubmitting || emailCodeCooldown > 0) {
       return;
     }
 
     setIsEmailCodeSending(true);
     setFeedback(null);
-    setFeedbackCode(null);
 
     try {
       window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
@@ -254,9 +227,11 @@ export function AuthPanel({
 
       setFeedback(payload?.message ?? "验证码已发送，请查看邮箱。");
       setFeedbackType("info");
+      setEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
     } catch (error) {
       setFeedback(getErrorMessage(error));
       setFeedbackType("error");
+      setEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
     } finally {
       setIsEmailCodeSending(false);
     }
@@ -269,7 +244,6 @@ export function AuthPanel({
 
     setIsEmailCodeVerifying(true);
     setFeedback(null);
-    setFeedbackCode(null);
 
     try {
       window.localStorage.setItem(LAST_AUTH_EMAIL_KEY, email.trim());
@@ -429,11 +403,15 @@ export function AuthPanel({
                   variant="outline"
                   className="h-11 rounded-[14px] border-border/70 bg-background/82 px-4 shadow-none"
                   type="button"
-                  disabled={isAuthSubmitting || !email.trim()}
+                  disabled={isAuthSubmitting || !email.trim() || emailCodeCooldown > 0}
                   onClick={() => void handleSendEmailCodeClick()}
                 >
                   <KeyRoundIcon data-icon="inline-start" />
-                  {isEmailCodeSending ? "发送中..." : "发送验证码"}
+                  {isEmailCodeSending
+                    ? "发送中..."
+                    : emailCodeCooldown > 0
+                      ? `${emailCodeCooldown} 秒后重发`
+                      : "发送验证码"}
                 </Button>
               </div>
 
@@ -447,23 +425,6 @@ export function AuthPanel({
               </Button>
             </form>
           )}
-
-          <div className="mt-3">
-            <Button
-              variant="outline"
-              className="h-11 w-full rounded-[14px] border-border/70 bg-background/82 shadow-none"
-              type="button"
-              disabled={isAuthSubmitting || !email.trim()}
-              onClick={() => void handleSendMagicLinkClick()}
-            >
-              <MailIcon data-icon="inline-start" />
-              {isMagicLinkSubmitting
-                ? "发送中..."
-                : feedbackCode === "otp_expired"
-                  ? "重新发送邮箱链接"
-                  : "使用邮箱链接登录"}
-            </Button>
-          </div>
 
           <div className="mt-3">
             <Button

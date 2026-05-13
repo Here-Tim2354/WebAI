@@ -4,7 +4,7 @@ import { createAppUrl } from "@/lib/env/app-origin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
- * 邮箱魔法链接最终会回到这个路由。
+ * OAuth 或旧无密码回调最终会回到这个路由。
  * 确认路由负责把 Supabase 邮件里的 token_hash 验证成真实登录态，然后再重定向回首页。
  */
 export async function GET(request: Request) {

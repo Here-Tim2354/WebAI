@@ -227,6 +227,26 @@ Location: http://localhost:4000/auth/confirm?token_hash=...&type=magiclink
 
 #### email-code
 
+
+#### github
+
+这是一个支持Github登陆请求的router。获取请求url之后传输到`signInWithOAuth`的Github选项来获得重定向链接。指向Github登陆的页面。
+
+#### password
+
+目前的项目实现并没有支持注册功能，用户是通过邮箱验证码或者Github登陆后自动注册的。该router负责在用户已经修改密码后登陆
+
+鉴于修改密码是比较敏感的操作，项目有一定的安全措施：
+1. 基本的鉴权和校验请求
+2. 获取请求的IP
+3. 断言邮箱和ip的限制
+
+然后根据邮箱和密码登陆。
+
+#### sign-out
+
+处理登出请求。简单的`supabase.auth.signOut`即可。
+
 ### chat
 
 一个是该文件夹的直接子router，用于负责处理发送消息并流式生成assistant回复。
@@ -243,4 +263,32 @@ const {
   geminiRuntimeConfig,
 } = parsedRequest.data;
 ```
-这一系列前端发送的数据。并进一步校验`geminiRuntimeConfig`
+这一系列前端发送的数据。并进一步校验`geminiRuntimeConfig`中是否填写了apiKey。
+
+接下来是一系列获取信息的操作：
+1. `getConversationById`获取Supabase的表的对应行信息，即实际上网页选中那个会话
+2. 获取请求中包含的模型的名称，如果没有就获取会话默认的模型。同理获取思考档位信息。如果前端请求的这两个信息与数据库的不一致，则更新数据库的。（说明用户修改了）
+
+然后通过`asserAttachmentInputAllowed`断言输入附件是否被允许上传，若允许，则调用`createConversationMessage`来创建一条新消息，并调用`touchConversation`来更新云端数据库，最后创建流式输出返回内容。
+
+#### cancel
+
+这个下面的router处理前端发送取消生成的请求。
+
+简单鉴权和校验后，获取当前会话的id，分别调用：
+1. `cancelAssistantMessage`
+2. `cancelConversationStream`
+来处理中断和流式输出。
+
+### conversations
+
+该文件夹下有一个直接的router。用于处理一系列会话请求。
+
+简单鉴权后。提供GET和POST两个方法。
+
+其中GET就是获取用户的会话列表，调用：
+1. `listFavoriteConversations`
+2. `listConversations`
+两个方法来分别获取添加了收藏的会话列表，和一般的会话列表。
+
+

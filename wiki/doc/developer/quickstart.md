@@ -74,13 +74,14 @@
 1. 首页 `page.tsx`
 2. 登录面板 `auth-panel.tsx`
 3. `/api/auth/password`
-4. `/api/auth/magic-link`
-5. `/auth/confirm`
-6. `/api/profile`
-7. `/api/profile/avatar`
-8. `/api/profile/password`
-9. `src/lib/supabase/server.ts`
-10. `src/lib/supabase/proxy.ts`
+4. `/api/auth/email-code/send`
+5. `/api/auth/email-code/verify`
+6. `/auth/confirm`
+7. `/api/profile`
+8. `/api/profile/avatar`
+9. `/api/profile/password`
+10. `src/lib/supabase/server.ts`
+11. `src/lib/supabase/proxy.ts`
 
 如果你是在本地开发时遇到 IAB 登录问题，优先检查：
 

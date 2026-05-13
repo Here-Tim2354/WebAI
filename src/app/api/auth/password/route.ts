@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * 邮箱密码登录。
- * 这条链路只负责建立 Supabase session，不承担注册；新用户仍可先用 Magic Link 登录后在个人账户中设置密码。
+ * 这条链路只负责建立 Supabase session，不承担注册；新用户仍可先用邮箱验证码登录后在个人账户中设置密码。
  */
 export async function POST(request: Request) {
   let payload: unknown;

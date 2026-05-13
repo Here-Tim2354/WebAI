@@ -15,7 +15,7 @@ function getRequiredEnvValue(name: string) {
 
 /**
  * 开发环境快捷登录：
- * 服务端使用 service role 生成一次性 magic link，再立刻重定向到确认页，避免手动查邮箱。
+ * 服务端使用 service role 生成一次性确认参数，再立刻重定向到确认页，避免手动查邮箱。
  */
 export async function GET(request: Request) {
   const isDevLoginModeEnabled =
@@ -69,8 +69,8 @@ export async function GET(request: Request) {
       throw new Error(error.message);
     }
 
-    // admin.generateLink 返回的是用于后续确认的原始参数，
-    // confirm URL 使用 generateLink 返回的原始确认参数，模拟用户点击邮件中的登录链接。
+    // admin.generateLink 返回的是用于后续确认的原始参数。
+    // 开发环境直接拼出确认 URL，让本地调试不依赖真实邮箱收信。
     const tokenHash = data.properties.hashed_token;
     const verificationType = data.properties.verification_type;
 

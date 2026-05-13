@@ -7,8 +7,8 @@
 - 阶段：公网部署后的产品化回归
 - 主线：WebAI 已部署到 Vercel，并通过 Cloudflare 接入公网域名。
 - 公网入口：`https://webai.tim2354.bytecola.cn`
-- 状态：Vercel production build 通过，Cloudflare CNAME 已指向 Vercel，公网首页可访问；邮箱密码登录、邮箱验证码登录、邮箱链接备用入口、个人账户入口、头像上传、修改密码和会话二级菜单进入上线回归范围。
-- 当前重点：登录后完整产品回归、Supabase 邮件模板分支配置、邮箱验证码发送与验证链路回归、个人资料与头像 Storage 验证、取消生成可靠性验证、GitHub provider 配置和答辩展示路径。
+- 状态：Vercel production build 通过，Cloudflare CNAME 已指向 Vercel，公网首页可访问；邮箱密码登录、邮箱验证码登录、个人账户入口、头像上传、修改密码和会话二级菜单进入上线回归范围。
+- 当前重点：登录后完整产品回归、Supabase Custom SMTP 与纯验证码邮件模板验证、邮箱验证码发送与验证链路回归、个人资料与头像 Storage 验证、取消生成可靠性验证、GitHub provider 配置和答辩展示路径。
 
 ## 当前架构边界
 
@@ -22,7 +22,7 @@
 - Supabase 继续作为核心数据库与私有 Storage。
 - Gemini Key / Base URL 仍由服务端接口和浏览器运行时配置共同约束，不进入数据库。
 - 用户展示资料继续由 `profiles` 承接，头像对象进入私有 Storage bucket `profile_avatars`。
-- 邮箱密码登录、邮箱验证码登录和邮箱链接登录均由 Supabase Auth 建立 session，新用户仍可通过无密码入口进入后设置密码。
+- 邮箱密码登录和邮箱验证码登录均由 Supabase Auth 建立 session，新用户仍可通过验证码入口进入后设置密码。
 
 ## 上线前任务
 
@@ -52,8 +52,7 @@
 ### Supabase
 
 - 检查生产环境允许的 Site URL 与 Redirect URLs。
-- 邮箱链接发送接口在线上返回成功。
-- 邮箱验证码发送与校验接口使用 Supabase Auth OTP 链路，验证码位数按 6-10 位数字兼容；发送验证码入口会标记 `auth_mode=email-code`，Supabase Magic Link 邮件模板需要按该值展示 `{{ .Token }}`。
+- 邮箱验证码发送与校验接口使用 Supabase Auth OTP 链路，验证码位数按 6-10 位数字兼容；邮件模板应保持纯 `{{ .Token }}` 验证码内容。
 - 密码登录接口通过 `/api/auth/password` 建立 Supabase session，并按邮箱和 IP 做限流。
 - `profile_avatars` bucket migration 已推送到 Supabase。
 - GitHub OAuth 发起路由可跳到 Supabase authorize，但 Supabase 当前未启用 GitHub provider。
@@ -63,7 +62,7 @@
 
 ## 上线回归范围
 
-- 登录、退出、邮箱链接 / GitHub OAuth 回调。
+- 登录、退出、GitHub OAuth 回调。
 - 邮箱密码登录、邮箱验证码发送与验证、设置密码后退出重登。
 - 个人账户修改昵称、上传头像和修改密码。
 - 新建会话、恢复历史会话、重命名、收藏、归档和恢复。
@@ -87,8 +86,8 @@
 
 ## 下一步
 
-1. 做一次公网邮箱密码登录、邮箱验证码登录、邮箱链接回调、退出重登和修改密码回归。
-2. 在 Supabase Dashboard 配置 Magic Link 邮件模板分支：`auth_mode=email-code` 展示 `{{ .Token }}`，邮箱链接入口展示 `{{ .ConfirmationURL }}`。
+1. 做一次公网邮箱密码登录、邮箱验证码登录、退出重登和修改密码回归。
+2. 在 Supabase Dashboard 配置 Custom SMTP，并保持登录邮件模板只展示 `{{ .Token }}`。
 3. 上传头像并确认生产域名下 `/api/profile/avatar` 能读取私有对象。
 4. 复测中断生成、退出重登和历史恢复，确认 cancelled 消息不会被后续流覆盖。
 5. 如需 GitHub 登录，在 Supabase Dashboard 启用 GitHub provider 并配置 GitHub OAuth App。
@@ -96,4 +95,4 @@
 
 ## 一句话结论
 
-WebAI 已经具备公网访问入口和更完整的账户入口。接下来优先完成邮箱密码、邮箱验证码、邮箱链接、个人资料、头像 Storage、取消生成和模型配置恢复的真实线上回归。
+WebAI 已经具备公网访问入口和更完整的账户入口。接下来优先完成邮箱密码、邮箱验证码、个人资料、头像 Storage、取消生成和模型配置恢复的真实线上回归。
