@@ -297,7 +297,11 @@ export function ChatShell({
       activeConversation.title === DEFAULT_CONVERSATION_TITLE &&
       autoTitle !== DEFAULT_CONVERSATION_TITLE
     ) {
-      await handleRenameConversation(conversationId, autoTitle);
+      try {
+        await handleRenameConversation(conversationId, autoTitle);
+      } catch {
+        // 自动标题是辅助体验，不能因为重命名失败阻断首条消息发送。
+      }
     }
 
     await handleSubmit({
