@@ -10,6 +10,7 @@ import {
   ThinkingLevel,
   thinkingLevelSchema,
 } from "@/lib/schemas/thinking";
+import { DEFAULT_CONVERSATION_TITLE } from "@/lib/conversation-title";
 
 type ConversationRow = {
   id: string;
@@ -61,7 +62,7 @@ export class ConversationAccessError extends Error {
 
 // 产品默认的“空白新会话标题”集中定义，避免前后端到处散落字面量。
 export function createDefaultConversationTitle() {
-  return "新会话";
+  return DEFAULT_CONVERSATION_TITLE;
 }
 
 export function createBranchConversationTitle(title: string) {

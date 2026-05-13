@@ -25,6 +25,7 @@ type UseChatWorkspaceOptions = {
 
 type CreateConversationOptions = {
   activate?: boolean;
+  title?: string;
   modelId?: string | null;
   systemPrompt?: string | null;
   webSearchEnabled?: boolean;
@@ -182,6 +183,7 @@ export function useChatWorkspace({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          title: options?.title ?? undefined,
           modelId: options?.modelId ?? undefined,
           systemPrompt: options?.systemPrompt ?? undefined,
           webSearchEnabled: options?.webSearchEnabled,
@@ -830,7 +832,9 @@ export function useChatWorkspace({
     }
   }, [syncConversationMessages, upsertConversation]);
 
-  const ensureConversationId = useCallback(async () => {
+  const ensureConversationId = useCallback(async (options?: {
+    title?: string;
+  }) => {
     if (activeConversationId) {
       return activeConversationId;
     }
@@ -840,6 +844,7 @@ export function useChatWorkspace({
     try {
       const conversation = await createConversation({
         activate: true,
+        title: options?.title,
         modelId: draftModelId ?? undefined,
         systemPrompt: draftSystemPrompt ?? undefined,
         webSearchEnabled: draftWebSearchEnabled,

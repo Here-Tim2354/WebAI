@@ -16,6 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { AuthUser } from "@/lib/schemas/auth";
 import { GeminiRuntimeConfig, MessageAttachment } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
+import {
+  createAutoConversationTitle,
+  DEFAULT_CONVERSATION_TITLE,
+} from "@/lib/conversation-title";
 import { AIModel } from "@/lib/schemas/model";
 import { AuthPanel } from "./auth-panel";
 import { ChatHeader } from "./chat-header";
@@ -280,10 +284,20 @@ export function ChatShell({
   ) => {
     setWorkspaceError(null);
 
-    const conversationId = await ensureConversationId();
+    const autoTitle = createAutoConversationTitle(content);
+    const conversationId = await ensureConversationId({ title: autoTitle });
 
     if (!conversationId) {
       return;
+    }
+
+    if (
+      activeConversation &&
+      !hasMessages &&
+      activeConversation.title === DEFAULT_CONVERSATION_TITLE &&
+      autoTitle !== DEFAULT_CONVERSATION_TITLE
+    ) {
+      await handleRenameConversation(conversationId, autoTitle);
     }
 
     await handleSubmit({
@@ -302,8 +316,11 @@ export function ChatShell({
     });
   }, [
     ensureConversationId,
+    activeConversation,
     currentThinkingLevel,
+    handleRenameConversation,
     activeGeminiRuntimeConfig,
+    hasMessages,
     handleSubmit,
     selectedModelId,
     setWorkspaceError,

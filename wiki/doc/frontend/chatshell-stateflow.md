@@ -494,17 +494,19 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 2. `handleSendMessage()` 调用 `useChatSession().handleSubmit()`
 3. `handleSubmit()` 先确认 `conversationId`
 4. 如果没有激活会话，则通过 `ensureConversationId()` 先建一个
-   - 当前会带上草稿模型、草稿提示词和草稿联网开关
-5. 本地先做乐观更新：
+   - 当前会带上草稿模型、草稿提示词、草稿联网开关和首条文本消息生成的自动标题
+   - 自动标题取首条文本消息约 10 个字符，超出时用 `...` 标记省略
+5. 如果已有激活会话但还没有消息，且标题仍是默认“新会话”，发送首条文本消息前会先重命名
+6. 本地先做乐观更新：
    - 插入用户消息
    - 插入 assistant 占位消息
-6. `POST /api/chat`
+7. `POST /api/chat`
    - 当前若存在 `urlContextUrls`，会一并作为 `urls` 传给后端
-7. 成功后：
+8. 成功后：
    - 用后端返回的真实消息快照覆盖本地缓存
    - 用后端返回的会话信息更新会话列表
    - 清空 URL 输入值、已确认 URL 列表，并收起 URL 输入区
-8. 失败时：
+9. 失败时：
    - 把 assistant 占位消息替换成 error 气泡
 
 结果：
