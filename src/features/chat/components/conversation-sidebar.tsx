@@ -343,15 +343,18 @@ export function ConversationSidebar({
   }
 
   async function handleConfirmDeleteConversation() {
-    if (!pendingDeleteConversation) {
+    const conversation = pendingDeleteConversation;
+
+    if (!conversation) {
       return;
     }
 
+    setPendingDeleteConversation(null);
+
     try {
-      await onDeleteConversation(pendingDeleteConversation.id);
-      setPendingDeleteConversation(null);
+      await onDeleteConversation(conversation.id);
     } catch {
-      // 删除失败时保留确认弹窗，避免用户误判操作已完成。
+      // 删除失败由工作区顶部错误提示承接，不再用确认弹窗硬控用户。
     }
   }
 
@@ -612,7 +615,7 @@ export function ConversationSidebar({
 
       <Button
         className={cn(
-          "h-10 rounded-[8px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
+          "h-10 w-full rounded-[8px] border border-border/70 bg-background/92 text-foreground shadow-none hover:bg-muted/70",
           isCollapsed && "lg:hidden",
         )}
         variant="outline"
@@ -689,14 +692,14 @@ export function ConversationSidebar({
                 <div
                   key={conversation.id}
                   className={cn(
-                    "rounded-[8px] border border-transparent bg-transparent transition-colors hover:bg-muted/40",
+                    "w-full rounded-[8px] border border-transparent bg-transparent transition-colors hover:bg-muted/40",
                     isActive && !isCollapsed &&
                       "border-border/70 bg-background/88",
                     isCollapsed && "lg:w-14",
                   )}
                 >
                   {isEditing ? (
-                    <form className="p-3" onSubmit={handleRenameSubmit}>
+                    <form className="w-full p-3" onSubmit={handleRenameSubmit}>
                       <Input
                         autoFocus
                         value={titleDraft}
@@ -710,7 +713,7 @@ export function ConversationSidebar({
                       />
                     </form>
                   ) : (
-                    <div className={cn("flex items-start gap-2 p-1.5", isCollapsed && "lg:block lg:p-0")}>
+                    <div className={cn("flex w-full items-start gap-2 p-1.5", isCollapsed && "lg:block lg:p-0")}>
                       <button
                         className={cn(
                           "flex min-w-0 flex-1 items-start gap-3 rounded-[8px] px-3 py-2.5 text-left",
@@ -731,7 +734,7 @@ export function ConversationSidebar({
                         >
                           <MessageSquareTextIcon className="size-4" />
                         </div>
-                        <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
+                        <div className={cn("min-w-0 flex-1", isCollapsed && "lg:hidden")}>
                           <strong className="block truncate text-sm font-medium text-foreground">
                             {conversation.title}
                           </strong>
@@ -871,7 +874,7 @@ export function ConversationSidebar({
       <aside
         className={cn(
           "hidden border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(245,249,255,0.9))] backdrop-blur-xl transition-[width] duration-200 lg:sticky lg:top-0 lg:flex lg:h-screen",
-          isCollapsed ? "lg:w-[5.75rem]" : "lg:w-[20rem]",
+          isCollapsed ? "lg:w-[5.75rem]" : "lg:w-[22rem]",
         )}
       >
         {sidebarContent}
@@ -880,7 +883,7 @@ export function ConversationSidebar({
       <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
         <SheetContent
           side="left"
-          className="w-[min(88vw,22rem)] border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(245,249,255,0.98))] p-0 backdrop-blur-xl"
+          className="w-[min(88vw,24rem)] border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(245,249,255,0.98))] p-0 backdrop-blur-xl"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>会话侧栏</SheetTitle>
