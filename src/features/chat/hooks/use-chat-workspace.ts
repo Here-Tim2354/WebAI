@@ -471,6 +471,34 @@ export function useChatWorkspace({
     setIsDeletingConversationId(conversationId);
     setWorkspaceError(null);
 
+    const previousConversations = conversations;
+    const previousArchivedConversations = archivedConversations;
+    const previousFavoriteConversations = favoriteConversations;
+    const previousActiveConversationId = activeConversationId;
+    const nextConversations = conversations.filter(
+      (conversation) => conversation.id !== conversationId,
+    );
+    setConversations(nextConversations);
+    setArchivedConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+    setFavoriteConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+    setActiveConversationId((activeId) => {
+      if (activeId !== conversationId) {
+        return activeId;
+      }
+
+      const nextActiveConversationId = nextConversations[0]?.id ?? null;
+
+      if (!nextActiveConversationId) {
+        resetDraftConversationControls();
+      }
+
+      return nextActiveConversationId;
+    });
+
     try {
       const response = await fetch(`/api/conversations/${conversationId}`, {
         method: "DELETE",
@@ -485,37 +513,26 @@ export function useChatWorkspace({
       }
 
       removeConversationMessages(conversationId);
-      setConversations((current) => {
-        const remaining = current.filter(
-          (conversation) => conversation.id !== conversationId,
-        );
-
-        // 如果删掉的是激活会话，就把焦点切到列表中的下一条，
-        // 避免主面板仍停留在一个已不存在的 conversationId 上。
-        setActiveConversationId((activeId) => {
-          if (activeId !== conversationId) {
-            return activeId;
-          }
-
-          const nextActiveConversationId = remaining[0]?.id ?? null;
-
-          if (!nextActiveConversationId) {
-            resetDraftConversationControls();
-          }
-
-          return nextActiveConversationId;
-        });
-
-        return remaining;
-      });
     } catch (error) {
       const message = getErrorMessage(error);
+      setConversations(previousConversations);
+      setArchivedConversations(previousArchivedConversations);
+      setFavoriteConversations(previousFavoriteConversations);
+      setActiveConversationId(previousActiveConversationId);
+
       setWorkspaceError(message);
       throw new Error(message);
     } finally {
       setIsDeletingConversationId(null);
     }
-  }, [removeConversationMessages, resetDraftConversationControls]);
+  }, [
+    activeConversationId,
+    archivedConversations,
+    conversations,
+    favoriteConversations,
+    removeConversationMessages,
+    resetDraftConversationControls,
+  ]);
 
   const loadArchivedConversations = useCallback(async (
     options?: {

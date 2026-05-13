@@ -211,12 +211,12 @@ const [titleDraft, setTitleDraft] = useState("");
 3. 打开删除确认 `Dialog`
 4. 用户点击确认删除
 5. `handleConfirmDeleteConversation()` 调用父层 `onDeleteConversation(id)`
-6. 成功后关闭弹窗
+6. 确认弹窗立即关闭，后续等待由父层乐观状态承接
 
 失败时：
 
-- 弹窗保持打开
-- 避免用户误以为操作成功
+- 弹窗不再保持打开，避免删除请求期间硬控用户
+- 父层恢复会话列表和激活会话，并通过工作区错误提示说明失败原因
 
 ---
 

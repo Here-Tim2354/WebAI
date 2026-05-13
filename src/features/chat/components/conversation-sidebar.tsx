@@ -343,15 +343,18 @@ export function ConversationSidebar({
   }
 
   async function handleConfirmDeleteConversation() {
-    if (!pendingDeleteConversation) {
+    const conversation = pendingDeleteConversation;
+
+    if (!conversation) {
       return;
     }
 
+    setPendingDeleteConversation(null);
+
     try {
-      await onDeleteConversation(pendingDeleteConversation.id);
-      setPendingDeleteConversation(null);
+      await onDeleteConversation(conversation.id);
     } catch {
-      // 删除失败时保留确认弹窗，避免用户误判操作已完成。
+      // 删除失败由工作区顶部错误提示承接，不再用确认弹窗硬控用户。
     }
   }
 

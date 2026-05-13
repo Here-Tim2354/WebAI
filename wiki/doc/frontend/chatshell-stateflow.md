@@ -539,14 +539,16 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 1. 用户在侧栏触发删除
 2. `handleDeleteConversation(conversationId)`
-3. `DELETE /api/conversations/:id`
-4. 成功后：
-   - 移除消息缓存
-   - 从 `conversations` 列表删掉该项
+3. 前端先乐观更新：
+   - 从 `conversations` / 收藏区 / 归档区移除该会话
    - 如果删的是当前会话，则切到剩余列表第一项
+4. `DELETE /api/conversations/:id`
+5. 成功后移除该会话的消息缓存
+6. 失败时恢复删除前的会话列表和激活会话
 
 结果：
 - 页面不会继续停留在一个已不存在的会话上
+- 删除请求等待期间，用户不会继续被确认弹窗硬控
 
 ---
 
