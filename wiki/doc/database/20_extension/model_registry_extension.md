@@ -15,6 +15,7 @@
 - 前端模型选择只读取用户已启用的 `model_fetched`
 - `model_catalog` 不作为用户模型列表直接暴露，只作为能力补全参照
 - 用户 API Key 与 Base URL 不进入数据库，只保存在本机浏览器并随请求临时传入
+- 同一用户的模型列表按 `model_id` 去重；重复拉取同一上游模型时刷新能力、名称和来源信息，不再因为 Base URL 不同而保留多条可选项
 
 ## 能力补全规则
 
@@ -49,3 +50,4 @@
 - 物理层区分内部 `model_catalog` 和用户侧 `model_fetched`
 - 模型注册表不保存用户私有 API Key
 - 拉取到的新模型进入用户私有 `model_fetched`，再由用户决定启用 / 停用
+- `base_url` 记录模型来自哪个 Gemini 端点，但当前唯一语义以 `user_id + model_id` 为准

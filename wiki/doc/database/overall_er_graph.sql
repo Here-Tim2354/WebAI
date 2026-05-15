@@ -135,8 +135,8 @@ CREATE INDEX "model_fetched_user_enabled_idx"
   ON "model_fetched" ("user_id", "is_enabled", "sort_order", "label");
 CREATE INDEX "model_fetched_user_model_idx"
   ON "model_fetched" ("user_id", "model_id");
-CREATE UNIQUE INDEX "model_fetched_user_base_model_idx"
-  ON "model_fetched" ("user_id", "base_url", "model_id");
+CREATE UNIQUE INDEX "model_fetched_user_model_unique"
+  ON "model_fetched" ("user_id", "model_id");
 CREATE UNIQUE INDEX "model_fetched_single_default_per_user_idx"
   ON "model_fetched" ("user_id")
   WHERE "is_default" = true AND "is_enabled" = true;

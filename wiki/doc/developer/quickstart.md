@@ -25,12 +25,15 @@
 19. `src/lib/ai/gemini-base-url.ts`
 20. `src/lib/ai/index.ts`
 21. `src/lib/ai/gemini.ts`
-22. `src/lib/schemas/*.ts`
-23. `src/features/chat`
-24. `src/components/ui`
-25. [[doc/database/GUIDE|database docs]]
-26. [[doc/developer/deployment|deployment docs]]
-27. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
+22. `src/lib/attachment-config.ts`
+23. `src/lib/attachments.ts`
+24. `src/lib/attachment-capabilities.ts`
+25. `src/lib/schemas/*.ts`
+26. `src/features/chat`
+27. `src/components/ui`
+28. [[doc/database/GUIDE|database docs]]
+29. [[doc/developer/deployment|deployment docs]]
+30. [[requirements/scau_database_course_design_ai_readable|requirements docs]]
 
 ## 先看什么
 
@@ -55,6 +58,7 @@
 - `model_catalog`：系统内部维护的 Gemini 能力参照表，不直接作为用户模型列表展示。
 - `model_fetched`：用户通过 Gemini 设置拉取并管理的私有模型列表，聊天顶部只读取其中已启用的条目。
 - `Gemini Runtime Config`：本机浏览器保存的 API Key / Base URL，请求时临时传给服务端，不写入数据库。
+- `MessageAttachment`：消息附件 metadata，文件对象在私有 Storage 中，聊天请求前由服务端下载并组装为 Gemini 输入。
 
 ## 主链路
 
@@ -64,7 +68,7 @@
 2. 登录后加载会话列表和模型列表。
 3. 用户发送消息。
 4. `/api/chat` 校验模型、附件、URL 与 Gemini Key。
-5. 服务端调用 Gemini 并写入 user / assistant 消息。
+5. 服务端写入 user 消息，创建 assistant 占位消息，再调用 Gemini。
 6. 前端消费 NDJSON 流，刷新界面并继续下一轮对话。
 
 ## 认证链路

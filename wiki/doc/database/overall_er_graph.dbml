@@ -174,8 +174,7 @@ Table model_fetched [headercolor: #F3F7FF] {
 
   indexes {
     (user_id, is_enabled, sort_order, label)
-    (user_id, model_id)
-    (user_id, base_url, model_id) [unique]
+    (user_id, model_id) [unique]
     (user_id) [unique, note: 'Partial unique in actual migration when is_default = true and is_enabled = true']
   }
 

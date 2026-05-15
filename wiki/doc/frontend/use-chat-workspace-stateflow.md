@@ -35,6 +35,8 @@ aliases:
 当前重点状态包括：
 
 - `conversations`
+- `archivedConversations`
+- `favoriteConversations`
 - `activeConversationId`
 - `availableModels`
 - `draftModelId`
@@ -48,6 +50,7 @@ aliases:
 - `isRestoringConversationId`
 - `isLoadingArchivedConversations`
 - `isLoadingFavoriteConversations`
+- `isTogglingFavorite`
 - `isLoadingConversation`
 
 这些状态共同描述的是：
@@ -56,6 +59,7 @@ aliases:
 - 当前有哪些可用模型
 - 当前草稿控制项是什么
 - 当前是否在做某类会话操作
+- 收藏区和归档区是否已经有缓存快照
 
 ---
 
@@ -180,21 +184,25 @@ aliases:
 
 收藏会话：
 
+- 先乐观切换最近列表和当前会话上的 `isFavorite`
 - 调用会话收藏接口
-- 更新当前列表中的收藏状态
-- 收藏区已加载时同步刷新收藏区
+- 收藏区已加载时同步增删收藏区条目
+- 失败时回滚最近列表、当前会话和收藏区状态
 
 归档会话：
 
+- 先从最近列表移除会话
+- 如果收藏区已加载，也同步移除对应条目
 - 调用会话归档接口
-- 从最近列表移除会话
 - 如果归档的是当前会话，则切换到剩余会话或空白工作区
+- 失败时恢复归档前的列表和激活会话
 
 恢复归档：
 
 - 调用归档恢复接口
 - 从归档区移除会话
 - 重新加入最近会话列表
+- 如果恢复的会话原本是收藏态，收藏区也会重新补回该条目
 
 ---
 

@@ -11,6 +11,7 @@
 
 - [x] `model_catalog(default_enabled, sort_order, label)` 是否有索引
 - [x] `model_fetched(user_id, is_enabled, sort_order, label)` 是否有索引
+- [x] `model_fetched(user_id, model_id)` 是否有唯一约束
 - [x] `model_fetched(user_id)` 是否有 `is_default = true and is_enabled = true` 的部分唯一约束
 
 索引状态：

@@ -468,6 +468,7 @@ const alertVariants = cva("基础 class", { variants: ... })
 ```
 可以根据不同的`variant`参数返回不同的`class`。
 
+还有`cn(...)`这个`className`合并的工具，便于页面补充布局类。
 
 ## alert
 
@@ -595,3 +596,328 @@ return <DialogPrimitive.Root data-slot="dialog" {...props} />
 12. `DropdownMenuSubTrigger`，子菜单的那个箭头
 13. `DropdownMenuSubContent`，子菜单展开后的内容
 14. `DropdownMenuShortcut`，一些快捷提示，比如复制的`Ctrl+C`。
+
+## input.tsx
+
+负责输入框。当然也使用了BaseUI的`InputPrimitive`。其中`React.ComponentProps<"input">`表示这个组件接受所有原生`<input>`能接受的属性。`React.forwardRed<>`表示外部可以拿到真实的`input DOM`，用于聚焦。
+
+## scroll-area.tsx
+
+此处引入了外部库[[overlayscrollbars-footprint]]，统一项目的滚动区域。比如：
+1. 消息列表
+2. 侧边栏
+3. 菜单滚动区
+
+```tsx
+<OverlayScrollbarsComponent
+  ref={scrollRef}
+  element="div"
+  options={scrollAreaOptionsByAxis[axis]}
+  events={events}
+  defer
+  className={cn("min-h-0", className)}
+  {...props}
+>
+  {children}
+</OverlayScrollbarsComponent>
+```
+这将滚动行为交给`OverlayScrollbarsComponent`管理。
+
+文件中的函数大部分都在处理外部ref的绑定关系。
+
+其中有一层转发，即外部的ref，最终会指向OverlayScrollbars的viewport。
+```tsx
+assignForwardedRef(forwardedRef, element ?? resolveScrollElement());
+```
+
+
+## scroll-options.ts
+
+关于滚动的配置中心。共享配置为：
+```ts
+const sharedScrollOptions = {
+  scrollbars: {
+    theme: "os-theme-webai",
+    autoHide: "move",
+    autoHideDelay: 480,
+    clickScroll: true,
+  },
+  update: {
+    debounce: {
+      mutation: 40,
+      resize: 40,
+      event: 80,
+      env: 120,
+    },
+  },
+} satisfies PartialOptions;
+
+```
+1. `theme: "os-theme-webai"` 使用项目自己的滚动条主题。
+2. `autoHide: "move"` 鼠标移动时显示，平时隐藏。
+3. `clickScroll: true` 允许点击滚动条轨道滚动。
+4. `debounce` 是性能控制
+
+## sheet.tsx
+
+从屏幕边缘滑出来的面板。比如项目的侧边栏。使用了BaseUI的`dialog`作为交互底层。
+
+导出的子组件包括：
+1. `Sheet`，根组件，对应`SheetPrimitive.Root`，即`Base UI Dialog`的根节点
+2. `SheetTrigger`，触发器，搭配按钮
+3. `SheetClose`，触发器，关闭
+4. `SheetContent`，具体的内容
+5. `SheetHeader`，面板顶部区域
+6. `SheetFooter`，面板底部区域
+7. `SheetTitle`，面板标题
+8. `SheetDescription`，描述
+
+一个该组件的示例：
+```tsx
+<Sheet>
+  <SheetTrigger>打开面板</SheetTrigger>
+
+  <SheetContent side="right">
+    <SheetHeader>
+      <SheetTitle>标题</SheetTitle>
+      <SheetDescription>说明文字</SheetDescription>
+    </SheetHeader>
+
+    <div>主体内容</div>
+
+    <SheetFooter>
+      <button>保存</button>
+    </SheetFooter>
+  </SheetContent>
+</Sheet>
+```
+
+## textarea.tsx
+
+```tsx
+const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.ComponentProps<"textarea">
+> 
+```
+与`input.tsx`不同的是，这对应多行输入。接受所有`textarea`的属性，并且允许外部获得ref。
+
+## tooltip.tsx
+
+项目自定义实现的一个轻量化提示气泡组件。用于鼠标悬停的时候，或者聚焦在某个元素时，浮现的一小段文字。
+
+# features\\chat
+
+根据开源社区的常见规范，鉴于本项目集中在聊天功能上，于是把一系列的UI组件放在`features\chat`里。
+
+由于我写的是code-walkthrough，先按照文件顺序来。并且与wiki不同，是基于代码的。
+
+## auth-panel.tsx
+
+负责登录页面。职责：
+- 展示登录页视觉
+- 接收邮箱输入
+- 在密码与邮箱验证码两种主登录方式之间切换
+- 接收密码输入并发起邮箱密码登录
+- 发送邮箱验证码并校验验证码登录
+- 发起 GitHub OAuth 登录
+- 展示登录反馈
+
+文件开头定义了许多Props，Type。以及：
+1. 用于获取失败信息的`getErrorMessage()`和
+2. 用于从URL中解析登陆回调结果的`parseAuthFeedbackFromLocation`。通过`window.location.search`浏览器内置API来获取参数，并且`get`到对应的状态字符串。
+
+然后是主函数，使用了React常见的`useRef,useState,useEffect`来管理一系列的前端状态。按顺序：
+1. 第一个`useEffect`，页面挂载时初始化，恢复上次使用过的邮箱，解析回调链接的URL。如果链接过期，那么焦点将重新放回邮箱输入框
+2. 第二个`useEffect`，60秒的邮件发送限制
+3. `handleSubmit`，表单提交处理函数。主要是提交密码，通过发送请求到`/api/auth/password`中来获取Response。若成功，则提示可以进入会话工作区。
+4. `handleSendEmailCodeClick`，发送验证码。发送请求到`/api/auth/email-code/send`来获取Response。
+5. `handleVerifyEmailCodeClick`，处理邮箱验证码登陆。同样发送请求到`/api/auth/email-code/verify`来获取Response。
+
+最后返回的组件将是一个未登录页的完整登陆面板，将大致为：
+```tsx
+<motion.main>
+  背景装饰层
+
+  <section>
+    <div>
+      品牌标识 WebAI
+
+      标题区
+      登录方式切换 tab
+
+      邮箱输入框
+
+      根据 authMode 二选一：
+        密码登录表单
+        邮箱验证码登录表单
+
+      GitHub 登录按钮
+
+      反馈提示 Alert
+    </div>
+  </section>
+</motion.main>
+```
+外观将是：
+![[Pasted image 20260515220739.png]]
+
+
+## chat-header.tsx
+
+聊天工作区的头部控制栏。负责移动端侧栏入口，模型选择，收藏当前会话，编辑会话级提示词。
+
+返回的结构大致是
+```tsx
+<header>
+  <div className="grid grid-cols-[auto_1fr_auto]">
+    <div>
+      移动端侧栏按钮
+    </div>
+
+    <div>
+      模型 DropdownMenu
+    </div>
+
+    <div>
+      收藏按钮
+      提示词按钮
+    </div>
+  </div>
+</header>
+
+```
+移动端按钮是针对手机适配的，如红框处：
+![[Pasted image 20260515221906.png|258]]
+电脑端则会隐藏这个侧边栏：
+![[Pasted image 20260515221956.png]]
+
+其中：
+1. 左侧的移动端侧栏按钮，行为是点击后调用`onOpenMobileSidebar`，即打开移动端侧边栏。大屏隐藏，小屏显示。
+2. 中间的模型选择菜单，是`DropdownMenu`。并且可以根据模型的能力展示其类型：![[Pasted image 20260515222325.png|379]]
+3. 右侧的收藏和会话级提示词修改内容顾名思义。
+
+## chat-input.tsx
+
+即聊天页面的底部聊天区。
+
+文件开头定义了许多`useState`的内容后，定义了许多函数来实现很多功能：
+1. `showUrlLimitWarning`，若用户输入的URL达到上限后，展示1.5秒的警告。
+2. `handleAddUrlContext`，处理添加的URL
+3. `handleSubmitDraft`，保存当前的发送消息为草稿，准备发送。如果URL输入框中有一个还没有正式添加的URL，也会发送时一起带上。并且也有状态检查，至少`对话|URL|附件`存在其一时才发送
+4. `handleUploadFiles`，处理添加的附件。
+5. `handleInlineUploadFiels`，附件处理核心函数。比如说粘贴，拖拽，文件选择时，文件时校验并处理。成功后，新上传的附件追加到当前附件数组。
+6. `useLayoutEffect`，自定义Hook，自动测量textarea的高度。
+7. 第一个`useEffect`，发送后，重新聚焦到文本输入框
+8. 第二个`useEffect`，设置Thinking档位
+9. 第三个`useEffect`，自动cleanup。
+
+最后返回大概是：
+```tsx
+<motion.div>                 // 整个输入面板容器
+  URL Context 展开面板          
+  // 只有 isUrlContextPanelOpen 为 true 时显示
+
+  <div>                      // 主输入区
+    <MotionTextarea />        // 正文输入框
+
+    附件预览列表               // 有附件时显示
+    附件错误提示               // 有错误时显示
+
+    <div>                    // 底部工具栏
+      <div>                  // 左侧工具按钮组
+        添加文件按钮
+        隐藏的 file input
+        联网按钮
+        thinking 档位菜单
+        URL Context 按钮
+      </div>
+
+      发送/停止按钮
+    </div>
+  </div>
+</motion.div>
+```
+红框所示：
+![[Pasted image 20260515224105.png]]
+
+## chat-shell.tsx
+
+真正的核心。用于拼接整个网页绝大部分元素。用户在登陆之后，该文件负责将各种组件拼接在一起。并且从：
+1. `useChatSession`，管理当前聊天消息层面的。
+2. `useChatWorkspace`，管理聊天工作区的聊天状态
+3. `useMessageScroll`，管理UI滚动层
+这是三个大自定义Hook。以及用于获取模型信息和运行时模型配置的：
+4. `useFetchedModels`
+5. `useGeminiRuntimeConfig`
+
+然后是逐个函数：
+1. `getErrorMessage`，规范错误信息
+2. `showWorkspaceNotice`，展示通知，比如“正在创建分支”，“模型同步失败”等
+3. `handlePromptDialogOpenChange`，控制会话级提示词的开关，关闭的时候会清空编辑草稿。并清除工作区错误。
+4. `handleSaveSystemPrompt`，保存会话级提示词
+5. `handleSaveGeminiRuntimeConfig`，保存Gemini运行配置
+6. `handleFetchGeminiModels`，拉取Gemini模型列表
+7. `handleUpdateFetchedModel`，根据拉取的模型列表更新某个模型的启用状态和默认状态
+8. `handleDeleteFetchedModel`，删除某个已经拉取的模型。
+9. `handleSignOut`，登出。调用`/api/auth/sign-out`API。
+10. `handleSendMessage`，发送消息。首先它会接受`content,attachments,urls`，清除旧的错误。自动命名标题和校验当前会话ID，并调用来自`useChatSession`的`handleSubmit`真正发送
+11. `handleCopyMessage`，复制消息。
+12. `handleEditMessage`，编辑消息后重新生成，调用多个hook提供的函数来处理。
+13. `handleBranchFromMessage`，处理分支。首先会创建一个工作区的提示，然后调用`handleBranchConversation`来执行世纪的操作。
+14. `handleRegenerateMessage`，重新生成消息。
+15. `handleJumpToLatest`，提供了一个按钮来“回到底部”，内部执行`scrollToLatest()`
+16. 第一个`useEffect`，首次登陆时自动拉取模型。
+17. `updateCurrentUser`，更新用户个人信息时，处理刷新前端用农户信息。
+18. `handleUpdateProfile`，更新个人名称时，调用`/api/profile`，来实际保存。
+19. `handleUploadAvatar`，上传头像。调用`/api/profile/avatar`。成功后刷新
+20. `handleUpdatePassword`，修改密码。调用`/api/profile/password`的`PATCH`。
+
+最后的return大概是：
+没有登陆的时候，就是简单的`AuthPanel`面板
+登陆的时候，就是：
+```tsx
+// 1. 未登录状态：只返回登录页
+if (!user) {
+  return (
+    <AuthPanel />
+  );
+}
+
+// 2. 已登录状态：返回完整聊天工作区
+return (
+  <>
+    <全局工作区通知 />
+
+    <整页聊天布局>
+      <左侧会话侧边栏 />
+
+      <右侧聊天主区域>
+        <背景渐变层 />
+
+        <顶部聊天控制栏 />
+
+        <工作区错误提示 />
+
+        <消息与输入区域>
+          <消息列表 />
+
+          <底部聊天输入框 />
+        </消息与输入区域>
+      </右侧聊天主区域>
+    </整页聊天布局>
+
+    <会话级提示词弹窗>
+      <弹窗标题和说明 />
+
+      <提示词编辑框 />
+
+      <弹窗底部操作区>
+        <取消按钮 />
+        <保存按钮 />
+      </弹窗底部操作区>
+    </会话级提示词弹窗>
+  </>
+);
+```
+

@@ -206,7 +206,7 @@
 - `model_catalog.provider` 与 `model_fetched.provider` 固定为 `gemini`
 - `model_catalog.api_style` 与 `model_fetched.api_style` 固定为 `gemini_native`
 - `model_catalog.model_id` 全局唯一
-- `model_fetched(user_id, base_url, model_id)` 唯一
+- `model_fetched(user_id, model_id)` 唯一
 - 每个用户最多一个启用中的默认模型
 - `conversations.status` 取值为 `active` / `archived`
 - `messages.sender_type` 取值为 `user` / `assistant`

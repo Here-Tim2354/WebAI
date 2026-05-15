@@ -19,24 +19,30 @@ aliases:
 `ChatInput` 仍然是受控输入组件，但它现在不只控制主消息文本，还承接：
 
 - 会话级联网开关入口
+- 会话级思考档位入口
 - 请求级 URL Context 输入区
 - URL 上限的局部警示反馈
 - 图片与文件附加项入口
 
-它自己不保存主消息文本或 URL 列表，而是依赖父层传入：
+它自己保存主消息正文草稿，但不保存 URL 列表、附件列表或会话级控制项。父层传入：
 
-- `value`
 - `webSearchEnabled`
+- `thinkingLevel`
 - `urlContextInputValue`
 - `urlContextUrls`
+- `attachments`
 - `isUrlContextPanelOpen`
-- `onChange`
+- `isUploadingAttachments`
 - `onToggleWebSearch`
+- `onThinkingLevelChange`
 - `onUrlContextInputChange`
+- `onAttachmentsChange`
 - `onToggleUrlContextPanel`
 - `onAddUrlContextUrl`
 - `onRemoveUrlContextUrl`
+- `onUploadAttachments`
 - `onSubmit`
+- `onStop`
 - `isSubmitting`
 - `disabled`
 
@@ -53,20 +59,10 @@ aliases:
 
 ## 2. 来自父层的输入
 
-### `value`
-
-作用：
-- 当前输入框内容
-
-### `onChange`
-
-作用：
-- 当用户输入时，把最新文本回传给父层
-
 ### `onSubmit`
 
 作用：
-- 当用户点击发送或按回车时，触发发送逻辑
+- 当用户点击发送或按回车时，把本地正文草稿、草稿附件和本次 URL 传给父层发送逻辑
 
 ### `isSubmitting`
 
@@ -77,6 +73,14 @@ aliases:
 
 作用：
 - 是否整体禁用输入区
+
+### URL、附件和控制项 props
+
+作用：
+- `urlContextInputValue` / `urlContextUrls` 由 `useChatSession` 维护
+- `attachments` / `isUploadingAttachments` 由 `useChatSession` 维护
+- `webSearchEnabled` / `thinkingLevel` 由 `useChatWorkspace` 根据真实会话或空白页草稿推导
+- 模型能力 props 决定联网、URL Context、图片、文件和思考档位入口是否可用
 
 ---
 
@@ -99,7 +103,15 @@ const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 ### `canSend`
 
 ```tsx
-const canSend = value.trim().length > 0 && !isSubmitting && !disabled;
+const canSend =
+  (
+    draftValue.trim().length > 0 ||
+    attachments.length > 0 ||
+    urlContextUrls.length > 0 ||
+    pendingUrlContextUrl !== null
+  ) &&
+  !isSubmitting &&
+  !disabled;
 ```
 
 作用：
@@ -142,16 +154,40 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 - 管理 URL 上限警示的自动恢复定时器
 - 避免连续触发时留下旧的 timeout
 
+### `draftValue`
+
+作用：
+- 保存主输入框中的正文草稿
+- 发送开始时先清空，发送失败时恢复
+
+它留在 `ChatInput` 内部，避免每一次敲字都推动工作区层重渲染。
+
+### `optimisticThinkingLevel`
+
+作用：
+- 思考档位菜单切换时先更新按钮展示
+- 父层真实 `thinkingLevel` 变化后再同步回来
+
+### `attachmentError`
+
+作用：
+- 展示粘贴、拖拽或文件选择时的附件校验和上传错误
+
+### `textareaHeight`
+
+作用：
+- 只保存测量后的目标高度，真实高度动画交给 Motion 驱动
+
 ---
 
-## 4. 本组件的三个 useEffect
+## 4. 本组件的 useEffect / useLayoutEffect
 
-### 4.1 高度自适应 effect
+### 4.1 高度自适应 layout effect
 
 依赖：
 
 ```tsx
-[value]
+[draftValue]
 ```
 
 它管理的内容：
@@ -161,14 +197,15 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 运行方式：
 
 1. 先拿到 `textareaRef.current`
-2. 把高度暂时设为 `0px`
+2. 临时把高度设为 `auto`
 3. 读取新的 `scrollHeight`
-4. 把高度设置为 `min(scrollHeight, 240)`
+4. 把目标高度限制在 224px 内
+5. 再把目标高度交给 Motion 的 `animate`
 
 目标：
 
 - 输入内容越多，高度越高
-- 但最大不超过 240px，避免输入区无限增高
+- 但最大不超过 224px，避免输入区无限增高
 
 ---
 
@@ -212,6 +249,23 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 - 避免组件卸载后定时器继续回写 state
 - 保持局部警示逻辑闭环
+
+### 4.4 思考档位同步 effect
+
+依赖：
+
+```tsx
+[thinkingLevel]
+```
+
+它管理的内容：
+
+- 把父层传入的真实思考档位同步到本地 `optimisticThinkingLevel`
+
+目标：
+
+- 菜单点击时可以立刻反馈
+- 如果父层回滚或切换会话，本地按钮展示也能跟随真实状态
 
 ---
 
@@ -267,10 +321,10 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 链路：
 
 1. 用户在 `Textarea` 中输入
-2. 触发 `onChange`
-3. 调用父层传入的 `onChange(event.target.value)`
-4. 父层更新 `value`
-5. `ChatInput` 接收到新的 `value` 并重渲染
+2. 触发本地 `setDraftValue(event.target.value)`
+3. `ChatInput` 本地重渲染并重新测量 textarea 高度
+
+正文草稿不再上提到 `ChatShell` 或 `useChatSession`。
 
 ---
 
@@ -284,7 +338,9 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
    - `event.key === "Enter"`
    - `!event.shiftKey`
 4. 阻止默认换行行为
-5. 调用 `onSubmit()`
+5. 调用 `handleSubmitDraft()`
+6. `handleSubmitDraft()` 计算待提交正文、附件和 URL
+7. 调用父层 `onSubmit(content, attachments, urls)`
 
 结果：
 - Enter 发送
@@ -298,10 +354,12 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 1. 用户点击按钮
 2. 触发 `onClick`
-3. 调用 `onSubmit()`
+3. 如果正在生成，调用 `onStop()`
+4. 如果没有生成，调用 `handleSubmitDraft()`
 
 前提：
 - `canSend === true`
+- 正在生成时不看 `canSend`，而是通过 `canStop` 允许停止按钮可点
 
 ---
 
@@ -319,6 +377,35 @@ const [isUrlLimitWarningVisible, setIsUrlLimitWarningVisible] = useState(false);
 
 ---
 
+### 5.7 附件上传
+
+链路：
+
+1. 用户通过文件按钮、粘贴或拖拽提供文件
+2. 组件先调用 `getAttachmentFileValidationError()` 做本地预校验
+3. 校验失败时写入 `attachmentError`
+4. 校验通过时调用父层 `onUploadAttachments(files)`
+5. 上传成功后通过 `onAttachmentsChange()` 追加到草稿附件列表
+6. 上传失败时把错误文案写入 `attachmentError`
+
+结果：
+- 附件状态仍由父层持有
+- 输入区只负责入口、校验反馈和预览交互
+
+---
+
+### 5.8 思考档位切换
+
+链路：
+
+1. 用户打开思考档位菜单
+2. 点击 `minimal / low / medium / high`
+3. 组件先更新 `optimisticThinkingLevel`
+4. 调用父层 `onThinkingLevelChange(nextThinkingLevel)`
+5. 父层根据当前是否有真实会话，决定写入草稿态或 patch 当前会话
+
+---
+
 ## 6. 一句话总结
 
-`ChatInput` 的状态流已经从“单一文本输入框”升级为“主消息输入 + URL Context 输入 + 附件入口 + 会话级控制按钮”的局部交互状态机：主数据仍由父层控制，本组件负责把这些状态组织成顺手、连续且可反馈的输入体验。附件入口目前仍属于 `Phase 4.4` 首轮接入能力，需要继续真实文件回归。
+`ChatInput` 的状态流已经从“单一文本输入框”升级为“主消息输入 + URL Context 输入 + 附件入口 + 会话级控制按钮”的局部交互状态机：正文草稿留在本组件内部，URL、附件和会话级控制项由父层管理，本组件负责把这些状态组织成顺手、连续且可反馈的输入体验。附件入口目前仍属于 `Phase 4.4` 首轮接入能力，需要继续真实文件回归。

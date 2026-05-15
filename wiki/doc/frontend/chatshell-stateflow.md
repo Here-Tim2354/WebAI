@@ -146,23 +146,32 @@ const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 它主要维护这些状态：
 
 - `conversations`
+- `archivedConversations`
+- `favoriteConversations`
 - `activeConversationId`
 - `workspaceError`
 - `availableModels`
 - `draftModelId`
 - `draftSystemPrompt`
 - `draftWebSearchEnabled`
+- `draftThinkingLevel`
 - `isCreatingConversation`
 - `isDeletingConversationId`
+- `isArchivingConversationId`
+- `isRestoringConversationId`
+- `isLoadingArchivedConversations`
+- `isLoadingFavoriteConversations`
+- `isTogglingFavorite`
 - `isLoadingConversation`
 
 它负责的行为包括：
 
 - 创建、重命名、删除会话
+- 收藏、归档、恢复会话
 - 切换当前会话
 - 首屏后同步模型列表
 - 切换会话时拉取会话详情
-- 协调当前会话模型、提示词与联网设置
+- 协调当前会话模型、提示词、联网设置与思考档位
 - 在首条消息发送前，把草稿控制项一并落入新会话
 
 因此现在的边界是：
@@ -197,18 +206,7 @@ const [conversationMessages, setConversationMessages] = useState<
 
 ---
 
-### 5.2 输入框内容
-
-```tsx
-const [inputValue, setInputValue] = useState("");
-```
-
-作用：
-- 保存当前输入框中的用户文本
-
----
-
-### 5.3 URL Context 相关状态
+### 5.2 URL Context 相关状态
 
 当前 `useChatSession` 还维护：
 
@@ -221,6 +219,21 @@ const [inputValue, setInputValue] = useState("");
 - 保存当前 URL 输入框内容
 - 保存当前这次发送已确认的 URL 列表
 - 控制 URL Context 输入区是否展开
+
+---
+
+### 5.3 附件草稿状态
+
+当前 `useChatSession` 还维护：
+
+- `draftAttachments`
+- `isUploadingAttachments`
+
+作用：
+
+- 保存当前这次发送前已经上传好的图片和文件附件
+- 管理附件上传中的状态反馈
+- 发送成功后清空草稿附件，发送失败时保留附件状态供用户重试
 
 ---
 
@@ -364,7 +377,7 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 虽然它们不在 `ChatShell` 本体里，但都参与了 `ChatShell` 页面运行。
 
-### 9.1 ChatInput 的三个 effect
+### 9.1 ChatInput 的 effect
 
 对应文件：
 - `src/features/chat/components/chat-input.tsx`
@@ -372,12 +385,12 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 #### effect 1：输入框高度自适应
 
 作用：
-- 让 textarea 随内容增长，但最高不超过 240px
+- 让 textarea 随内容增长，但最高不超过 224px
 
 实现：
-- 每次 `value` 变化后先把高度设为 `0px`
-- 再读取 `scrollHeight`
-- 回写新的受限高度
+- 每次本地 `draftValue` 变化后测量 `scrollHeight`
+- 把目标高度限制在 224px 内
+- 再交给 Motion 驱动高度动画
 
 #### effect 2：发送完成后恢复焦点
 
@@ -395,6 +408,15 @@ const [isSubmitting, setIsSubmitting] = useState(false);
 
 实现：
 - 组件卸载时清理未结束的 warning timer
+
+#### effect 4：思考档位同步
+
+作用：
+- 把父层传入的真实 `thinkingLevel` 同步到本地 `optimisticThinkingLevel`
+
+实现：
+- 用户切换菜单时先本地乐观展示
+- 切换会话或父层回滚时再以真实值为准
 
 ---
 
@@ -501,11 +523,12 @@ const [isSubmitting, setIsSubmitting] = useState(false);
    - 插入用户消息
    - 插入 assistant 占位消息
 7. `POST /api/chat`
-   - 当前若存在 `urlContextUrls`，会一并作为 `urls` 传给后端
+   - 当前若存在 `urlContextUrls` 或输入框里有合法待确认 URL，会一并作为 `urls` 传给后端
+   - 当前若存在草稿附件，会一并作为 `attachments` 传给后端
 8. 成功后：
    - 用后端返回的真实消息快照覆盖本地缓存
    - 用后端返回的会话信息更新会话列表
-   - 清空 URL 输入值、已确认 URL 列表，并收起 URL 输入区
+   - 清空 URL 输入值、已确认 URL 列表、草稿附件，并收起 URL 输入区
 9. 失败时：
    - 把 assistant 占位消息替换成 error 气泡
 
@@ -598,8 +621,8 @@ useChatWorkspace
 
 useChatSession
   -> 管各会话消息缓存
-  -> 管输入框文本
   -> 管 URL Context 输入与已确认 URL
+  -> 管草稿附件和附件上传状态
   -> 管发送中状态
   -> 管停止生成后的本地 cancelled 状态和服务端精确取消请求
   -> 调用 chat-stream.ts 消费服务端 NDJSON 事件

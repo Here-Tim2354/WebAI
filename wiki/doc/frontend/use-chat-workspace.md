@@ -24,6 +24,8 @@ aliases:
 它当前承担的是“聊天工作区编排层”的职责，主要负责：
 
 - 会话列表状态
+- 收藏会话列表状态
+- 归档会话列表状态
 - 当前激活会话
 - 模型列表同步
 - 草稿控制项
@@ -45,6 +47,8 @@ aliases:
 当前 hook 内部维护的重点状态包括：
 
 - `conversations`
+- `archivedConversations`
+- `favoriteConversations`
 - `activeConversationId`
 - `availableModels`
 - `draftModelId`
@@ -54,6 +58,11 @@ aliases:
 - `workspaceError`
 - `isCreatingConversation`
 - `isDeletingConversationId`
+- `isArchivingConversationId`
+- `isRestoringConversationId`
+- `isLoadingArchivedConversations`
+- `isLoadingFavoriteConversations`
+- `isTogglingFavorite`
 - `isLoadingConversation`
 
 这些状态的共同特点是：
@@ -70,6 +79,11 @@ aliases:
 - `handleCreateConversation`
 - `handleRenameConversation`
 - `handleDeleteConversation`
+- `handleArchiveConversation`
+- `handleRestoreConversation`
+- `handleToggleFavoriteConversation`
+- `handleLoadArchivedConversations`
+- `handleLoadFavoriteConversations`
 - `handleSelectModel`
 - `saveSystemPrompt`
 - `toggleWebSearchEnabled`
@@ -81,6 +95,8 @@ aliases:
 这说明它不只是“提供状态”，还负责：
 
 - 创建 / 重命名 / 删除会话
+- 收藏、归档和恢复会话
+- 为侧栏二级面板加载收藏区与归档区
 - 同步当前会话配置
 - 协调首条消息前的草稿控制项落库
 
@@ -120,6 +136,7 @@ aliases:
 如果没有 `useChatWorkspace`，这些逻辑会继续全部堆在 `ChatShell`：
 
 - 会话列表排序
+- 收藏区和归档区列表管理
 - 当前激活会话
 - 模型列表拉取
 - 当前会话详情拉取
@@ -129,6 +146,7 @@ aliases:
 - 会话级模型切换
 - 会话级联网切换
 - 会话级思考档位切换
+- 删除、收藏、归档、恢复的乐观更新和失败回滚
 
 这会让 `ChatShell` 很快重新膨胀成“页面壳 + 工作区规则总控”。
 

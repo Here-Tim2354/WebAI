@@ -27,12 +27,12 @@ aliases:
 ### [[auth-panel|AuthPanel]]
 
 - 未登录时展示的登录面板
-- 负责邮箱输入、密码登录、验证码登录和登录反馈
+- 负责邮箱输入、密码登录、验证码登录、GitHub OAuth 入口和登录反馈
 
 ### [[conversation-sidebar|ConversationSidebar]]
 
 - 左侧会话管理区
-- 负责展示历史会话、新建、切换、重命名、删除和退出登录
+- 负责展示最近会话、新建、切换、重命名、收藏、归档、删除、账户管理、Gemini 设置和退出登录
 
 ### ChatHeader
 
@@ -51,7 +51,7 @@ aliases:
 ### [[chat-input|ChatInput]]
 
 - 页面底部输入区
-- 负责文本输入、回车发送、会话级联网开关、`URL Context`、附件入口和输入框高度自适应
+- 负责本地文本草稿、回车发送、停止生成、会话级联网开关、思考档位、`URL Context`、附件入口和输入框高度自适应
 
 ### ModelIcon
 
@@ -60,7 +60,7 @@ aliases:
 
 简短介绍：
 - 用于模型选择器中的模型图标展示
-- 帮助用户区分不同 provider 或模型条目
+- 帮助用户识别 Gemini 模型条目
 
 ---
 
@@ -154,9 +154,15 @@ if (!user) {
 - 新建会话
 - 切换会话
 - 重命名会话
+- 收藏 / 取消收藏会话
+- 归档 / 恢复会话
 - 删除会话
-- 展示当前用户邮箱
+- 展示和修改当前用户资料
+- 上传头像
+- 修改密码
+- 管理 Gemini Key、Base URL 和用户私有模型列表
 - 退出登录
+- 桌面端收起 / 展开侧栏
 - 移动端抽屉式侧栏
 
 也就是说，页面左边这一整块“会话管理区”，都是由 `ConversationSidebar` 渲染的。
@@ -189,9 +195,11 @@ if (!user) {
 
 ```tsx
 <ChatHeader
+  activeConversation={activeConversation}
   availableModels={availableModels}
   selectedModel={selectedModel}
   onSelectModel={handleSelectModel}
+  onToggleFavoriteConversation={handleToggleFavoriteConversation}
   onOpenPromptDialog={...}
 />
 ```
@@ -199,8 +207,8 @@ if (!user) {
 这一块在页面里承担三类作用：
 
 - 移动端打开侧栏按钮
-- 当前会话概览
 - 模型选择入口
+- 当前会话收藏入口
 - 会话级提示词入口
 
 #### 头部左侧
@@ -219,7 +227,8 @@ if (!user) {
 
 - 显示当前模型名称
 - 显示模型图标
-- 按 provider 分组展示模型
+- 在 Gemini 分组下展示当前可用模型
+- 展示模型能力摘要，例如推理、图像、文件、联网和工具
 - 点击后切换 `selectedModelId`
 
 补充说明：
@@ -235,12 +244,13 @@ if (!user) {
 
 ```tsx
 <Button
-  variant="ghost"
+  variant="outline"
   size="icon-sm"
+  className="h-9 w-10 ..."
   ...
   aria-label="编辑会话级提示词"
 >
-  <NotebookPenIcon className="size-4.5" />
+  <NotebookPenIcon className="size-4" />
 </Button>
 ```
 
@@ -395,6 +405,7 @@ if (!user) {
 - 输入框高度自适应
 - 发送中状态控制
 - 会话级联网开关
+- 会话级思考档位
 - `URL Context` 展开、输入、确认、删除与数量提示
 - 图片与文件附加项入口
 
@@ -447,11 +458,13 @@ ChatShell
 负责聊天工作区编排层：
 
 - 会话列表
+- 收藏会话列表
+- 归档会话列表
 - 当前激活会话
 - 模型列表与当前会话模型
 - 草稿控制项
 - 会话详情同步
-- 会话级提示词、模型与联网设置 patch
+- 会话级提示词、模型、联网设置与思考档位 patch
 - 工作区错误状态
 
 ### ConversationSidebar
@@ -462,7 +475,11 @@ ChatShell
 - 新建
 - 切换
 - 重命名
+- 收藏
+- 归档 / 恢复
 - 删除
+- 账户资料
+- Gemini 设置
 - 退出登录
 
 ### MessageList
@@ -492,13 +509,15 @@ ChatShell
 
 负责底部输入与发送：
 
-- 文本输入
+- 本地文本草稿
 - 回车发送
 - 按钮发送 / 停止
 - 高度自适应
+- 文件 / 图片附件
 - URL Context 输入与删除
 - URL 上限警示
 - 会话级联网切换
+- 会话级思考档位切换
 
 ### AuthPanel
 

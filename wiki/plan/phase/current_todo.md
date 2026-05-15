@@ -1,6 +1,6 @@
 # Current Todo
 
-更新时间：2026-05-14
+更新时间：2026-05-15
 
 ## 项目状态
 
@@ -21,6 +21,7 @@
 - `src/lib` 保留跨功能共享的 schema、Supabase、AI、附件规则、环境与安全边界工具。
 - Supabase 继续作为核心数据库与私有 Storage。
 - Gemini Key / Base URL 仍由服务端接口和浏览器运行时配置共同约束，不进入数据库。
+- Gemini 模型注册表以 `model_catalog + model_fetched` 为核心，用户侧模型按 `user_id + model_id` 去重，聊天运行时只读取已启用的 `model_fetched.id`。
 - 用户展示资料继续由 `profiles` 承接，头像对象进入私有 Storage bucket `profile_avatars`。
 - 邮箱密码登录和邮箱验证码登录均由 Supabase Auth 建立 session，新用户仍可通过验证码入口进入后设置密码。
 
