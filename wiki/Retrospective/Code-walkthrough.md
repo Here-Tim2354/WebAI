@@ -449,3 +449,6 @@ body {
 如果是开发者模式下（通过命令行参数`--mode=DEV`），那么会重定向至`/api/auth/dev-login`，将环境变量中的邮箱地址和Supabase Role Key打包进Supabase客户端，从而免登录页面直接进入指定账号。
 
 然后获取User的对话，列出可用模型，获取用户个人信息。并且初始化登陆状态信息。最后通过`ChatShell`拼接上述各种信息。
+
+# components\\ui
+
