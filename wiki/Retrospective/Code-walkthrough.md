@@ -452,3 +452,146 @@ body {
 
 # components\\ui
 
+本项目的同样UI积木层。是业务中会反复使用的到的组件，采用Shadcn/ui的方式组织。配置：
+- 风格：`base-nova`
+- 框架：`Next.js App Router`，`rsc: true`
+- UI 路径：`@/components/ui`
+- 工具函数路径：`@/lib/utils`
+- 图标库：`lucide`
+- 全局主题 CSS：`src/app/globals.css`
+- 底层 primitive：大量使用 `@base-ui/react`
+
+
+项目大量使用了样式生成器的写法：
+```ts
+const alertVariants = cva("基础 class", { variants: ... })
+```
+可以根据不同的`variant`参数返回不同的`class`。
+
+
+## alert
+
+定义了一系列用于醒目的消息弹出框的UI Primitives
+```tsx
+function Alert({
+  className,
+  variant,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+  return (
+    <div
+      data-slot="alert"
+      role="alert"
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
+  )
+}
+```
+`React.ComponentProps<"div">` 表示它接受普通 `<div>` 能接受的所有属性，比如 `id`、`onClick`、`children`。
+
+并且有以下具体UI：
+1. AlertTitle
+2. AlertDescription
+3. AlertAction
+
+## badge.tsx
+
+负责小标签/状态标记的组件，用于展示状态，分类，数量，提示性短文本。比如：
+- 消息旁边的小状态标识
+- 会话侧栏里的数量或状态提示
+- 模型、能力、附件这类短标签
+- “已归档”“已收藏”“错误”等状态展示
+
+`badgeVariants`也是样式生成器，定义了比如
+1. default
+2. secondary
+3. destructive
+4. outline
+5. ghost
+6. link
+
+并且使用了Base UI的useRender写法，默认渲染为`<span>`，但如果外部传入了`<render>`，可以换成别的元素。
+
+
+## button.tsx
+
+文件开头声明了`use client`，表明这是在浏览器渲染的。
+
+通过样式生成器，把按钮样式分为了两组
+1. variant
+2. size
+
+`ButtonPrimitive.Props & VariantProps<typeof buttonVariants>`表明它接受Base UI Button支持的所有属性。还额外接受`variant`和`size`。
+即Base UI帮我处理了Button的交互和逻辑行为，我只需要包装。
+```tsx
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+```
+
+## dialog.tsx
+
+也利用了Base UI的Dialog Primitive
+```tsx
+return <DialogPrimitive.Root data-slot="dialog" {...props} />
+```
+
+主要服务于需要用户临时停下来处理的一类“弹窗任务”，主要是：
+- 修改当前会话的系统提示词
+- 管理消息附件
+- 打开收藏会话列表
+- 打开归档会话列表
+- 打开个人账户设置
+- 打开 Gemini 设置
+- 展示需要用户集中处理的配置表单
+
+实例组件：
+1. `DialogTrigger`，打开弹窗的触发器
+2. `DialogPortal`，意思是弹窗不会渲染在当前DOM层级中，而是挂到更外层，避免被父元素影响
+3. `DialogClose`，关闭
+4. `DialogOverlay`，背景遮罩层
+5. `DialogContent`，弹窗主体。渲染上述的Portal和Overlay，居中的Popup。
+   关闭按钮写法`<DialogPrimitive.Close render={<Button ... />}>`也采用了render的组合方式。实际为：关闭逻辑采用`DialogPrimitive.Close`，外观使用自己写的`Button`
+6. `DialogHeader`，存放弹窗标题和描述的容器
+7. `DialogFooter`，弹窗底部的按钮
+8. `DialogTitle`，视觉的标题
+9. `DialogDescription`，弹窗描述文本
+
+## DropdownMenu.tsx
+
+一些点击后展开的菜单，在项目中主要是：
+- 顶部模型选择
+- 输入区 thinking 档位选择
+- 会话卡片的更多操作
+- 用户头像菜单
+- 收藏、归档、Gemini 设置、退出登录入口
+
+通过`const dropdownContentClassName/dropdownSubContentClassName`定义样式。使用了Base UI的`MenuPrimitive`来定义根组件。
+
+实例组件：
+1. `DropdownMenuPortal`，渲染到外层
+2. `DropdownMenuTrigger`，菜单触发器。同样触发逻辑采用了Base UI，外观使用自己的Button。
+3. `DropdownMenuContent`，菜单浮层内容。并且内部使用了`MenuPrimitive.Positioner`，负责定位到按钮旁边。
+4. `DropdownMenuGroup`，菜单分组。用于把一系列的菜单组合到一起。
+5. `DropdownMenuLabel`，分组标题。表示说明
+6. `DropdownMenuItem`，普通的菜单项。适合一次性的，比如重命名，收藏，归档等。
+7. `DropdownMenuCheckboxItem`，复选菜单项，负责一些“开关”的菜单。可多选
+8. `DropdownMenuRadioGroup`，单选菜单组
+9. `DropdownMenuRadioItem`，单选项。放在单选菜单组里。
+10. `DropdownMenuSeparator`，分隔线
+11. `DropdownMenuSub`，子菜单。允许菜单之后可能会有子菜单。
+12. `DropdownMenuSubTrigger`，子菜单的那个箭头
+13. `DropdownMenuSubContent`，子菜单展开后的内容
+14. `DropdownMenuShortcut`，一些快捷提示，比如复制的`Ctrl+C`。
