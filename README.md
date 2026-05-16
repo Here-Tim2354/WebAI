@@ -57,7 +57,6 @@ supabase/migrations/             数据库、RLS、Storage 与功能迁移
 
 在开始之前，你需要有一个 [Supabase](https://supabase.com/) 云端账号，或者本地部署的 Supabase。然后获取下方的 `env` 环境变量，来链接到你的数据库。推荐使用 [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)，让 Agent 帮你实现连接和migration。
 
-
 ```bash
 git clone https://github.com/Here-Tim2354/WebAI
 npm install
@@ -82,6 +81,63 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
 DEV_AUTH_EMAIL=
 ```
+
+## 开发者本地启动补充
+
+如果希望第一次 clone 后快速跑通，推荐先准备一个自己的 Supabase 云端项目，再把仓库里的 `supabase/migrations` 推送到该项目。这样数据库结构、RLS 和 Storage policy 都来自同一套 migration，后续开发和部署也更接近真实环境。
+
+### 环境要求
+
+- [Node.js](https://nodejs.org/) 20 或更高版本
+- [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+- 一个可用的 [Gemini API Key](https://ai.google.dev/gemini-api/docs/api-key)
+
+### Supabase migration
+
+在 Supabase Dashboard 创建项目后，使用 Supabase CLI 关联项目并推送 migration：
+
+```bash
+supabase login
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+如果没有全局安装 Supabase CLI，也可以使用 `npx supabase ...` 执行同样的命令。Windows 环境下更推荐使用已安装好的全局 CLI，减少 npm cache 权限问题。
+
+推送完成后，在 `.env` 中填写 Supabase Dashboard 提供的项目配置：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=<project url>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+SUPABASE_SECRET_KEY=<service role key>
+```
+
+再补上本地应用地址和 Gemini 配置：
+
+```env
+APP_ORIGIN=http://localhost:4000
+NEXT_PUBLIC_APP_URL=http://localhost:4000
+GEMINI_API_KEY=<your Gemini API key>
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BASE_URL=
+DEV_AUTH_EMAIL=dev@example.com
+```
+
+云端 Auth Redirect URL 建议至少包含：
+
+```text
+http://localhost:4000/auth/confirm
+```
+
+生产部署时再加入正式域名对应的 `/auth/confirm` 回调地址。
+
+然后启动 WebAI：
+
+```bash
+npm run dev -- --mode=DEV
+```
+
+本地调试时可以访问 `http://localhost:4000/api/auth/dev-login`，系统会使用 `DEV_AUTH_EMAIL` 快捷创建登录会话。这个入口只在开发环境且显式启用 `DEV` 模式时可用。
 
 
 ## Gemini 模型配置
