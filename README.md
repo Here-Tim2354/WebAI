@@ -2,6 +2,8 @@
 
 这是一个基于 [Supabase](https://supabase.com/) 的 AI 对话与会话持久化管理系统。也是我的第一个项目，原本这是用于我的数据库作业的，于是也包括了我自己的复盘文档。欢迎阅读~
 
+在线网站演示：[https://webai.tim2354.bytecola.cn/](https://webai.tim2354.bytecola.cn/)
+
 ![WebAI 主界面](asset/web-example-picture.png)
 
 ## 支持功能
