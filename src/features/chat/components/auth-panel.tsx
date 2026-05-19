@@ -22,6 +22,7 @@ type AuthPanelProps = {
 };
 
 const LAST_AUTH_EMAIL_KEY = "webai:last-auth-email";
+const AUTH_NOTICE_STORAGE_KEY = "webai:auth-notice";
 const EMAIL_CODE_COOLDOWN_SECONDS = 60;
 
 type AuthFeedbackState = {
@@ -39,6 +40,13 @@ function getErrorMessage(error: unknown) {
   }
 
   return "登录失败，请稍后再试。";
+}
+
+function rememberLoginSuccessNotice() {
+  window.sessionStorage.setItem(
+    AUTH_NOTICE_STORAGE_KEY,
+    "登录成功，欢迎回来。",
+  );
 }
 
 /**
@@ -190,6 +198,7 @@ export function AuthPanel({
 
       setFeedback("登录成功，正在进入你的会话工作区。");
       setFeedbackType("info");
+      rememberLoginSuccessNotice();
       window.location.assign("/");
     } catch (error) {
       setFeedback(getErrorMessage(error));
@@ -266,6 +275,7 @@ export function AuthPanel({
 
       setFeedback("登录成功，正在进入你的会话工作区。");
       setFeedbackType("info");
+      rememberLoginSuccessNotice();
       window.location.assign("/");
     } catch (error) {
       setFeedback(getErrorMessage(error));
@@ -293,7 +303,10 @@ export function AuthPanel({
               登录
             </h1>
             <p className="max-w-[42ch] text-sm leading-6 text-muted-foreground sm:text-[0.95rem]">
-              使用密码或邮箱验证码进入你的会话工作区
+              使用密码或邮箱验证码进入你的会话工作区。
+            </p>
+            <p className="max-w-[42ch] text-xs leading-5 text-slate-500">
+              首次使用邮箱验证码或 GitHub 登录时，会自动创建账户。
             </p>
           </div>
 
@@ -423,6 +436,9 @@ export function AuthPanel({
                 <ArrowRightIcon data-icon="inline-end" />
                 {isEmailCodeVerifying ? "验证中..." : "验证码登录"}
               </Button>
+              <p className="text-xs leading-5 text-slate-500">
+                验证码通常很快送达；如果没有看到，可以稍等片刻并检查垃圾邮件或拦截规则。
+              </p>
             </form>
           )}
 
@@ -438,7 +454,7 @@ export function AuthPanel({
               }}
             >
               <GitBranchIcon data-icon="inline-start" />
-              {isGithubSubmitting ? "跳转中..." : "使用 Github 登陆"}
+              {isGithubSubmitting ? "跳转中..." : "使用 GitHub 登录"}
             </Button>
           </div>
 
@@ -454,7 +470,13 @@ export function AuthPanel({
               role="status"
             >
               <AlertCircleIcon className="size-4" />
-              <AlertTitle>{feedbackType === "error" ? "登录提醒" : "邮件已发送"}</AlertTitle>
+              <AlertTitle>
+                {feedbackType === "error"
+                  ? "登录提醒"
+                  : feedback.includes("登录成功")
+                    ? "登录成功"
+                    : "邮件已发送"}
+              </AlertTitle>
               <AlertDescription>{feedback}</AlertDescription>
             </Alert>
           ) : null}

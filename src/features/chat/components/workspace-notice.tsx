@@ -11,7 +11,7 @@ import { softSpring } from "../lib/motion-presets";
 
 export type WorkspaceNoticeState = {
   id: number;
-  type: "loading" | "success" | "error";
+  type: "loading" | "success" | "error" | "info";
   title: string;
   description?: string;
 } | null;
@@ -29,6 +29,10 @@ const noticeStyles = {
     shell: "border-emerald-200/85 bg-white/94 text-slate-700 shadow-[0_18px_50px_rgba(48,124,91,0.13)]",
     icon: "bg-emerald-50 text-emerald-600",
   },
+  info: {
+    shell: "border-sky-200/85 bg-white/94 text-slate-700 shadow-[0_18px_50px_rgba(47,95,148,0.13)]",
+    icon: "bg-sky-50 text-sky-600",
+  },
   error: {
     shell: "border-red-200/85 bg-white/94 text-slate-700 shadow-[0_18px_50px_rgba(160,55,65,0.14)]",
     icon: "bg-red-50 text-red-600",
@@ -40,7 +44,7 @@ function NoticeIcon({ type }: { type: NonNullable<WorkspaceNoticeState>["type"] 
     return <LoaderCircleIcon className="size-4 animate-spin" />;
   }
 
-  if (type === "success") {
+  if (type === "success" || type === "info") {
     return <CheckCircle2Icon className="size-4" />;
   }
 

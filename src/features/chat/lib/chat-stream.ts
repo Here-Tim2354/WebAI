@@ -15,6 +15,7 @@ type ConsumeAssistantStreamOptions = {
     nextMessage: ChatMessage,
   ) => void;
   onConversationSynced: (conversation: Conversation) => void;
+  onAssistantMessageIdChanged?: (assistantMessageId: string) => void;
 };
 
 export function isAbortError(error: unknown) {
@@ -135,6 +136,7 @@ export async function consumeAssistantStream({
   assistantPlaceholder,
   replaceMessage,
   onConversationSynced,
+  onAssistantMessageIdChanged,
 }: ConsumeAssistantStreamOptions) {
   if (!response.body) {
     throw new Error("聊天接口未返回流式响应。");
@@ -157,6 +159,7 @@ export async function consumeAssistantStream({
     );
 
     currentAssistantMessageId = nextAssistantMessage.id;
+    onAssistantMessageIdChanged?.(currentAssistantMessageId);
     latestAssistantMessage = nextAssistantMessage;
     replaceMessage(conversationId, previousMessageId, nextAssistantMessage);
   }
