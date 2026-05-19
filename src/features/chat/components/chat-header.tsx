@@ -30,6 +30,7 @@ type ChatHeaderProps = {
   selectedModelId: string | null;
   currentSystemPrompt: string | null;
   isTogglingFavorite: boolean;
+  isInteractionLocked: boolean;
   onOpenMobileSidebar: () => void;
   onSelectModel: (modelId: string) => void | Promise<void>;
   onToggleFavoriteConversation: () => void | Promise<void>;
@@ -44,6 +45,7 @@ export function ChatHeader({
   selectedModelId,
   currentSystemPrompt,
   isTogglingFavorite,
+  isInteractionLocked,
   onOpenMobileSidebar,
   onSelectModel,
   onToggleFavoriteConversation,
@@ -73,6 +75,7 @@ export function ChatHeader({
                   type="button"
                   className="inline-flex h-9 w-[min(62vw,15rem)] items-center justify-between gap-2.5 rounded-[13px] border border-slate-300/70 bg-white/26 px-3 text-left text-[0.8rem] font-medium text-slate-600 transition-colors hover:border-slate-400/80 hover:bg-white/42 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
                   aria-label="选择模型"
+                  disabled={isInteractionLocked}
                 />
               }
             >
@@ -95,7 +98,7 @@ export function ChatHeader({
               side="bottom"
               align="start"
               sideOffset={9}
-              className="w-[22rem] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
+              className="w-[min(calc(100vw-2rem),22rem)] rounded-[16px] border border-border/70 bg-white/96 p-1.5 shadow-[0_18px_50px_rgba(58,84,132,0.12)] backdrop-blur-xl"
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="px-3 pt-2 pb-1 text-[0.7rem] tracking-[0.16em] uppercase">
@@ -118,6 +121,7 @@ export function ChatHeader({
                       onClick={() => {
                         void onSelectModel(model.id);
                       }}
+                      disabled={isInteractionLocked}
                     >
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-2.5">
@@ -162,7 +166,7 @@ export function ChatHeader({
               }`}
               type="button"
               onClick={() => void onToggleFavoriteConversation()}
-              disabled={!activeConversationId || isTogglingFavorite}
+              disabled={!activeConversationId || isTogglingFavorite || isInteractionLocked}
               aria-label={
                 activeConversation?.isFavorite ? "取消收藏会话" : "收藏会话"
               }
@@ -184,6 +188,7 @@ export function ChatHeader({
               }`}
               type="button"
               onClick={onOpenPromptDialog}
+              disabled={isInteractionLocked}
               aria-label="编辑会话级提示词"
             >
               <NotebookPenIcon className="size-4" />

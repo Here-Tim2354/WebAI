@@ -450,8 +450,8 @@ export function ChatInput({
           <p className="px-1 text-xs text-red-500">{attachmentError}</p>
         ) : null}
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Tooltip content={attachmentTooltip}>
               <Button
                 variant="outline"
@@ -600,7 +600,7 @@ export function ChatInput({
           </div>
 
           <Button
-            className="h-8 rounded-[8px] px-1 shadow-[0_10px_18px_rgba(72,115,195,0.13)]"
+            className="h-8 shrink-0 rounded-[8px] px-1 shadow-[0_10px_18px_rgba(72,115,195,0.13)]"
             type="button"
             onClick={() => {
               if (isSubmitting) {

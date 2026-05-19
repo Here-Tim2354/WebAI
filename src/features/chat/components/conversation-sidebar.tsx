@@ -7,6 +7,7 @@ import {
   CameraIcon,
   EllipsisIcon,
   KeyRoundIcon,
+  LoaderCircleIcon,
   LogOutIcon,
   MessageSquareTextIcon,
   PanelLeftCloseIcon,
@@ -67,6 +68,7 @@ type ConversationSidebarProps = {
   isFetchingGeminiModels: boolean;
   updatingFetchedModelId: string | null;
   isSigningOut: boolean;
+  streamingConversationIds: string[];
   currentUser: AuthUser;
   geminiRuntimeConfig: GeminiRuntimeConfig;
   mobileOpen: boolean;
@@ -250,6 +252,7 @@ export function ConversationSidebar({
   isFetchingGeminiModels,
   updatingFetchedModelId,
   isSigningOut,
+  streamingConversationIds,
   currentUser,
   geminiRuntimeConfig,
   mobileOpen,
@@ -299,6 +302,7 @@ export function ConversationSidebar({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const streamingConversationIdSet = new Set(streamingConversationIds);
 
   // 重命名采用“局部编辑态 + 提交后调用父层 API”的模式，
   // 这样侧栏只关心输入交互，不直接碰数据访问细节。
@@ -687,6 +691,7 @@ export function ConversationSidebar({
               const isEditing = conversation.id === editingConversationId;
               const isDeleting = conversation.id === isDeletingConversationId;
               const isArchiving = conversation.id === isArchivingConversationId;
+              const isStreaming = streamingConversationIdSet.has(conversation.id);
 
               return (
                 <div
@@ -732,14 +737,18 @@ export function ConversationSidebar({
                             isCollapsed && "lg:size-9 lg:rounded-[8px]",
                           )}
                         >
-                          <MessageSquareTextIcon className="size-4" />
+                          {isStreaming ? (
+                            <LoaderCircleIcon className="size-4 animate-spin" />
+                          ) : (
+                            <MessageSquareTextIcon className="size-4" />
+                          )}
                         </div>
                         <div className={cn("min-w-0 flex-1", isCollapsed && "lg:hidden")}>
                           <strong className="block truncate text-sm font-medium text-foreground">
                             {conversation.title}
                           </strong>
                           <span className="block text-xs text-muted-foreground">
-                            {formatUpdatedAt(conversation.updatedAt)}
+                            {isStreaming ? "正在回复" : formatUpdatedAt(conversation.updatedAt)}
                           </span>
                         </div>
                       </button>
@@ -764,6 +773,7 @@ export function ConversationSidebar({
                                 setEditingConversationId(conversation.id);
                                 setTitleDraft(conversation.title);
                               }}
+                              disabled={isStreaming}
                             >
                               <PencilLineIcon />
                               重命名
@@ -772,7 +782,7 @@ export function ConversationSidebar({
                               onClick={() =>
                                 void handleArchiveConversationClick(conversation.id)
                               }
-                              disabled={isArchiving}
+                              disabled={isArchiving || isStreaming}
                             >
                               <ArchiveIcon />
                               {isArchiving ? "归档中..." : "归档"}
@@ -783,7 +793,7 @@ export function ConversationSidebar({
                             <DropdownMenuItem
                               variant="destructive"
                               onClick={() => setPendingDeleteConversation(conversation)}
-                              disabled={isDeleting}
+                              disabled={isDeleting || isStreaming}
                             >
                               <Trash2Icon />
                               {isDeleting ? "删除中..." : "删除"}
@@ -1042,7 +1052,7 @@ export function ConversationSidebar({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 border-t border-border/60 bg-slate-50/45 px-7 py-4">
-            <section className="flex items-start gap-4">
+            <section className="flex flex-col items-start gap-4 sm:flex-row">
               <UserAvatar user={currentUser} className="size-14 rounded-[10px] text-base" />
               <div className="min-w-0 flex-1">
                 <strong className="block truncate text-base font-medium text-foreground">
@@ -1231,9 +1241,9 @@ export function ConversationSidebar({
                   return (
                     <div
                       key={model.id}
-                      className="group flex min-w-0 items-center gap-4 rounded-[6px] border border-border/65 bg-white px-4 py-2.5"
+                      className="group flex min-w-0 flex-col items-start gap-3 rounded-[6px] border border-border/65 bg-white px-4 py-2.5 sm:flex-row sm:items-center sm:gap-4"
                     >
-                      <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.85fr)_minmax(0,0.9fr)_5rem] items-center gap-4">
+                      <div className="grid w-full min-w-0 flex-1 grid-cols-1 items-start gap-1.5 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,0.9fr)_5rem] sm:items-center sm:gap-4">
                         <div className="min-w-0 truncate text-[0.92rem] font-medium text-foreground">
                           {model.label}
                         </div>
@@ -1254,7 +1264,7 @@ export function ConversationSidebar({
                           {model.catalogMatched ? "支持" : "不支持"}
                         </span>
                       </div>
-                      <div className="flex w-36 shrink-0 items-center justify-end gap-2">
+                      <div className="flex w-full shrink-0 items-center justify-start gap-2 sm:w-36 sm:justify-end">
                         {isUnsupported ? (
                           <span className="h-6 w-12" aria-hidden="true" />
                         ) : (

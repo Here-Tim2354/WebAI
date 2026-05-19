@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircleIcon } from "lucide-react";
+import { AlertCircleIcon, KeyRoundIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +46,8 @@ type ChatShellProps = {
   initialAuthMessageType?: "info" | "error";
 };
 
+const AUTH_NOTICE_STORAGE_KEY = "webai:auth-notice";
+
 // 前端链路既可能抛 Error，也可能抛非 Error 值，需要统一收口成人类可读消息。
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
@@ -68,6 +70,9 @@ export function ChatShell({
 }: ChatShellProps) {
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
+  const [authPanelMessage, setAuthPanelMessage] = useState(initialAuthMessage);
+  const [authPanelMessageType, setAuthPanelMessageType] =
+    useState<"info" | "error">(initialAuthMessageType);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const autoFetchedGeminiModelsForUserRef = useRef<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -86,7 +91,8 @@ export function ChatShell({
     draftAttachments,
     isUploadingAttachments,
     isUrlContextPanelOpen,
-    isSubmitting,
+    streamingTasks,
+    isConversationSubmitting,
     setUrlContextInputValue,
     setDraftAttachments,
     getMessages,
@@ -159,6 +165,9 @@ export function ChatShell({
     scrollToLatest,
   } = useMessageScroll({ messages });
   const hasMessages = messages.length > 0;
+  const shouldShowApiKeyNotice = !geminiRuntimeConfig.apiKey;
+  const isActiveConversationSubmitting =
+    isConversationSubmitting(activeConversationId);
 
   const activeGeminiRuntimeConfig =
     Object.keys(geminiRuntimeConfig).length > 0
@@ -266,6 +275,8 @@ export function ChatShell({
       }
 
       setUser(null);
+      setAuthPanelMessage("已退出登录。");
+      setAuthPanelMessageType("info");
       resetAfterSignOut();
       router.refresh();
     } catch (error) {
@@ -329,6 +340,70 @@ export function ChatShell({
     selectedModelId,
     setWorkspaceError,
     upsertConversation,
+  ]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const notice = window.sessionStorage.getItem(AUTH_NOTICE_STORAGE_KEY);
+
+    if (!notice) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(AUTH_NOTICE_STORAGE_KEY);
+    showWorkspaceNotice({
+      id: Date.now(),
+      type: "success",
+      title: notice,
+      description: "你的会话工作区已经准备好。",
+    }, 2600);
+  }, [showWorkspaceNotice, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "n") {
+        return;
+      }
+
+      const target = event.target;
+      const isEditingText =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if (isEditingText) {
+        return;
+      }
+
+      event.preventDefault();
+
+      void handleCreateConversation().catch(() => {
+        showWorkspaceNotice({
+          id: Date.now(),
+          type: "error",
+          title: "新建对话失败",
+          description: "请稍后再试。",
+        }, 3000);
+      });
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    handleCreateConversation,
+    showWorkspaceNotice,
+    user,
   ]);
 
   const handleCopyMessage = useCallback(async (message: { content: string }) => {
@@ -557,8 +632,8 @@ export function ChatShell({
   if (!user) {
     return (
       <AuthPanel
-        initialMessage={initialAuthMessage}
-        initialMessageType={initialAuthMessageType}
+        initialMessage={authPanelMessage}
+        initialMessageType={authPanelMessageType}
       />
     );
   }
@@ -583,6 +658,7 @@ export function ChatShell({
           isFetchingGeminiModels={isFetchingGeminiModels}
           updatingFetchedModelId={updatingFetchedModelId}
           isSigningOut={isSigningOut}
+          streamingConversationIds={Object.keys(streamingTasks)}
           currentUser={user}
           geminiRuntimeConfig={geminiRuntimeConfig}
           mobileOpen={isMobileSidebarOpen}
@@ -617,6 +693,7 @@ export function ChatShell({
             selectedModelId={selectedModelId}
             currentSystemPrompt={currentSystemPrompt}
             isTogglingFavorite={isTogglingFavorite}
+            isInteractionLocked={isActiveConversationSubmitting}
             onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
             onSelectModel={handleSelectModel}
             onToggleFavoriteConversation={handleToggleFavoriteConversation}
@@ -637,6 +714,21 @@ export function ChatShell({
             </div>
           ) : null}
 
+          {shouldShowApiKeyNotice ? (
+            <div className="relative z-10 px-4 pt-4 pb-3 sm:px-6 lg:px-8">
+              <Alert
+                className="rounded-[14px] border-sky-100/90 bg-white/82 text-slate-700 shadow-none"
+                role="status"
+              >
+                <KeyRoundIcon className="size-4 text-sky-600" />
+                <AlertTitle>还没有填写 Gemini API Key</AlertTitle>
+                <AlertDescription>
+                  可以从左下角头像菜单进入 Gemini 设置填写。URL 不填时会使用官方地址。
+                </AlertDescription>
+              </Alert>
+            </div>
+          ) : null}
+
           <section
             className={`relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden ${
               hasMessages ? "px-3 pb-5 sm:px-5 lg:px-8" : "px-4 pb-8 sm:px-6 lg:px-8"
@@ -650,7 +742,7 @@ export function ChatShell({
               messageEndRef={messageEndRef}
               scrollContainerRef={scrollContainerRef}
               loadingHint={isLoadingConversation ? "请稍等，我们正在从数据库同步当前会话。" : null}
-              actionsDisabled={isSubmitting || isLoadingConversation}
+              actionsDisabled={isActiveConversationSubmitting || isLoadingConversation}
               supportsImages={selectedModel?.capabilities.image ?? false}
               supportsFiles={selectedModel?.capabilities.files ?? false}
               isUploadingAttachments={isUploadingAttachments}
@@ -693,8 +785,8 @@ export function ChatShell({
                   onRemoveUrlContextUrl={removeUrlContextUrl}
                   onUploadAttachments={uploadAttachments}
                   onSubmit={handleSendMessage}
-                  onStop={stopStreaming}
-                  isSubmitting={isSubmitting}
+                  onStop={() => stopStreaming(activeConversationId)}
+                  isSubmitting={isActiveConversationSubmitting}
                 />
               </div>
             </div>

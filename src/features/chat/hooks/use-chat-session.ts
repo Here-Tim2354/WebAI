@@ -58,6 +58,14 @@ export type AddUrlContextResult =
   | "invalid"
   | "limit";
 
+type StreamingTaskSnapshot = {
+  assistantMessageId: string;
+};
+
+type StreamingTaskRef = StreamingTaskSnapshot & {
+  abortController: AbortController;
+};
+
 /**
  * useChatSession 管的是“消息交互状态”，不是整个页面状态：
  * 输入框内容、发送中状态、各会话消息缓存都集中收在消息会话层。
@@ -71,13 +79,85 @@ export function useChatSession() {
   const [draftAttachments, setDraftAttachments] = useState<MessageAttachment[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [isUrlContextPanelOpen, setIsUrlContextPanelOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [streamingConversationId, setStreamingConversationId] = useState<
-    string | null
-  >(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const streamingConversationIdRef = useRef<string | null>(null);
-  const streamingAssistantMessageIdRef = useRef<string | null>(null);
+  const [streamingTasks, setStreamingTasks] = useState<
+    Record<string, StreamingTaskSnapshot>
+  >({});
+  const streamingTasksRef = useRef<Record<string, StreamingTaskRef>>({});
+  const isAnyConversationSubmitting = Object.keys(streamingTasks).length > 0;
+
+  const isConversationSubmitting = useCallback((conversationId: string | null) => {
+    return Boolean(conversationId && streamingTasks[conversationId]);
+  }, [streamingTasks]);
+
+  const beginStreamingTask = useCallback((
+    conversationId: string,
+    task: StreamingTaskRef,
+  ) => {
+    if (streamingTasksRef.current[conversationId]) {
+      return false;
+    }
+
+    streamingTasksRef.current = {
+      ...streamingTasksRef.current,
+      [conversationId]: task,
+    };
+    setStreamingTasks((current) => ({
+      ...current,
+      [conversationId]: {
+        assistantMessageId: task.assistantMessageId,
+      },
+    }));
+
+    return true;
+  }, []);
+
+  const updateStreamingAssistantMessageId = useCallback((
+    conversationId: string,
+    assistantMessageId: string,
+  ) => {
+    const task = streamingTasksRef.current[conversationId];
+
+    if (!task || task.assistantMessageId === assistantMessageId) {
+      return;
+    }
+
+    streamingTasksRef.current = {
+      ...streamingTasksRef.current,
+      [conversationId]: {
+        ...task,
+        assistantMessageId,
+      },
+    };
+    setStreamingTasks((current) => {
+      if (!current[conversationId]) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [conversationId]: {
+          assistantMessageId,
+        },
+      };
+    });
+  }, []);
+
+  const endStreamingTask = useCallback((conversationId: string) => {
+    const remainingTaskRefs = { ...streamingTasksRef.current };
+    delete remainingTaskRefs[conversationId];
+    streamingTasksRef.current = remainingTaskRefs;
+
+    setStreamingTasks((current) => {
+      if (!current[conversationId]) {
+        return current;
+      }
+
+      const remainingSnapshots = { ...current };
+      delete remainingSnapshots[conversationId];
+
+      return remainingSnapshots;
+    });
+  }, []);
 
   const getMessages = useCallback((conversationId: string | null) => {
     if (!conversationId) {
@@ -90,7 +170,14 @@ export function useChatSession() {
   const syncConversationMessages = useCallback((
     conversationId: string,
     messages: ChatMessage[],
+    options?: {
+      force?: boolean;
+    },
   ) => {
+    if (streamingTasksRef.current[conversationId] && !options?.force) {
+      return;
+    }
+
     setConversationMessages((current) => ({
       ...current,
       [conversationId]: messages,
@@ -244,26 +331,31 @@ export function useChatSession() {
     }
   }, []);
 
-  const stopStreaming = useCallback(() => {
-    const conversationId = streamingConversationIdRef.current;
-    const assistantMessageId = streamingAssistantMessageIdRef.current;
-
-    if (conversationId && assistantMessageId) {
-      // 同时通知服务端和中断浏览器 fetch：
-      // 服务端负责停止模型流与写 cancelled，前端 abort 负责尽快结束本地 reader。
-      void fetch("/api/chat/cancel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          conversationId,
-          assistantMessageId,
-        }),
-      }).catch(() => null);
+  const stopStreaming = useCallback((conversationId: string | null) => {
+    if (!conversationId) {
+      return;
     }
 
-    abortControllerRef.current?.abort();
+    const task = streamingTasksRef.current[conversationId];
+
+    if (!task) {
+      return;
+    }
+
+    // 同时通知服务端和中断浏览器 fetch：
+    // 服务端负责停止模型流与写 cancelled，前端 abort 负责尽快结束本地 reader。
+    void fetch("/api/chat/cancel", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId,
+        assistantMessageId: task.assistantMessageId,
+      }),
+    }).catch(() => null);
+
+    task.abortController.abort();
   }, []);
 
   const handleSubmit = useCallback(async ({
@@ -286,7 +378,7 @@ export function useChatSession() {
         submittedUrlContextUrls.length === 0 &&
         submittedAttachments.length === 0
       ) ||
-      isSubmitting
+      streamingTasksRef.current[conversationId]
     ) {
       return;
     }
@@ -315,6 +407,14 @@ export function useChatSession() {
     const abortController = new AbortController();
     let currentAssistantMessageId = assistantPlaceholder.id;
     let latestAssistantMessage = assistantPlaceholder;
+    const taskStarted = beginStreamingTask(conversationId, {
+      assistantMessageId: currentAssistantMessageId,
+      abortController,
+    });
+
+    if (!taskStarted) {
+      return;
+    }
 
     // 先乐观写入用户消息和 assistant 占位，让界面立即响应。
     // 如果请求失败，catch 分支会把占位消息转成 error/cancelled 状态。
@@ -327,11 +427,6 @@ export function useChatSession() {
     setUrlContextUrls([]);
     setDraftAttachments([]);
     setIsUrlContextPanelOpen(false);
-    setIsSubmitting(true);
-    setStreamingConversationId(conversationId);
-    streamingConversationIdRef.current = conversationId;
-    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
-    abortControllerRef.current = abortController;
 
     try {
       const response = await fetch("/api/chat", {
@@ -366,9 +461,12 @@ export function useChatSession() {
         assistantPlaceholder,
         replaceMessage,
         onConversationSynced,
+        onAssistantMessageIdChanged(assistantMessageId) {
+          updateStreamingAssistantMessageId(conversationId, assistantMessageId);
+        },
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
-      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
+      updateStreamingAssistantMessageId(conversationId, currentAssistantMessageId);
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (isAbortError(error)) {
@@ -395,16 +493,14 @@ export function useChatSession() {
         nextAssistantMessage,
       );
     } finally {
-      abortControllerRef.current = null;
-      setIsSubmitting(false);
-      setStreamingConversationId(null);
-      streamingConversationIdRef.current = null;
-      streamingAssistantMessageIdRef.current = null;
+      endStreamingTask(conversationId);
     }
   }, [
-    isSubmitting,
+    beginStreamingTask,
+    endStreamingTask,
     markAssistantMessageCancelled,
     replaceMessage,
+    updateStreamingAssistantMessageId,
     updateConversationMessages,
     urlContextUrls,
     draftAttachments,
@@ -433,7 +529,7 @@ export function useChatSession() {
       return;
     }
 
-    if (isSubmitting) {
+    if (streamingTasksRef.current[conversationId]) {
       return;
     }
 
@@ -448,6 +544,14 @@ export function useChatSession() {
     let latestAssistantMessage = assistantPlaceholder;
     let responseAccepted = false;
     let restoredPreviousMessages = false;
+    const taskStarted = beginStreamingTask(conversationId, {
+      assistantMessageId: currentAssistantMessageId,
+      abortController,
+    });
+
+    if (!taskStarted) {
+      return;
+    }
 
     updateConversationMessages(conversationId, (current) => {
       const targetMessageIndex = current.findIndex(
@@ -489,12 +593,6 @@ export function useChatSession() {
 
       return [...nextMessages, assistantPlaceholder];
     });
-    setIsSubmitting(true);
-    setStreamingConversationId(conversationId);
-    streamingConversationIdRef.current = conversationId;
-    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
-    abortControllerRef.current = abortController;
-
     try {
       const response = await fetch(`/api/messages/${messageId}`, {
         method: "PATCH",
@@ -516,7 +614,9 @@ export function useChatSession() {
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         // 重新生成失败时还原旧 assistant 消息，避免用户丢失原回复。
-        syncConversationMessages(conversationId, previousMessages);
+        syncConversationMessages(conversationId, previousMessages, {
+          force: true,
+        });
         restoredPreviousMessages = true;
         throw new Error(payload?.error?.message ?? "编辑消息失败。");
       }
@@ -528,9 +628,12 @@ export function useChatSession() {
         assistantPlaceholder,
         replaceMessage,
         onConversationSynced,
+        onAssistantMessageIdChanged(assistantMessageId) {
+          updateStreamingAssistantMessageId(conversationId, assistantMessageId);
+        },
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
-      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
+      updateStreamingAssistantMessageId(conversationId, currentAssistantMessageId);
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (isAbortError(error)) {
@@ -544,7 +647,9 @@ export function useChatSession() {
 
       if (!responseAccepted) {
         if (!restoredPreviousMessages) {
-          syncConversationMessages(conversationId, previousMessages);
+          syncConversationMessages(conversationId, previousMessages, {
+            force: true,
+          });
         }
         throw error;
       }
@@ -564,18 +669,16 @@ export function useChatSession() {
       );
       throw error;
     } finally {
-      abortControllerRef.current = null;
-      setIsSubmitting(false);
-      setStreamingConversationId(null);
-      streamingConversationIdRef.current = null;
-      streamingAssistantMessageIdRef.current = null;
+      endStreamingTask(conversationId);
     }
   }, [
+    beginStreamingTask,
     conversationMessages,
-    isSubmitting,
+    endStreamingTask,
     markAssistantMessageCancelled,
     replaceMessage,
     syncConversationMessages,
+    updateStreamingAssistantMessageId,
     updateConversationMessages,
   ]);
 
@@ -590,7 +693,7 @@ export function useChatSession() {
     geminiRuntimeConfig,
     onConversationSynced,
   }: RegenerateAssistantMessageOptions) => {
-    if (isSubmitting) {
+    if (streamingTasksRef.current[conversationId]) {
       return;
     }
 
@@ -607,6 +710,14 @@ export function useChatSession() {
     let latestAssistantMessage = assistantPlaceholder;
     let responseAccepted = false;
     let restoredPreviousMessages = false;
+    const taskStarted = beginStreamingTask(conversationId, {
+      assistantMessageId: currentAssistantMessageId,
+      abortController,
+    });
+
+    if (!taskStarted) {
+      return;
+    }
 
     updateConversationMessages(conversationId, (current) => {
       const targetMessageIndex = current.findIndex(
@@ -652,11 +763,6 @@ export function useChatSession() {
     setUrlContextUrls([]);
     setDraftAttachments([]);
     setIsUrlContextPanelOpen(false);
-    setIsSubmitting(true);
-    setStreamingConversationId(conversationId);
-    streamingConversationIdRef.current = conversationId;
-    streamingAssistantMessageIdRef.current = currentAssistantMessageId;
-    abortControllerRef.current = abortController;
 
     try {
       const response = await fetch(`/api/messages/${messageId}/regenerate`, {
@@ -683,7 +789,9 @@ export function useChatSession() {
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         // 编辑失败时恢复原消息列表，避免前端停在一个服务端没有接受的乐观状态。
-        syncConversationMessages(conversationId, previousMessages);
+        syncConversationMessages(conversationId, previousMessages, {
+          force: true,
+        });
         restoredPreviousMessages = true;
         throw new Error(payload?.error?.message ?? "重新生成失败。");
       }
@@ -695,9 +803,12 @@ export function useChatSession() {
         assistantPlaceholder,
         replaceMessage,
         onConversationSynced,
+        onAssistantMessageIdChanged(assistantMessageId) {
+          updateStreamingAssistantMessageId(conversationId, assistantMessageId);
+        },
       });
       currentAssistantMessageId = result.currentAssistantMessageId;
-      streamingAssistantMessageIdRef.current = currentAssistantMessageId;
+      updateStreamingAssistantMessageId(conversationId, currentAssistantMessageId);
       latestAssistantMessage = result.latestAssistantMessage;
     } catch (error) {
       if (restoredPreviousMessages) {
@@ -715,7 +826,9 @@ export function useChatSession() {
 
       if (!responseAccepted) {
         if (!restoredPreviousMessages) {
-          syncConversationMessages(conversationId, previousMessages);
+          syncConversationMessages(conversationId, previousMessages, {
+            force: true,
+          });
         }
         throw error;
       }
@@ -735,18 +848,16 @@ export function useChatSession() {
       );
       throw error;
     } finally {
-      abortControllerRef.current = null;
-      setIsSubmitting(false);
-      setStreamingConversationId(null);
-      streamingConversationIdRef.current = null;
-      streamingAssistantMessageIdRef.current = null;
+      endStreamingTask(conversationId);
     }
   }, [
+    beginStreamingTask,
     conversationMessages,
-    isSubmitting,
+    endStreamingTask,
     markAssistantMessageCancelled,
     replaceMessage,
     syncConversationMessages,
+    updateStreamingAssistantMessageId,
     updateConversationMessages,
   ]);
 
@@ -757,8 +868,9 @@ export function useChatSession() {
     draftAttachments,
     isUploadingAttachments,
     isUrlContextPanelOpen,
-    isSubmitting,
-    streamingConversationId,
+    isAnyConversationSubmitting,
+    streamingTasks,
+    isConversationSubmitting,
     setUrlContextInputValue,
     setUrlContextUrls,
     setDraftAttachments,
