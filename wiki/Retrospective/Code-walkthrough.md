@@ -712,7 +712,10 @@ const Textarea = React.forwardRef<
 
 由于我写的是code-walkthrough，先按照文件顺序来。并且与wiki不同，是基于代码的。
 
-## auth-panel.tsx
+## components
+
+所有的组件。
+### auth-panel.tsx
 
 负责登录页面。职责：
 - 展示登录页视觉
@@ -763,7 +766,7 @@ const Textarea = React.forwardRef<
 ![[Pasted image 20260515220739.png]]
 
 
-## chat-header.tsx
+### chat-header.tsx
 
 聊天工作区的头部控制栏。负责移动端侧栏入口，模型选择，收藏当前会话，编辑会话级提示词。
 
@@ -797,7 +800,7 @@ const Textarea = React.forwardRef<
 2. 中间的模型选择菜单，是`DropdownMenu`。并且可以根据模型的能力展示其类型：![[Pasted image 20260515222325.png|379]]
 3. 右侧的收藏和会话级提示词修改内容顾名思义。
 
-## chat-input.tsx
+### chat-input.tsx
 
 即聊天页面的底部聊天区。
 
@@ -841,7 +844,7 @@ const Textarea = React.forwardRef<
 红框所示：
 ![[Pasted image 20260515224105.png]]
 
-## chat-shell.tsx
+### chat-shell.tsx
 
 真正的核心。用于拼接整个网页绝大部分元素。用户在登陆之后，该文件负责将各种组件拼接在一起。并且从：
 1. `useChatSession`，管理当前聊天消息层面的。
@@ -921,3 +924,344 @@ return (
 );
 ```
 
+### code-block
+
+负责代码块的渲染。采用了`highlight.js`的渲染。如果传入的`language`无法识别，就使用`highlightAuto`来自动高亮。
+
+代码框右上角支持复制按钮，复制走的是`Clipboard API`，如果失败，则采用`fallbackCopyText`函数，走`execCommand`的方式。
+
+最后返回的结构如图：
+
+### conversation-sidebar.tsx
+
+负责左侧的会话sidebar。包括了一系列的会话导航和管理。
+
+先有一系列的工具函数：
+1. `formatUpdatedAt`：负责将会话列表展示时间格式化为`5/17 23:05`这种格式
+2. `formatFetchedModelCapabilities`：将Fetched的模型，根据其`capabilities`，给其添加上`联网，视觉...`等标签
+3. `getAvatarFallback`：用户刚注册时，使用`UserRoundIcon`这种`Fallback`，即未设置头像时的采用的默认图
+4. `getAvatarImageSrc`：获取用户头像URL的实际地址，返回一个URL，这个URL就是`/api/profile/avatar?path-...`，便于发送请求到API端
+5. `UserAvatar`：利用上述有关用户头像的函数，负责返回用户头像的组件
+6. `WebAILogo`：获取本项目的LOGO，返回组件
+7. `getUserDisplayName`：简单的一个解析函数，返回`user.displayName/email.trim()`。若都不存在，返回`WebAI 用户`
+
+解读`ConversationSidebar`这个超大的函数：
+1. `useState`定义一系列可能需要前端反馈的状态
+2. 一系列的`handle...`，绝大部分都是设置状态后，简单中转一层函数，调用由`ConversationSidebarProps`解包得来的一系列自定义`Hook`提供的函数，处理各种各样的前端事件。可能会有错误处理。
+3. `const sidebarContent`，定义了一个组件，这个组件是共享侧栏内容的，避免移动端和桌面端出现不一致的情况。结构大致为：
+```tsx
+const sidebarContent = (
+  <div>
+    顶部品牌区 / 折叠按钮
+
+    新对话按钮
+
+    最近对话列表区域
+      ScrollArea
+        如果没有会话：显示空状态
+        如果有会话：map(conversations)
+          每个会话项
+            如果正在编辑：显示重命名 Input 表单
+            否则：显示会话按钮 + 操作菜单
+
+    底部用户区域
+      用户头像 / 昵称 / 邮箱
+      用户菜单：账户、收藏、归档、Gemini、退出
+  </div>
+);
+```
+
+
+最后返回的组件大致结构如下：
+```tsx
+<>
+  桌面端侧栏 aside
+  移动端侧栏 Sheet
+  收藏会话 Dialog
+  归档会话 Dialog
+  个人账户 Dialog
+  Gemini 设置 Dialog
+  删除确认 Dialog
+</>
+```
+### markdown-message.tsx
+
+用于渲染AI返回的Markdown信息。专门适配了`cjk`和`Latex`行间行级公式的处理。
+
+函数解读：
+1. `isSingleDollarDelimiter`和`isEscaped`都是判断一个美元符号`$`到底是不是一个单独的美元符号，避免被识别为公式
+2. `containsCjkNaturalLanguage`：判断一段字符串里是否存在中日韩文字，采用正则。避免被识别为公式。配合下方的`escapeCjkContaminatedSingleDollarMath`来去掉`$中文$`的样子。后者会自动添加转义。
+3. `normalizeSingleLineDisplayMath`，处理单行块级公式
+4. `extractTextContent`：从React节点中递归提取纯文本
+5. `MarkdownMessage`，最后返回的组件。真正负责把聊天消息正文渲染为富文本。
+
+### message-attachments.tsx
+
+负责消息附件的前端展示与编辑弹窗。会在`chat-input.tsx`和`message-bubble.tsx`中用到。
+
+定义了一系列的工具函数：
+1. `getAttachmentLabel`：返回附件显示名称
+2. `isConvertedXlsxAttachment`：判断附件是否为`xlsx`文件。
+3. `ImagePreviewPortal`：渲染图片的放大预览层
+4. `AttachmentPreviewList`：展示一组附件预览
+5. `AttachmentEditorDialog`：渲染“修改附加项”的弹窗
+
+
+### message-bubble.tsx
+
+负责渲染聊天气泡。定义了外部传入的`MessageBubbleProps`，用于提供一系列的配置，包括：
+1. 是否中断？
+2. 允许重新生成？
+3. 支持图片/文件
+4. 正在上传附件？
+5. 一系列的`on...`的外部Hooks
+
+工具函数：
+1. `isCjkCharacter`：判断一个字符是否为CJK字符。对于中日韩文字，它们应当逐字流式输出，而非一个基于空格的一个单词。
+2. `isWordCharacter`：判断一个字符是否为英文或者数字。
+3. `splitStreamingUnits`：将文本拆分成逐个显示的小单元，便于流式输出。拆分规则为
+	-   \r` 直接忽略
+	- `\n` 单独保留
+	- 空格和 tab 会合并成一个块
+	- CJK 字符按单字拆
+	- 英文/数字按短片段拆，不超过三个字符
+	- 其他符号按单字符拆
+4. `getQueuedContent`：将当前已经显示的内容`baseContent`和还在队列中等待揭示的内容拼接。
+5. `getRevealBatchSize`：动态调整揭示的单位。如果队列挤压的词很多，则一次吐出更多的字符数量。
+6. `getRevealDelay`：动态调整揭示的延迟。如果队列挤压的词很多，则延迟越短
+
+流式消息组件`StreamingMarkdown`：
+1. 维护一系列的`useState`和`useRef`指向。比如`displayContent`，`isFreshReveal`，`queuedUnitsRef`，`revealGlowTimerRef`，`displayContentRef`
+2. 第一个`useEffect`：同步最新的`displayContent`到ref中
+3. 第二个`useEffect`：维护组件卸载时的清理定时器
+4. 第三个`useEffect`：流式逻辑的主控制器。如果似乎`reduced motion`模式，则取消流式。若内容不是单调增长，则重置显示的内容。如果是单调增长，则把新增的部分拆分成单元发送到`queuedUnitsRef.current`中。然后启动`flushQueue`，从待揭示队列中去一批内容放到`displayContent`，然后递归安排下一次更新。
+5. 最后返回一个能实时展示Markdown，又能表达生成状态的消息正文UI。
+
+思考摘要组件`ThinkingSummary`，把`assistant`的`thinking metadata`渲染成一个可以折叠的摘要卡片。根据状态显示：
+- `思考中`
+- `已思考`
+- `已停止`
+- `思考失败`
+并且默认折叠，点击后展开内容。
+
+然后是主消息的气泡组件`MessageBubble`，处理一系列比如：
+- 角色识别：`assistant / user / system / error`
+- 状态展示：`pending / streaming / cancelled / error`
+- 普通文本渲染
+- assistant 流式渲染
+- 思考摘要展示
+- user 消息编辑
+- 消息复制
+- 分支
+- 重新生成
+- URL 上下文展示
+- 附件展示
+- 编辑附加项弹窗
+
+定义一系列表示状态的词后：
+1. 第一个`useEffect`：若消息内容或者metadata发生变化，同步到最新消息数据
+2. 定义一系列的`handle...`函数。
+最后返回的组件大致是：
+```tsx
+<MessageBubble>
+  <motion.article>
+    <头部信息区>
+      <角色图标 />
+      <角色标签 />
+      <状态徽标 />
+    </头部信息区>
+
+    <消息主体区>
+      <编辑态>
+        <文本输入框 />
+        <修改附加项按钮 />
+        <URL预览 />
+        <附件预览列表 />
+        <取消按钮 />
+        <保存按钮 />
+      </编辑态>
+
+      <等待占位态>
+        <加载图标 />
+        <状态文本 />
+      </等待占位态>
+
+      <已取消空态 />
+
+      <流式Markdown消息 />
+
+      <普通Markdown消息 />
+    </消息主体区>
+
+    <附加信息区>
+      <已停止标记 />
+      <URL上下文摘要 />
+      <附件预览列表 />
+    </附加信息区>
+
+    <附件编辑弹窗 />
+
+    <操作栏>
+      <复制按钮 />
+      <编辑按钮 />
+      <分支按钮 />
+      <重新生成按钮 />
+    </操作栏>
+  </motion.article>
+</MessageBubble>
+```
+
+### message-list.tsx
+
+承载滚动消息流的消息列表，如果是空的，显示欢迎页面。
+
+其中的两个Ref
+1. `scrollContainerRef`：指向整个消息容器，获取滚动区域。挂在到`ScrollArea`中
+2. `messageEndRef`：指向消息列表最底部的空`div`的ref。用于滚动到消息底部。
+用来提升用户体验。
+
+返回的组件大致为
+```tsx
+<MessageList>
+  <外层容器>
+    <ScrollArea ref={scrollContainerRef}>
+      <内容区域>
+        <空会话欢迎页 />
+        或
+        <消息列表>
+          <MessageBubble />
+          <MessageBubble />
+          <MessageBubble />
+          ...
+          <底部锚点 ref={messageEndRef} />
+        </消息列表>
+      </内容区域>
+    </ScrollArea>
+
+    <跳转到底部按钮>
+      <ArrowDownIcon />
+    </跳转到底部按钮>
+  </外层容器>
+</MessageList>
+```
+
+### message-url-content.tsx
+
+处理用户发送消息附带的一组网页链接，将其添加进metadata中。
+
+`MessageUrlContextSummary`返回一个横向换行的摘要调：
+```tsx
+<MessageUrlContextSummary>
+  <容器>
+    <标题>
+      <链接图标 />
+      <文本>URL Context · 数量</文本>
+    </标题>
+
+    <可见URL链接 />
+    <可见URL链接 />
+    <可见URL链接 />
+
+    <隐藏数量标记 />
+  </容器>
+</MessageUrlContextSummary>
+```
+
+`EditableMessageUrlContent`：用于展示并编辑一组`URL Context`。由聊天发送框的URL按钮触发：
+```tsx
+<EditableMessageUrlContext>
+  <外层卡片>
+    <顶部行>
+      <URL列表摘要>
+        <标题>
+          <链接图标 />
+          <文本>URL Context · 数量</文本>
+        </标题>
+
+        <URL标签>
+          <URL展示文本 />
+          <删除按钮 />
+        </URL标签>
+
+        <隐藏数量标记 />
+      </URL列表摘要>
+
+      <编辑按钮 />
+    </顶部行>
+
+    <展开编辑区>
+      <输入行>
+        <URL输入框 />
+        <添加按钮 />
+      </输入行>
+
+      <错误提示 />
+    </展开编辑区>
+  </外层卡片>
+</EditableMessageUrlContext>
+```
+
+### model-icon.tsx
+
+获取模型的图标。图标放在Supabase的Storage中。
+
+
+### workspace-notice.tsx
+
+在聊天页面的顶部显示一个轻量的，不打算操作的通知条。有三个样式：
+1. `loading`样式
+2. `success`样式
+3. `error`样式
+
+返回组件的结构为：
+```tsx
+<WorkspaceNotice>
+  <固定定位容器>
+    <AnimatePresence>
+      <通知卡片>
+        <图标区域>
+          <NoticeIcon />
+        </图标区域>
+
+        <文字区域>
+          <标题 />
+          <描述 />
+        </文字区域>
+      </通知卡片>
+    </AnimatePresence>
+  </固定定位容器>
+</WorkspaceNotice>
+```
+
+## hooks
+
+一系列的自定义Hooks
+
+### use-chat-sessions.ts
+
+负责聊天工作区的消息交互状态控制。把一系列的“发送消息，编辑消息，重新生成，停止生成，附件上传，URL Context管理”的业务操作联系起来。并导出函数供组件使用。
+
+1. 内部函数`getErrorMessage`获取错误信息。
+2. 一系列的type，定义了一系列业务函数的参数。
+
+然后是Hook：
+1. 定义了一系列的消息相关的状态，URL Context的状态，附件相关的状态，提交流程的状态，流式生成的状态。`useState`管理。
+2. 三个ref。`abortControllerRef`用于当中断生成的请求；`streamingConversationIdRef`保存最新的流式会话的ID；`streamingAssistantMessageIdRef`，保存当前正在流式输出的Assistant消息ID
+3. 定义了一系列的业务函数。这些函数看名字就能知道作用。
+
+### use-chat-workspace.ts
+
+负责会话层级的控制。包括新建、切换、重命名、删除、归档、收藏、恢复、分支、模型选择、系统提示词、联网开关、思考档位，以及草稿态控制。比如：
+- 当前有多少个会话
+- 哪个会话是当前激活的
+- 会话列表怎么排序
+- 新会话怎么创建
+- 会话怎么删除
+- 会话怎么归档和恢复
+- 哪个会话收藏了
+- 当前会话使用哪个模型
+- 当前会话的 system prompt 是什么
+- 当前会话是否启用联网
+- 当前会话的 thinking level 是什么
+
+同样定义了一系列的类型，辅助和业务函数，这些函数看名字就能知道作用。
