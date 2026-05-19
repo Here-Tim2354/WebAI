@@ -2,6 +2,73 @@
 
 这是一份给“重新回到项目时”的快速入口文档。目标不是把所有内容讲完，而是用最短路径恢复你对项目的理解。
 
+## 本地启动路径
+
+项目依赖 Supabase migration。推荐先准备一个自己的 Supabase 云端项目，再用 Supabase CLI 把 `supabase/migrations` 推送到该项目。
+
+### 前置环境
+
+- Node.js 20 或更高版本
+- Supabase CLI
+- Gemini API Key
+
+### 启动步骤
+
+```powershell
+npm install
+Copy-Item .env.example .env
+supabase login
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+如果没有全局安装 Supabase CLI，也可以使用 `npx supabase ...` 执行同样的命令。Windows 环境下更推荐使用已安装好的全局 CLI，减少 npm cache 权限问题。
+
+把 Supabase Dashboard 提供的项目配置写入 `.env`：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=<project url>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+SUPABASE_SECRET_KEY=<service role key>
+```
+
+本地应用与 Gemini 配置：
+
+```env
+APP_ORIGIN=http://localhost:4000
+NEXT_PUBLIC_APP_URL=http://localhost:4000
+GEMINI_API_KEY=<your Gemini API key>
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BASE_URL=
+DEV_AUTH_EMAIL=dev@example.com
+```
+
+启动 Next.js：
+
+```powershell
+npm run dev -- --mode=DEV
+```
+
+访问地址：
+
+```text
+http://localhost:4000
+```
+
+开发环境快捷登录地址：
+
+```text
+http://localhost:4000/api/auth/dev-login
+```
+
+该入口只在开发环境且显式启用 `DEV` 模式时可用，依赖 `.env` 中的 `DEV_AUTH_EMAIL` 和 `SUPABASE_SECRET_KEY`。
+
+本地登录回调至少需要允许：
+
+```text
+http://localhost:4000/auth/confirm
+```
+
 ## 推荐阅读顺序
 
 1. [[plan/phase/phase_overview|phase_overview]]
