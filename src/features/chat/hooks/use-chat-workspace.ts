@@ -12,6 +12,7 @@ import {
   DEFAULT_THINKING_LEVEL,
   ThinkingLevel,
 } from "@/lib/schemas/thinking";
+import { DEFAULT_CONVERSATION_TITLE } from "@/lib/conversation-title";
 
 type UseChatWorkspaceOptions = {
   initialConversations: Conversation[];
@@ -75,6 +76,9 @@ export function useChatWorkspace({
     initialConversations[0]?.id ?? null,
   );
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [optimisticConversationIds, setOptimisticConversationIds] = useState<
+    Set<string>
+  >(new Set());
   const [isDeletingConversationId, setIsDeletingConversationId] = useState<
     string | null
   >(null);
@@ -148,6 +152,18 @@ export function useChatWorkspace({
     });
   }, []);
 
+  const removeConversationFromActiveLists = useCallback((conversationId: string) => {
+    setConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+    setArchivedConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+    setFavoriteConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+  }, []);
+
   const syncFavoriteConversation = useCallback((nextConversation: Conversation) => {
     setFavoriteConversations((current) => {
       const remaining = current.filter(
@@ -176,6 +192,33 @@ export function useChatWorkspace({
     setIsCreatingConversation(true);
     setWorkspaceError(null);
 
+    const conversationId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const shouldActivate = options?.activate ?? true;
+    const previousActiveConversationId = activeConversationId;
+    const optimisticConversation: Conversation = {
+      id: conversationId,
+      title: options?.title ?? DEFAULT_CONVERSATION_TITLE,
+      systemPrompt: options?.systemPrompt?.trim() || null,
+      modelId: options?.modelId ?? null,
+      webSearchEnabled: options?.webSearchEnabled ?? true,
+      thinkingLevel: options?.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
+      status: "active",
+      archivedAt: null,
+      isFavorite: false,
+      favoritedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    upsertConversation(optimisticConversation);
+    syncConversationMessages(conversationId, []);
+    setOptimisticConversationIds((current) => new Set(current).add(conversationId));
+
+    if (shouldActivate) {
+      setActiveConversationId(conversationId);
+    }
+
     try {
       const response = await fetch("/api/conversations", {
         method: "POST",
@@ -183,6 +226,7 @@ export function useChatWorkspace({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          id: conversationId,
           title: options?.title ?? undefined,
           modelId: options?.modelId ?? undefined,
           systemPrompt: options?.systemPrompt ?? undefined,
@@ -212,10 +256,29 @@ export function useChatWorkspace({
       }
 
       return parsed.conversation;
+    } catch (error) {
+      removeConversationFromActiveLists(conversationId);
+      removeConversationMessages(conversationId);
+      setActiveConversationId((current) =>
+        current === conversationId ? previousActiveConversationId : current,
+      );
+      throw error;
     } finally {
+      setOptimisticConversationIds((current) => {
+        const next = new Set(current);
+        next.delete(conversationId);
+        return next;
+      });
       setIsCreatingConversation(false);
     }
-  }, [resetDraftConversationControls, syncConversationMessages, upsertConversation]);
+  }, [
+    activeConversationId,
+    removeConversationFromActiveLists,
+    removeConversationMessages,
+    resetDraftConversationControls,
+    syncConversationMessages,
+    upsertConversation,
+  ]);
 
   // 客户端挂载后同步模型列表，并用返回结果校正可用模型和草稿默认值。
   useEffect(() => {
@@ -268,6 +331,12 @@ export function useChatWorkspace({
     }
 
     const conversationId = activeConversationId;
+
+    if (optimisticConversationIds.has(conversationId)) {
+      setIsLoadingConversation(false);
+      return;
+    }
+
     let cancelled = false;
 
     // 切换会话时按需拉取详情，避免首页一次性把所有历史消息都塞进首屏 payload。
@@ -309,7 +378,12 @@ export function useChatWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [activeConversationId, syncConversationMessages, upsertConversation]);
+  }, [
+    activeConversationId,
+    optimisticConversationIds,
+    syncConversationMessages,
+    upsertConversation,
+  ]);
 
   const handleCreateConversation = useCallback(async () => {
     try {

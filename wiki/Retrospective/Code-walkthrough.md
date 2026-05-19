@@ -1235,33 +1235,421 @@ const sidebarContent = (
 
 ## hooks
 
-一系列的自定义Hooks
+`features/chat/hooks` 是聊天页面的状态编排层。它不直接渲染 UI，也不直接写数据库，而是把组件事件、API 请求、本地乐观状态和服务端返回结果接起来。
 
-### use-chat-sessions.ts
+这一层可以粗略分成四块：
 
-负责聊天工作区的消息交互状态控制。把一系列的“发送消息，编辑消息，重新生成，停止生成，附件上传，URL Context管理”的业务操作联系起来。并导出函数供组件使用。
+1. `use-chat-session.ts`：消息交互层，负责发送、编辑、重新生成、停止生成、附件上传和 URL Context。
+2. `use-chat-workspace.ts`：会话工作区层，负责会话列表、激活会话、会话级控制项和二级管理入口。
+3. `use-fetched-models.ts`：模型设置层，负责 Gemini 模型拉取、启用、默认项和删除。
+4. `use-message-scroll.ts`：消息列表滚动层，负责自动吸底、用户上滑暂停和跳到底部按钮。
 
-1. 内部函数`getErrorMessage`获取错误信息。
-2. 一系列的type，定义了一系列业务函数的参数。
+这样拆的原因是很直观的：`ChatShell` 本身已经承担页面拼装，如果继续把所有状态都写在一个组件里，后面会变成一个巨大组件。Hooks 把“可见组件”和“业务状态机”分开，组件只管展示，Hook 负责告诉组件现在是什么状态、点击后该做什么。
 
-然后是Hook：
-1. 定义了一系列的消息相关的状态，URL Context的状态，附件相关的状态，提交流程的状态，流式生成的状态。`useState`管理。
-2. 三个ref。`abortControllerRef`用于当中断生成的请求；`streamingConversationIdRef`保存最新的流式会话的ID；`streamingAssistantMessageIdRef`，保存当前正在流式输出的Assistant消息ID
-3. 定义了一系列的业务函数。这些函数看名字就能知道作用。
+### use-chat-session.ts
+
+这是消息交互层。它管的是“某个会话里的消息怎么变化”，而不是整个工作区怎么切换。
+
+它承接的功能比较多：
+
+- 普通发送消息：`POST /api/chat`
+- 编辑 user 消息并重新生成：`PATCH /api/messages/[messageId]`
+- 重新生成最新 assistant 消息：`POST /api/messages/[messageId]/regenerate`
+- 停止当前会话的流式生成：`POST /api/chat/cancel`
+- 上传附件：`POST /api/attachments/upload`
+- 管理 URL Context 输入和当前草稿附件
+
+它内部最重要的状态有几组：
+
+1. `conversationMessages`：按 `conversationId` 分组保存消息缓存。
+2. `urlContextInputValue` / `urlContextUrls`：当前输入区的 URL Context 草稿。
+3. `draftAttachments`：当前输入区还没发送的附件草稿。
+4. `isUploadingAttachments`：附件上传状态。
+5. `streamingTasks`：当前哪些会话正在生成。
+6. `streamingTasksRef`：保存真实的 `AbortController`，用于取消生成。
+
+这里同时用 `streamingTasks` 和 `streamingTasksRef` 是有必要的。`streamingTasks` 是给 UI 看，比如按钮是否 loading；`streamingTasksRef` 是给事件函数拿最新的中断控制器。前者需要触发渲染，后者不能因为每次流状态变化都让组件重渲染。
+
+主要函数：
+
+1. `getErrorMessage`：把未知错误转成可展示文案。
+2. `isConversationSubmitting`：判断某个会话是否正在生成。
+3. `beginStreamingTask`：开始一轮生成。若同一个会话已经有生成任务，就直接拒绝，避免并发写同一个会话。
+4. `updateStreamingAssistantMessageId`：服务端创建真实 assistant 消息后，更新当前流式任务的消息 ID。
+5. `endStreamingTask`：清理一轮生成任务。
+6. `syncConversationMessages`：用服务端快照同步某个会话的消息。
+7. `removeConversationMessages`：删除某个会话在前端缓存里的消息。
+8. `getMessages`：按当前会话 ID 读取消息列表。
+9. `updateConversationMessages`：以函数式方式修改某个会话消息，避免直接改原数组。
+10. `replaceMessage`：把一条占位消息替换成服务端返回的新消息。
+11. `markAssistantMessageCancelled`：把正在生成的 assistant 消息改成 `cancelled`。
+12. `addUrlContextUrl` / `removeUrlContextUrl` / `toggleUrlContextPanel`：管理 URL Context 输入。
+13. `uploadAttachments`：上传文件并返回 `MessageAttachment[]`。
+14. `stopStreaming`：中断当前会话生成，同时通知服务端把 assistant 消息改成 cancelled。
+15. `submitMessage`：发送普通消息的主流程。
+16. `editMessageAndRegenerate`：编辑 user 消息后，截断后文并重新生成 assistant。
+17. `regenerateAssistantMessage`：重新生成某条 assistant 消息。
+
+`submitMessage` 的流程比较能代表这个 Hook 的设计：
+
+```txt
+构造 user 消息和 assistant 占位消息
+  -> 本地先乐观追加到 conversationMessages
+  -> 请求 /api/chat
+  -> consumeAssistantStream 消费服务端 NDJSON 流
+  -> 不断 replaceMessage 更新 assistant 气泡
+  -> 流结束后清理 streaming task
+```
+
+这里的重点是“前端先有占位气泡”。否则用户点击发送后要等服务端创建消息成功才看到反馈，流式体验会慢一拍。
+
+编辑和重新生成则多了一层回滚逻辑：如果服务端还没接受请求就失败，会恢复 `previousMessages`，避免页面停在一个数据库没有承认的乐观状态。当然如果服务端已经开始返回流了，后续错误就会落到 assistant 消息本身的 `error` 状态里。
 
 ### use-chat-workspace.ts
 
-负责会话层级的控制。包括新建、切换、重命名、删除、归档、收藏、恢复、分支、模型选择、系统提示词、联网开关、思考档位，以及草稿态控制。比如：
-- 当前有多少个会话
-- 哪个会话是当前激活的
-- 会话列表怎么排序
-- 新会话怎么创建
-- 会话怎么删除
-- 会话怎么归档和恢复
-- 哪个会话收藏了
-- 当前会话使用哪个模型
-- 当前会话的 system prompt 是什么
-- 当前会话是否启用联网
-- 当前会话的 thinking level 是什么
+这是会话工作区层。它管的是“当前打开哪个会话、会话列表怎么维护、会话级控制项是什么”，比 `use-chat-session` 更外层。
 
-同样定义了一系列的类型，辅助和业务函数，这些函数看名字就能知道作用。
+它管理的状态主要有：
+
+1. `conversations`：普通 active 会话列表。
+2. `archivedConversations`：归档区会话列表。
+3. `favoriteConversations`：收藏区会话列表。
+4. `activeConversationId`：当前激活会话。
+5. `availableModels`：当前聊天可用模型。
+6. `draftModelId` / `draftSystemPrompt` / `draftWebSearchEnabled` / `draftThinkingLevel`：空白首页还没创建会话时的草稿控制项。
+7. 各种 loading 状态：创建、删除、归档、恢复、加载收藏、加载归档等。
+
+这里最值得注意的是“草稿态控制项”。空白首页还没有 `conversationId`，但用户仍然可以先选模型、改 system prompt、开关联网、调整 thinking level。真正发送第一条消息时，`ensureConversationId` 才创建会话，并把这些草稿控制项一起写进数据库。
+
+这就是它的设计重点：**会话存在前，控制项是本地草稿；会话存在后，控制项是数据库里的会话配置。**
+
+主要函数：
+
+1. `getErrorMessage`：错误文案兜底。
+2. `getDefaultModelId`：从模型列表里找默认模型，找不到就取第一个。
+3. `sortConversations`：按 `updatedAt` 倒序排序，让最近活动会话靠前。
+4. `resetDraftConversationControls`：把空白会话草稿控制项重置回默认值。
+5. `syncAvailableModels`：同步可用模型列表，并校正草稿模型 ID。
+6. `upsertConversation`：有则更新，无则插入，然后重新排序。
+7. `syncFavoriteConversation`：维护收藏区列表，收藏就插入，取消收藏就移除。
+8. `createConversation`：调用 `/api/conversations` 创建会话，并同步空消息数组。
+9. `patchConversationControls`：统一 PATCH 会话级控制项，比如标题、模型、system prompt、联网、thinking。
+10. `saveSystemPrompt`：保存当前会话或草稿态的 system prompt。
+11. `toggleWebSearchEnabled`：切换联网。已有会话走 PATCH，空白态只改草稿。
+12. `handleDeleteConversation`：乐观删除会话，失败时恢复三份列表和激活会话。
+13. `loadArchivedConversations` / `loadFavoriteConversations`：加载归档区和收藏区。
+14. `handleToggleFavoriteConversation`：收藏 / 取消收藏，先乐观更新，失败再回滚。
+15. `handleSelectThinkingLevel`：切换思考档位。
+16. `handleArchiveConversation` / `handleRestoreConversation`：归档和恢复。
+17. `handleBranchConversation`：从某条消息创建分支会话，并同步返回的完整消息快照。
+18. `ensureConversationId`：如果当前没有会话，就用草稿配置创建一个。
+19. `resetAfterSignOut`：退出登录后清理工作区状态。
+
+它有两个比较关键的 `useEffect`：
+
+1. 进入工作区后重新拉取 `/api/models`，用服务端最新启用模型校正前端模型列表。
+2. `activeConversationId` 变化时拉取 `/api/conversations/[conversationId]`，同步会话和完整消息快照。
+
+这两个 effect 里都有 `cancelled` 标记。原因是切换会话可能很快，旧请求如果后返回，不应该把旧会话消息覆盖到新会话上。
+
+### use-fetched-models.ts
+
+这是 Gemini 模型设置层。它服务的不是普通聊天发送，而是“用户自己的模型列表怎么管理”。
+
+它对应四类 API：
+
+1. 读取当前用户已拉取的模型：`GET /api/models/fetched`
+2. 用用户填写的 API Key / Base URL 拉取 Gemini 模型：`POST /api/models/gemini/fetch`
+3. 启用、停用、设为默认模型：`PATCH /api/models/fetched/[modelId]`
+4. 删除某个已拉取模型：`DELETE /api/models/fetched/[modelId]`
+
+内部状态很少，但边界很重要：
+
+1. `fetchedModels`：完整模型列表，给 Gemini 设置弹窗看。
+2. `isLoadingFetchedModels`：正在读取已保存模型。
+3. `isFetchingGeminiModels`：正在请求 Gemini 远端模型列表。
+4. `updatingFetchedModelId`：当前正在操作哪一条模型记录。
+
+核心函数是 `syncFetchedModelState`：
+
+```ts
+setFetchedModels(models);
+onAvailableModelsSynced(models.filter((model) => model.isEnabled));
+```
+
+这段说明了它的真正作用：同一份服务端模型列表，被拆成两种前端状态。
+
+- Gemini 设置弹窗需要完整列表，包括未启用、不支持、默认项等信息。
+- 聊天顶部模型选择只应该看到 `isEnabled` 的模型。
+
+主要函数：
+
+1. `getErrorMessage`：错误文案兜底。
+2. `syncFetchedModelState`：同步完整 fetched 列表，同时把已启用模型推给聊天运行时。
+3. `loadFetchedModels`：读取数据库中当前用户的 fetched models。
+4. `fetchGeminiModels`：保存本机 Gemini 运行时配置，并调用服务端拉取远端模型列表。
+5. `updateFetchedModel`：启用 / 停用模型，或者设置默认模型。
+6. `deleteFetchedModel`：删除用户列表里的某个 fetched model。
+
+这里更新和删除都不做前端局部猜测，而是等待服务端返回完整列表。因为默认模型唯一性、不支持模型不能启用、删除默认模型后的处理，这些都属于服务端和数据库规则。前端只发意图，最终状态以服务端返回为准。
+
+### use-message-scroll.ts
+
+这是消息列表滚动层。它只管用户读消息时的滚动体验。
+
+它解决的问题很具体：AI 正在流式输出时，页面通常应该自动滚到底部；但用户一旦主动向上滚去看历史消息，就不能继续把他拉回底部。
+
+主要状态：
+
+1. `messageEndRef`：消息列表末尾的空 `div`，用于 `scrollIntoView`。
+2. `scrollContainerRef`：滚动容器。
+3. `showJumpToLatest`：是否显示“跳转到底部”按钮。
+4. `shouldStickToBottomRef`：是否应该自动吸底。
+5. `isAutoScrollPausedByUserRef`：是否因为用户上滑而暂停自动滚动。
+6. `scrollIntentRef`：用户滚动意图，`up` 或 `down`。
+7. `lastScrollTopRef` / `lastTouchYRef`：记录上一次滚动位置，用于判断方向。
+
+这里大量使用 `useRef`，原因是滚动事件非常高频。像 `scrollTop`、触摸坐标、是否暂停吸底这些行为状态，不应该每变化一次就触发 React 重新渲染。只有 `showJumpToLatest` 这种真正影响 UI 可见性的值才用 `useState`。
+
+主要函数：
+
+1. `isNearBottom`：判断当前滚动位置距离底部是否小于阈值。这里留了 80px 缓冲，避免轻微滚动就打断吸底。
+2. `getOverlayViewport`：从 DOM 根节点里找到 OverlayScrollbars 真正的滚动 viewport。
+3. `getScrollElement`：从滚动事件中找到应该读取 `scrollTop` 的元素。
+4. `pauseAutoScroll`：用户上滑时暂停自动吸底，并显示跳到底部按钮。
+5. `resumeAutoScrollIfAtBottom`：用户重新滚回底部附近时恢复自动吸底。
+6. `scrollToLatest`：给跳到底部按钮用，滚到底部并恢复自动吸底。
+7. `handleScroll`：核心滚动处理函数，判断用户是在上滑、下滑还是已经回到底部。
+8. `handleWheelCapture`：桌面端滚轮方向判断，向上滚时立即暂停自动吸底。
+9. `handleTouchStartCapture` / `handleTouchMoveCapture`：移动端用手指 Y 坐标差值判断滚动意图。
+
+这些函数基本都用 `useCallback` 包起来，不只是为了性能。更重要的是这些函数会被传给 `ScrollArea` 和 `MessageList`，而且滚动事件非常频繁。函数引用稳定，事件绑定和 memo 组件就更稳定。
+
+还有一个 `useEffect` 监听 `messages`：
+
+```txt
+messages 变化
+  -> 如果 shouldStickToBottom 为 true，就滚到 messageEndRef
+  -> 如果用户已经暂停自动吸底，就只显示跳到底部按钮
+  -> 如果消息为空，就重置滚动状态
+```
+
+所以这个 Hook 的本质不是“每次有消息就滚到底”，而是维护一个更像聊天产品的阅读规则：用户在底部，就跟随新回复；用户在看历史，就不要打扰他。
+
+## lib
+
+features\chat的内部专用工具层。提供给`component,hook`的可复用工具。
+
+### attachment-client.ts
+
+聊天附件输入的客户端预校验工具。主要在`ChatInput`和`MessageAttachments`中使用。拦截明显不合法的文件。
+
+1. `getAttachmentAcceptMimeTypes`：获取支持的附件类型
+2. `isSupportedByCurrentModel`：看文件拓展名和浏览器给的`MIME`是否被模型所支持。
+3. `getAttachmentFileValidationError`：校验函数。
+4. `getFileSizeLimit`：根据文件类型决定返回大小上限
+
+### chat-stream.ts
+
+服务于`useChatSession`。服务端的`/api/chat`或消息重新生成接口会持续返回一行一行的JSON事件，将读取，拆解，校验事件，更新`Assistant`消息和同步`conversation`集中到一个文件中。
+
+1. `mergeAssistantMessageParts`：将服务端返回的`assistant`消息快照，合并为更适合本地展示的消息结构。若内容是旧内容的延长，只把新增的文本追加到part。如果不是，说明服务端出了问题，用完整文本重建parts。
+2. `createCancelledAssistantMessege`：把一个assistant消息转换为`cancelled`状态。
+3. `consumeAssistantStream`：主函数，负责消费服务端数据流。根据事件类型，更新本地消息或者会话。
+
+### clipboard.ts
+
+给复制消息操作使用的工具。
+
+1. `copyTextWithFallback`：一旦浏览器提供的复制接口不可用，则创建一个不可见的`textarea`，然后调用`document.execCommand("copy")`来复制。无论成功与否，都会移出这个临时`textarea`
+2. `copyTextToClipboard`：走现代的`Clipboard API`
+
+### gemini-runtime-config.ts
+
+对Gemini本机运行时配置管理，管理用户填写的
+1. Gemini API Key
+2. Gemini Base URL
+这些保存在浏览器的`localStorage`，不会进入数据库。
+
+一些函数：
+1. `getGemini RuntimeCOnfigStorageKey`：根据用户id生成`localStorage key`
+2. `normalizeGeminiRuntimeConfig`：规范化
+3. `loadStoredGeminiRuntimeConfig`：加载
+4. `removeStoredGeminiRuntimeConfig`：清除
+5. `useGeminiRuntimeConfig`，主要的Hook，返回三个工具函数`geminiRuntimeConfig,saveGeminiRuntimeConfig,clearGeminiRuntimeConfig`。
+
+### motion-presets.ts
+
+聊天的动画参数集合。便于组件复用。
+
+### url-context.ts
+
+聊天URL Context输入的前端工具，负责URL数量上限，展示文本和输入标准化。
+
+1. `getUrlDisplayText`：展示的URL短文本
+2. `normalizedUrlCandidate`：规范化
+3. `areUrlListEqual`：按顺序比较两个URL列表是否完全相同，用语编辑URL后的判断
+
+
+# lib
+
+全局业务层，负责真正的后端业务逻辑。服务于整个应用的数据契约，AI调用，环境配置，安全限制。
+
+```
+src/lib
+├─ ai/
+│  ├─ assistant-stream-response.ts
+│  ├─ gemini-base-url.ts
+│  ├─ gemini-model-catalog.ts
+│  ├─ gemini-model-normalizer.ts
+│  ├─ gemini.ts
+│  ├─ index.ts
+│  ├─ stream-control.ts
+│  ├─ system-instruction.ts
+│  └─ types.ts
+│
+├─ env/
+│  ├─ app-origin.ts
+│  ├─ server.ts
+│  └─ supabase.ts
+│
+├─ schemas/
+│  ├─ auth.ts
+│  ├─ chat.ts
+│  ├─ conversation.ts
+│  ├─ model.ts
+│  └─ thinking.ts
+│
+├─ supabase/
+│  ├─ auth.ts
+│  ├─ conversations.ts
+│  ├─ messages.ts
+│  ├─ model-registry.ts
+│  ├─ profiles.ts
+│  ├─ proxy.ts
+│  └─ server.ts
+│
+├─ attachment-capabilities.ts
+├─ attachment-config.ts
+├─ attachments.ts
+├─ conversation-title.ts
+├─ network-errors.ts
+├─ rate-limit.ts
+└─ utils.ts
+```
+
+## ai
+
+AI的服务于流式生成层。负责Gemini相关的服务端逻辑。
+- index.ts：AI 统一入口。
+- gemini.ts：Gemini SDK adapter。
+- assistant-stream-response.ts：生成 + 落库 + NDJSON 响应编排。
+- stream-control.ts：当前进程内的取消生成控制。
+- gemini-base-url.ts：自定义 endpoint 安全边界。
+- gemini-model-catalog.ts：产品认可的模型能力目录。
+- gemini-model-normalizer.ts：远端模型列表标准化。
+- system-instruction.ts：system prompt 合并。
+- types.ts：AI 层共享流式类型。
+### index.ts
+
+AI层的统一入口。接受项目统一的`ChatMessage[]`和生成选项，然后转发给`streamWithGemini`
+
+### gemini.ts
+
+利用Gemini的原生SDK调用层，负责把WebAI的统一消息转换为`Content[]`，然后调用`generateContentStream`
+
+主要函数：
+1. `normalizeUrls`：规范化URL
+2. `withUrlContextPrompt`把URL Context临时拼接到最后一条user消息里
+3. `toGeminiAttachmentParts`：把消息附件转成Gemini能够理解的parts
+4. `toGeminiContents`：把`ChatMessage[]`转换成`Gemini SDK`的`content[]`。首先过滤空消息，把`user,assistant`映射为`user,model`。从设计上只会给最新的user消息附加二进制文件，历史消息保留正文。
+5. `streamWithGemini`：调用主函数，返回`AsyuncGenerator<AssistantStreamDelta>`。
+	1. 读取 API Key 和 Base URL。
+	 2. 标准化 Gemini Base URL。
+	 3. 合并 URL Context。
+	 4. 生成 system instruction。
+	 5. 转换 messages 为 Gemini contents。
+	 6. 创建 GoogleGenAI client。
+	 7. 调用 client.models.generateContentStream。
+	 8. 把 Gemini chunk 统一转成 `{ type, delta }`。
+
+### assistant-stream-response.ts
+
+AI生成与数据库之间的编排层。负责创建 assistant 占位消息、消费 AI delta、节流写库、推送 NDJSON 事件、处理取消和错误。
+
+1. `createStreamEventChunk`：把一个流事件转换为NDJSON行
+2. `isAbortError`：判断是否是取消请求导致的错误
+3. `createStreamResponse`：把`ReadableStream<Uint8Array>`类型的`stream`转换为`HTTP Response`。
+4. `getAssistantFailureContent`：获取失败信息
+5. `createAssistantStreamResponse`：主函数。核心流程是：
+	1. 先创建一条空 assistant 消息，状态 pending。
+	2. 注册当前 conversation 的 AbortController，供 /api/chat/cancel 中断。
+	3. 创建 ReadableStream。
+	4. 立即推送 assistant-message-created。
+	5. 调用 streamAssistantReply 获取 Gemini delta。
+	6. 每个 delta 更新本地 assistant 快照，并推送 assistant-message-updated。
+	7. 每 120ms 节流写入数据库一次。
+	8. 完成后写入最终 complete 状态。
+	9. touchConversation 更新时间。
+	10. 推送 conversation-updated 和 done。
+
+### stream-control.ts
+
+服务端进程内的生成中断注册表。它让 `/api/chat/cancel` 可以通过 `conversationId` 找到正在生成的流并 `abort`。
+
+1. `registerConversationStream`：注册当前会话的`AbortController`
+2. `unregisterConversationStream`：移除注册
+3. `cancelConversationStream`：通过`conversationId`找到`controller`并`abort`
+4. `mergeAbortSignals`：把多个`abort singal`合成一个。
+
+### gemini-base-url.ts
+
+自定义 Gemini Base URL 的标准化和安全校验模块。
+
+1. `normalizeIpLiteral`：去掉`IPv6`地址的外层`[]`
+2. `parselpv4Parts`：把`IPv4`字符串拆成四个数字。并校验是否合法
+3. `isBlockedIpAddress`：判断IP是否属于禁止访问的本机/内网/link-local网段
+4. `assertGeminiBaseUrlResolvesPublicly`：如果传入的是域名，则会先DNS解析一次
+5. `normalizeGeminiBaseUrl`：主函数：
+	1. 空值使用默认 Gemini URL。
+	2. 要求协议必须是 https。
+	3. 禁止 username / password / query / hash。
+	4. 禁止 localhost 和内网地址。
+	5. DNS 解析后再次阻止内网解析。
+	6. 返回去掉尾部 / 的 URL。
+
+### gemini-model-catalog.ts
+
+WebAI 注册的 Gemini 模型目录。允许哪些Gemini模型在本项目中可用。并且补全一些模型能力。
+
+支持的模型目录：
+- gemini-3-flash-preview
+- gemini-3-pro-preview
+- gemini-3.1-pro-preview
+- gemini-2.5-pro
+- gemini-2.5-flash
+
+### gemini-model-normalizer.ts
+
+Gemini `models.list` 结果的标准化模块。它把 `Google SDK` 返回的 `Model` 转成 WebAI 的 `NormalizedFetchedGeminiModel`。
+
+1. `normalizeModelId`：把Gemini返回的模型名转成项目使用的`model id`
+2. `getModelActions`：兼容读取不同端点返回的动作字段
+3. `supportGenerateContent`：判断模型是否支持`generateContent`，保守认为可用。
+4. `shouldIncludeFetchedGeminiModel`：判断拉取的模型是否应当进入聊天列表，会排除：
+	- image / imagen
+	- veo
+	- live
+	- tts
+	- embedding
+	- deep-research
+	- computer-use 等
+5. `normalizeFetchedGeminiModel`：主要的标准化函数。如果模型命中`catalog`，则使用允许使用。否则不允许。
+
+### system-instructions.ts
+
+获取提示词
+
+### types.ts
+
+AI层的共享类型文件。只定义流式delta。

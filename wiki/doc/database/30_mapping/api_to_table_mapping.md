@@ -9,8 +9,10 @@
 | `POST /api/auth/email-code/verify` | `auth.users` | 通过 Supabase Auth 校验邮箱验证码并建立 session |
 | `GET /api/auth/github` | `auth.users` | 发起 Supabase GitHub OAuth 授权 |
 | `POST /api/auth/sign-out` | `auth.users` | 清理当前 Supabase session |
+| `DELETE /api/profile/account` | `auth.users`, `profiles`, `conversations`, `messages`, `favorites`, Storage objects | 注销当前账户；服务端 admin client 删除 Auth 用户并清理当前用户头像和消息附件对象，业务表依赖外键级联清理 |
+| `GET /api/release-notes/current` | 无数据库表 | 读取当前版本 Markdown 更新日志 |
 | `GET /api/conversations` | `conversations` | 读取当前用户会话列表 |
-| `POST /api/conversations` | `conversations` | 新建会话 |
+| `POST /api/conversations` | `conversations` | 新建会话；可接收浏览器预生成 UUID 以支持乐观更新 |
 | `GET /api/conversations/[conversationId]` | `conversations`, `messages` | 读取会话详情与消息快照 |
 | `PATCH /api/conversations/[conversationId]` | `conversations` | 更新标题、提示词、模型、`web_search_enabled` 或 `thinking_level` |
 | `DELETE /api/conversations/[conversationId]` | `conversations`, `messages` | 删除会话及其消息 |

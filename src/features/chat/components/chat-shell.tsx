@@ -17,6 +17,10 @@ import { AuthUser } from "@/lib/schemas/auth";
 import { GeminiRuntimeConfig, MessageAttachment } from "@/lib/schemas/chat";
 import { Conversation } from "@/lib/schemas/conversation";
 import {
+  CURRENT_RELEASE_NOTE,
+  type ReleaseNote,
+} from "@/lib/release-notes";
+import {
   createAutoConversationTitle,
   DEFAULT_CONVERSATION_TITLE,
 } from "@/lib/conversation-title";
@@ -33,6 +37,7 @@ import { copyTextToClipboard } from "../lib/clipboard";
 import { useGeminiRuntimeConfig } from "../lib/gemini-runtime-config";
 import type { EditMessageUpdate } from "./message-bubble";
 import { MessageList } from "./message-list";
+import { MarkdownMessage } from "./markdown-message";
 import {
   WorkspaceNotice,
   WorkspaceNoticeState,
@@ -47,6 +52,7 @@ type ChatShellProps = {
 };
 
 const AUTH_NOTICE_STORAGE_KEY = "webai:auth-notice";
+const RELEASE_NOTE_STORAGE_PREFIX = "webai:release-notes";
 
 // 前端链路既可能抛 Error，也可能抛非 Error 值，需要统一收口成人类可读消息。
 function getErrorMessage(error: unknown) {
@@ -55,6 +61,18 @@ function getErrorMessage(error: unknown) {
   }
 
   return "暂时无法完成操作，请稍后再试。";
+}
+
+function getLocalDateKey() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
+function getReleaseNoteDismissedStorageKey(userId: string) {
+  return `${RELEASE_NOTE_STORAGE_PREFIX}:${CURRENT_RELEASE_NOTE.id}:${userId}:dismissed`;
+}
+
+function getReleaseNoteLastShownStorageKey(userId: string) {
+  return `${RELEASE_NOTE_STORAGE_PREFIX}:${CURRENT_RELEASE_NOTE.id}:${userId}:last-shown`;
 }
 
 /**
@@ -74,11 +92,19 @@ export function ChatShell({
   const [authPanelMessageType, setAuthPanelMessageType] =
     useState<"info" | "error">(initialAuthMessageType);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const autoFetchedGeminiModelsForUserRef = useRef<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptEditorValue, setPromptEditorValue] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  const [releaseNote, setReleaseNote] = useState<ReleaseNote | null>(null);
+  const [isReleaseNoteDialogOpen, setIsReleaseNoteDialogOpen] = useState(false);
+  const [isLoadingReleaseNote, setIsLoadingReleaseNote] = useState(false);
+  const [releaseNoteError, setReleaseNoteError] = useState<string | null>(null);
+  const [isAutoReleaseNotePrompt, setIsAutoReleaseNotePrompt] = useState(false);
+  const [hideCurrentReleaseNote, setHideCurrentReleaseNote] = useState(false);
+  const autoReleaseNotePromptRef = useRef<string | null>(null);
   const {
     geminiRuntimeConfig,
     saveGeminiRuntimeConfig,
@@ -208,6 +234,63 @@ export function ChatShell({
     onWorkspaceNotice: showWorkspaceNotice,
   });
 
+  const loadCurrentReleaseNote = useCallback(async () => {
+    if (releaseNote) {
+      return releaseNote;
+    }
+
+    setIsLoadingReleaseNote(true);
+    setReleaseNoteError(null);
+
+    try {
+      const response = await fetch("/api/release-notes/current", {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "更新日志读取失败。");
+      }
+
+      const nextReleaseNote = payload as ReleaseNote;
+      setReleaseNote(nextReleaseNote);
+
+      return nextReleaseNote;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setReleaseNoteError(message);
+      throw new Error(message);
+    } finally {
+      setIsLoadingReleaseNote(false);
+    }
+  }, [releaseNote]);
+
+  const handleOpenReleaseNotes = useCallback(() => {
+    setIsAutoReleaseNotePrompt(false);
+    setHideCurrentReleaseNote(false);
+    setIsReleaseNoteDialogOpen(true);
+
+    void loadCurrentReleaseNote().catch(() => {
+      // 错误信息由更新日志弹窗自身展示。
+    });
+  }, [loadCurrentReleaseNote]);
+
+  function handleReleaseNoteDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen && hideCurrentReleaseNote && user?.id) {
+      window.localStorage.setItem(
+        getReleaseNoteDismissedStorageKey(user.id),
+        "true",
+      );
+    }
+
+    setIsReleaseNoteDialogOpen(nextOpen);
+
+    if (!nextOpen) {
+      setIsAutoReleaseNotePrompt(false);
+      setHideCurrentReleaseNote(false);
+    }
+  }
+
   function handlePromptDialogOpenChange(nextOpen: boolean) {
     setIsPromptDialogOpen(nextOpen);
     setWorkspaceError(null);
@@ -288,6 +371,34 @@ export function ChatShell({
     }
   }
 
+  async function handleDeleteAccount() {
+    setIsDeletingAccount(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/profile/account", {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "账户注销失败。");
+      }
+
+      setUser(null);
+      setAuthPanelMessage("账户已注销。");
+      setAuthPanelMessageType("info");
+      resetAfterSignOut();
+      router.refresh();
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setWorkspaceError(message);
+      throw new Error(message);
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   const handleSendMessage = useCallback(async (
     content: string,
     attachments?: MessageAttachment[],
@@ -361,6 +472,49 @@ export function ChatShell({
       description: "你的会话工作区已经准备好。",
     }, 2600);
   }, [showWorkspaceNotice, user]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const todayKey = getLocalDateKey();
+    const promptKey = `${user.id}:${CURRENT_RELEASE_NOTE.id}:${todayKey}`;
+
+    if (autoReleaseNotePromptRef.current === promptKey) {
+      return;
+    }
+
+    if (
+      window.localStorage.getItem(getReleaseNoteDismissedStorageKey(user.id)) ===
+      "true"
+    ) {
+      return;
+    }
+
+    if (
+      window.localStorage.getItem(getReleaseNoteLastShownStorageKey(user.id)) ===
+      todayKey
+    ) {
+      return;
+    }
+
+    autoReleaseNotePromptRef.current = promptKey;
+
+    void loadCurrentReleaseNote()
+      .then(() => {
+        window.localStorage.setItem(
+          getReleaseNoteLastShownStorageKey(user.id),
+          todayKey,
+        );
+        setIsAutoReleaseNotePrompt(true);
+        setHideCurrentReleaseNote(false);
+        setIsReleaseNoteDialogOpen(true);
+      })
+      .catch(() => {
+        autoReleaseNotePromptRef.current = null;
+      });
+  }, [loadCurrentReleaseNote, user?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -658,6 +812,7 @@ export function ChatShell({
           isFetchingGeminiModels={isFetchingGeminiModels}
           updatingFetchedModelId={updatingFetchedModelId}
           isSigningOut={isSigningOut}
+          isDeletingAccount={isDeletingAccount}
           streamingConversationIds={Object.keys(streamingTasks)}
           currentUser={user}
           geminiRuntimeConfig={geminiRuntimeConfig}
@@ -679,6 +834,8 @@ export function ChatShell({
           onUpdateProfile={handleUpdateProfile}
           onUploadAvatar={handleUploadAvatar}
           onUpdatePassword={handleUpdatePassword}
+          onDeleteAccount={handleDeleteAccount}
+          onOpenReleaseNotes={handleOpenReleaseNotes}
           onSignOut={handleSignOut}
         />
 
@@ -793,6 +950,66 @@ export function ChatShell({
           </section>
         </main>
       </div>
+
+      <Dialog
+        open={isReleaseNoteDialogOpen}
+        onOpenChange={handleReleaseNoteDialogOpenChange}
+      >
+        <DialogContent className="flex max-h-[min(42rem,calc(100vh-2rem))] w-[min(92vw,40rem)] max-w-[40rem] flex-col overflow-hidden rounded-[14px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)] sm:!max-w-[40rem]">
+          <DialogHeader className="px-7 pt-5 pb-3">
+            <DialogTitle className="text-[1.15rem] leading-none font-medium tracking-normal text-foreground">
+              {releaseNote?.title ?? CURRENT_RELEASE_NOTE.title}
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-muted-foreground">
+              最近一次版本更新。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/60 bg-slate-50/45 px-7 py-4">
+            {isLoadingReleaseNote ? (
+              <p className="text-sm leading-6 text-muted-foreground">
+                正在读取更新日志...
+              </p>
+            ) : releaseNoteError ? (
+              <p className="rounded-[6px] border border-red-100 bg-red-50 px-3 py-2 text-sm leading-6 text-red-600">
+                {releaseNoteError}
+              </p>
+            ) : releaseNote ? (
+              <MarkdownMessage
+                content={releaseNote.content}
+                className="text-sm leading-7 text-foreground"
+              />
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border/50 bg-slate-50/45 px-7 py-3 sm:flex-row sm:items-center sm:justify-between">
+            {isAutoReleaseNotePrompt ? (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded-[4px] border-border text-primary"
+                  checked={hideCurrentReleaseNote}
+                  onChange={(event) =>
+                    setHideCurrentReleaseNote(event.target.checked)
+                  }
+                />
+                不再弹出本次更新内容
+              </label>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                可从左下角头像菜单再次打开。
+              </span>
+            )}
+            <Button
+              className="h-9 rounded-[6px] px-4"
+              type="button"
+              onClick={() => handleReleaseNoteDialogOpenChange(false)}
+            >
+              知道了
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isPromptDialogOpen}

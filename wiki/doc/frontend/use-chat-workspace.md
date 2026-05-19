@@ -50,6 +50,7 @@ aliases:
 - `archivedConversations`
 - `favoriteConversations`
 - `activeConversationId`
+- `optimisticConversationIds`
 - `availableModels`
 - `draftModelId`
 - `draftSystemPrompt`
@@ -146,7 +147,7 @@ aliases:
 - 会话级模型切换
 - 会话级联网切换
 - 会话级思考档位切换
-- 删除、收藏、归档、恢复的乐观更新和失败回滚
+- 新建、删除、收藏、归档、恢复的乐观更新和失败回滚
 
 这会让 `ChatShell` 很快重新膨胀成“页面壳 + 工作区规则总控”。
 
@@ -158,6 +159,23 @@ aliases:
 
 ---
 
-## 6. 一句话理解
+## 6. 新建会话的乐观更新
+
+新建会话时，浏览器会先生成一个 UUID，并用这个 ID 立即插入侧栏列表和空消息缓存。
+
+随后 `POST /api/conversations` 会把同一个 ID 传给服务端，由数据库使用这个 ID 创建真实会话。
+
+这种做法避免了“临时 ID 替换真实 ID”的复杂迁移，也降低了新会话刚出现时用户立刻发送消息、切模型或切换会话导致状态错绑的风险。
+
+创建失败时会：
+
+- 从 active / archived / favorite 三份会话列表中移除该会话
+- 清理该会话对应的空消息缓存
+- 如果当前仍停留在该会话，恢复到创建前的激活会话
+- 保留工作区错误提示，方便用户重试
+
+---
+
+## 7. 一句话理解
 
 `useChatWorkspace` 是当前聊天工作区的编排层：它把会话、模型、草稿控制项、联网偏好、思考档位、工作区错误和会话级 patch 收在一起，让 `ChatShell` 可以回到页面壳组件的角色。

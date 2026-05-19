@@ -128,10 +128,12 @@ export async function createConversation(
   modelId?: string,
   webSearchEnabled = true,
   thinkingLevel: ThinkingLevel = DEFAULT_THINKING_LEVEL,
+  conversationId?: string,
 ) {
   const { data, error } = await supabase
     .from("conversations")
     .insert({
+      ...(conversationId ? { id: conversationId } : {}),
       user_id: userId,
       title,
       system_prompt: systemPrompt?.trim() ? systemPrompt.trim() : null,

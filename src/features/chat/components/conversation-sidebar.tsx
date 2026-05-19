@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import {
+  AlertTriangleIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   CameraIcon,
   EllipsisIcon,
+  FileTextIcon,
   KeyRoundIcon,
   LoaderCircleIcon,
   LogOutIcon,
@@ -68,6 +70,7 @@ type ConversationSidebarProps = {
   isFetchingGeminiModels: boolean;
   updatingFetchedModelId: string | null;
   isSigningOut: boolean;
+  isDeletingAccount: boolean;
   streamingConversationIds: string[];
   currentUser: AuthUser;
   geminiRuntimeConfig: GeminiRuntimeConfig;
@@ -95,6 +98,8 @@ type ConversationSidebarProps = {
   onUpdateProfile: (displayName: string) => Promise<void>;
   onUploadAvatar: (file: File) => Promise<void>;
   onUpdatePassword: (password: string) => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
+  onOpenReleaseNotes: () => void;
   onSignOut: () => Promise<void>;
 };
 
@@ -252,6 +257,7 @@ export function ConversationSidebar({
   isFetchingGeminiModels,
   updatingFetchedModelId,
   isSigningOut,
+  isDeletingAccount,
   streamingConversationIds,
   currentUser,
   geminiRuntimeConfig,
@@ -273,6 +279,8 @@ export function ConversationSidebar({
   onUpdateProfile,
   onUploadAvatar,
   onUpdatePassword,
+  onDeleteAccount,
+  onOpenReleaseNotes,
   onSignOut,
 }: ConversationSidebarProps) {
   const collapsedTrackClass =
@@ -288,6 +296,8 @@ export function ConversationSidebar({
   const [isGeminiSettingsDialogOpen, setIsGeminiSettingsDialogOpen] =
     useState(false);
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] =
+    useState(false);
   const [geminiApiKeyDraft, setGeminiApiKeyDraft] = useState("");
   const [geminiBaseUrlDraft, setGeminiBaseUrlDraft] = useState("");
   const [geminiSettingsError, setGeminiSettingsError] = useState<string | null>(
@@ -571,6 +581,25 @@ export function ConversationSidebar({
       onMobileOpenChange(false);
     } catch {
       // 退出失败时保留工作区上下文。
+    }
+  }
+
+  async function handleConfirmDeleteAccount() {
+    setAccountError(null);
+    setAccountMessage(null);
+
+    try {
+      await onDeleteAccount();
+      setIsDeleteAccountDialogOpen(false);
+      setIsAccountDialogOpen(false);
+      onMobileOpenChange(false);
+    } catch (error) {
+      setAccountError(
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "账户注销失败。",
+      );
+      setIsDeleteAccountDialogOpen(false);
     }
   }
 
@@ -861,6 +890,10 @@ export function ConversationSidebar({
                 <KeyRoundIcon />
                 Gemini 设置
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenReleaseNotes}>
+                <FileTextIcon />
+                更新日志
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
@@ -1042,7 +1075,7 @@ export function ConversationSidebar({
           }
         }}
       >
-        <DialogContent className="w-[min(92vw,42rem)] max-w-[42rem] overflow-hidden rounded-[10px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)] sm:!max-w-[42rem]">
+        <DialogContent className="flex max-h-[min(46rem,calc(100vh-2rem))] w-[min(92vw,42rem)] max-w-[42rem] flex-col overflow-hidden rounded-[10px] border border-border/70 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)] sm:!max-w-[42rem]">
           <DialogHeader className="px-7 pt-5 pb-3">
             <DialogTitle className="text-[1.15rem] leading-none font-medium tracking-normal text-foreground">
               个人账户
@@ -1051,7 +1084,7 @@ export function ConversationSidebar({
               管理头像、昵称和登录密码。
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 border-t border-border/60 bg-slate-50/45 px-7 py-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto border-t border-border/60 bg-slate-50/45 px-7 py-4">
             <section className="flex flex-col items-start gap-4 sm:flex-row">
               <UserAvatar user={currentUser} className="size-14 rounded-[10px] text-base" />
               <div className="min-w-0 flex-1">
@@ -1139,6 +1172,25 @@ export function ConversationSidebar({
               </Button>
             </section>
 
+            <section className="space-y-3 border-t border-border/60 pt-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-red-600">
+                <AlertTriangleIcon className="size-4" />
+                注销账户
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                注销后会删除账户资料、会话、消息和已上传文件。
+              </p>
+              <Button
+                type="button"
+                variant="destructive"
+                className="h-9 rounded-[6px] bg-red-600 px-4 text-white hover:bg-red-700"
+                onClick={() => setIsDeleteAccountDialogOpen(true)}
+                disabled={isDeletingAccount}
+              >
+                {isDeletingAccount ? "注销中" : "注销账户"}
+              </Button>
+            </section>
+
             {accountError ? (
               <p className="rounded-[6px] border border-red-100 bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">
                 {accountError}
@@ -1149,6 +1201,43 @@ export function ConversationSidebar({
                 {accountMessage}
               </p>
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isDeleteAccountDialogOpen}
+        onOpenChange={setIsDeleteAccountDialogOpen}
+      >
+        <DialogContent className="w-[min(92vw,32rem)] max-w-[32rem] overflow-hidden rounded-[10px] border border-red-100 bg-white/97 p-0 shadow-[0_24px_56px_rgba(46,79,134,0.12)] sm:!max-w-[32rem]">
+          <DialogHeader className="px-7 pt-5 pb-3">
+            <DialogTitle className="flex items-center gap-2 text-[1.05rem] leading-none font-medium tracking-normal text-red-600">
+              <AlertTriangleIcon className="size-5" />
+              注销账户
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-muted-foreground">
+              注意，你会永远失去你账户的所有信息，请谨慎操作。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-3 border-t border-border/50 bg-slate-50/45 px-7 py-3">
+            <Button
+              variant="outline"
+              className="h-10 rounded-[6px] border-border/70 bg-white px-5 shadow-none"
+              type="button"
+              onClick={() => setIsDeleteAccountDialogOpen(false)}
+              disabled={isDeletingAccount}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-10 rounded-[6px] bg-red-600 px-5 text-white hover:bg-red-700"
+              type="button"
+              onClick={() => void handleConfirmDeleteAccount()}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? "注销中..." : "确认注销"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

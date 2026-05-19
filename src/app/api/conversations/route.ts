@@ -96,6 +96,7 @@ export async function POST(request: Request) {
       parsed.data.modelId,
       parsed.data.webSearchEnabled,
       parsed.data.thinkingLevel,
+      parsed.data.id,
     );
 
     return NextResponse.json(conversationResponseSchema.parse({ conversation }));

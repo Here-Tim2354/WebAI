@@ -30,6 +30,7 @@ export const conversationResponseSchema = z.object({
 export const conversationStatusSchema = z.enum(["active", "archived"]);
 
 export const createConversationRequestSchema = z.object({
+  id: z.string().uuid("会话标识不正确。").optional(),
   title: z
     .string()
     .trim()
