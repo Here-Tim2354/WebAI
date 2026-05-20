@@ -24,6 +24,10 @@
 | 保存会话级提示词 | `conversations` | `system_prompt` |
 | 会话级联网搜索偏好 | `conversations` | `web_search_enabled`，当前默认开启 |
 | 会话级思考档位 | `conversations` | `thinking_level`，取值为 `minimal / low / medium / high`，当前默认 `minimal` |
+| 会话收藏 | `favorites` | 收藏对象是会话，使用 `conversation_id` |
+| 会话归档 / 恢复 | `conversations` | `status` 与 `archived_at` |
+| 消息 URL Context | `messages` | `metadata.urls` |
+| 图片 / 文件附件 | `message_attachments`, `messages` | Storage 保存对象，`messages.metadata.attachments` 保存引用 |
 
 ## 当前系统配置层
 
@@ -39,6 +43,4 @@
 
 | 功能 | 目标表 | 状态 |
 | --- | --- | --- |
-| 收藏会话 | `favorites` | 已用于会话收藏入口 |
-| 搜索记录 | `search_records` | `planned` |
-| 归档区管理增强 | `conversations.archived_at` | 已用于归档区入口 |
+| 搜索记录 | `search_records` | `withdrawn`，云端不存在该表 |

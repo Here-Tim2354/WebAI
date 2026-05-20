@@ -34,6 +34,20 @@
 
 默认模型在用户私有列表中表现为 `model_fetched` 记录，便于用户启用、停用和选择，但这些记录的能力来源仍以 `model_catalog` 为准。
 
+## 云端 seed 状态
+
+`2026-05-20` 通过 Supabase CLI 确认，云端 `model_catalog` 当前包含 7 条 seed：
+
+- `gemini-3-flash-preview`：默认模型模板，默认启用
+- `gemini-3-pro-preview`
+- `gemini-3.1-pro-preview`
+- `gemini-3.1-flash-lite-preview`
+- `gemini-2.5-pro`
+- `gemini-2.5-flash`
+- `gemini-2.5-flash-lite`
+
+所有 seed 当前均使用 Gemini 图标资源 `ai_svgs/gemini.svg`，能力字段以 `capabilities` JSONB 保存。
+
 ## 扩展层内容
 
 以下内容应继续视为扩展字段或候选规划，不直接写进 `10_verified/`：

@@ -7,17 +7,18 @@
 - 会话 CRUD
 - 消息持久化与恢复
 - `profiles` 作为用户资料扩展表
+- `favorites` 作为会话收藏表，已经存在于云端 schema，但在课程设计叙事中仍属于会话管理增强能力
 - `model_catalog` 作为内部 Gemini 能力目录
 - `model_fetched` 作为用户可启用 / 停用的 Gemini 模型列表
 - 前端模型选择读取已启用模型列表
 - 服务端按 `model_fetched.id` 解析 Gemini 上游模型名
 - Supabase 环境采用 Gemini-only `model_catalog + model_fetched` 模型结构
-- 首个模型 seed 为 `Gemini 3 Flash Preview`
+- 云端 `model_catalog` 当前有 7 条 Gemini seed，默认模型模板为 `Gemini 3 Flash Preview`
+- `messages.metadata` 已进入云端表结构，用于保存 URL Context、附件和 thinking 等消息级上下文
 
 ## 暂不进入数据库主线
 
-- 收藏表与收藏链路
-- 搜索记录表与搜索页面
+- 搜索记录表与搜索页面；`search_records` 不存在于当前云端 schema
 - 管理员看板与封号能力
 - 模型注册表里未进入代码主查询路径的扩展元数据
 

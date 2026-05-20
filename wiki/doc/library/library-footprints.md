@@ -22,11 +22,11 @@ aliases:
 ## 相关阅读
 
 - [[frontend/GUIDE|Frontend 文档索引]]
-- [[chatshell]]
-- [[conversation-sidebar]]
-- [[chat-input]]
-- [[message-list]]
-- [[ui-primitives]]
+- [[frontend/components/chat-shell|chat-shell]]
+- [[frontend/components/conversation-sidebar|conversation-sidebar]]
+- [[frontend/components/chat-input|chat-input]]
+- [[frontend/components/message-list|message-list]]
+- [[frontend/ui/button|UI primitives]]
 
 ## 使用建议
 

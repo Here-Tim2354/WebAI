@@ -28,6 +28,14 @@ bucket：
   - `text/markdown`
   - `text/csv`
 
+云端核对：
+
+- `2026-05-20` 已通过 Supabase CLI 确认 `message_attachments` bucket 存在
+- bucket 类型为 `STANDARD`
+- `file_size_limit = 20971520`
+- `allowed_mime_types = {image/png,image/jpeg,image/webp,application/pdf,text/plain,text/markdown,text/csv}`
+- Storage policy 已按 `storage.foldername(name)[1] = auth.uid()` 做用户目录隔离
+
 Excel `.xlsx` 不直接保存原文件。服务端会先通过 `read-excel-file` 读取工作簿内容，转换为 CSV 后再把 CSV 存入 bucket。
 
 UI 展示时使用转换后的 `.csv` 文件名，同时保留原始 `.xlsx` 文件名用于提示“已转换”。如果 Excel 文件没有读取到有效单元格，上传接口会返回明确错误，避免保存 `0 B` 的空 CSV。

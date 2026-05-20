@@ -4,28 +4,73 @@
 
 ## 项目状态
 
-- 阶段：公网部署后的产品化回归
+- 阶段：公网部署后的产品持续优化
 - 主线：WebAI 已部署到 Vercel，并通过 Cloudflare 接入公网域名。
 - 公网入口：`https://webai.tim2354.bytecola.cn`
 - 状态：Vercel production build 通过，Cloudflare CNAME 已指向 Vercel，公网首页可访问；邮箱密码登录、邮箱验证码登录、个人账户入口、头像上传、修改密码、注销账户、更新日志和会话二级菜单进入上线回归范围。
 - 当前重点：登录后完整产品回归、Supabase Custom SMTP 与纯验证码邮件模板验证、邮箱验证码发送与验证链路回归、个人资料与头像 Storage 验证、账户注销链路验证、更新日志弹窗验证、取消生成可靠性验证、侧栏会话管理细节回归、GitHub provider 配置和答辩展示路径。
 
-## 当前架构边界
+## 项目架构
 
-- 前端采用 Next.js App Router。
-- 聊天能力按 feature-first 组织在 `src/features/chat`：
-  - `components/`：聊天可见组件
-  - `hooks/`：聊天状态与业务流程
-  - `lib/`：聊天局部工具、流消费、附件客户端与 URL 上下文
-- `src/components` 保留通用 UI primitive。
-- `src/lib` 保留跨功能共享的 schema、Supabase、AI、附件规则、环境与安全边界工具。
-- Supabase 继续作为核心数据库与私有 Storage。
-- Gemini Key / Base URL 仍由服务端接口和浏览器运行时配置共同约束，不进入数据库。
-- Gemini 模型注册表以 `model_catalog + model_fetched` 为核心，用户侧模型按 `user_id + model_id` 去重，聊天运行时只读取已启用的 `model_fetched.id`。
-- 用户展示资料继续由 `profiles` 承接，头像对象进入私有 Storage bucket `profile_avatars`。
-- 邮箱密码登录和邮箱验证码登录均由 Supabase Auth 建立 session，新用户仍可通过验证码入口进入后设置密码。
-- 账户注销由服务端 admin client 处理，依赖 `SUPABASE_SECRET_KEY` 或 `SUPABASE_SERVICE_ROLE_KEY`，并清理用户头像与消息附件 Storage 对象。
-- 更新日志从 `wiki/Optimization/version/V1.1.md` 读取，左下角头像菜单可随时打开；登录后的自动提示按浏览器本地记录控制每天最多一次。
+```
+WebAI/
+|-- src/
+|   |-- app/
+|   |   |-- page.tsx
+|   |   |-- layout.tsx
+|   |   |-- auth/
+|   |   |-- api/
+|   |       |-- auth/
+|   |       |-- chat/
+|   |       |-- conversations/
+|   |       |-- messages/
+|   |       |-- models/
+|   |       |-- profile/
+|   |       |-- attachments/
+|   |
+|   |-- features/
+|   |   |-- chat/
+|   |       |-- components/
+|   |       |-- hooks/
+|   |       |-- lib/
+|   |
+|   |-- components/
+|   |   |-- ui/
+|   |
+|   |-- lib/
+|       |-- ai/
+|       |-- env/
+|       |-- schemas/
+|       |-- supabase/
+|       |-- attachments.ts
+|       |-- rate-limit.ts
+|
+|-- supabase/
+|   |-- migrations/
+|
+|-- public/
+|
+|-- asset/
+|
+|-- scripts/
+|
+|-- wiki/
+|   |-- plan/
+|   |-- doc/
+|   |   |-- database/
+|   |   |-- frontend/
+|   |   |-- developer/
+|   |   |-- library/
+|
+|-- output/
+|   |-- doc/
+|
+|-- package.json
+|-- next.config.ts
+|-- tsconfig.json
+|-- README.md
+|-- AGENTS.md
+```
 
 ## 上线前任务
 
@@ -63,6 +108,7 @@
 - 复查 RLS 策略、Storage bucket policy 与用户目录隔离。
 - 准备用于演示的种子数据或测试账号。
 - 保留 migration 与表设计说明，方便课程答辩引用。
+- 已于 `2026-05-20` 通过 Supabase CLI 核对云端 `public` / `storage` schema：确认 `profiles`、`conversations`、`messages`、`favorites`、`model_catalog`、`model_fetched`、`message_attachments`、`profile_avatars` 与 RLS / Storage policy 现状，并同步 `wiki/doc/database`。
 
 ## 上线回归范围
 
@@ -89,7 +135,7 @@
 
 - 保持 `wiki/doc/frontend/GUIDE.md` 与 feature-first 结构一致。
 - 整理部署说明：Vercel、Cloudflare、Supabase 回调 URL、环境变量。
-- 整理数据库说明：核心表、关系、RLS、Storage policy、migration 对应关系。
+- 整理数据库说明：核心表、关系、RLS、Storage policy、migration 对应关系。`wiki/doc/database` 已完成一轮云端 schema 核对同步，后续重点转为 advisor 遗留项与答辩叙事整理。
 - 整理演示路径：登录、发起对话、附件输入、会话管理、模型选择、历史恢复。
 
 ## 下一步

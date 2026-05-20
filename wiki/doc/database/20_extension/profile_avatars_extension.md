@@ -35,6 +35,15 @@
 - WebP
 - 最大 2 MB
 
+云端核对：
+
+- `2026-05-20` 已通过 Supabase CLI 确认 `profile_avatars` bucket 存在
+- `public = false`
+- bucket 类型为 `STANDARD`
+- `file_size_limit = 2097152`
+- `allowed_mime_types = {image/png,image/jpeg,image/webp}`
+- Storage policy 已按 `storage.foldername(name)[1] = auth.uid()` 做用户目录隔离
+
 浏览器读取头像时不直接暴露公开 bucket，而是通过 `/api/profile/avatar?path=...` 代理下载。接口会检查路径是否位于当前用户目录下。
 
 ## 接口映射

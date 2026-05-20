@@ -15,12 +15,16 @@
 
 不属于本文的内容：
 
-- `favorites`
 - `search_records`
 - 管理员后台
 - 尚未决定的模型注册表扩展字段
 
 这些内容统一转入 `20_extension/`。
+
+说明：
+
+- `favorites` 已经存在于云端 schema，本文件把它作为“已验证的会话组织扩展表”记录，但课程设计主线仍以 `profiles`、`conversations`、`messages` 为核心。
+- `search_records` 当前不存在于云端 schema，继续视为撤回方向。
 
 ---
 
@@ -32,6 +36,7 @@
 - `profiles`
 - `conversations`
 - `messages`
+- `favorites`
 - `model_catalog`
 - `model_fetched`
 
@@ -39,6 +44,7 @@
 
 - `auth.users` 与 `profiles` 承接用户身份与展示资料
 - `conversations` 与 `messages` 构成数据库课程设计主线
+- `favorites` 承接 Phase 4.3 的会话收藏能力
 - `model_catalog` 是服务端私有维护的 Gemini 能力参照表
 - `model_fetched` 是用户通过 Gemini 设置拉取并启用 / 停用的模型列表
 
@@ -115,9 +121,36 @@
 | `conversation_id` | `uuid` | 否 | 否 | `conversations.id` | 无 | 所属会话 |
 | `sender_type` | `message_sender_type` | 否 | 否 | 否 | 无 | 发送者类型 |
 | `content` | `text` | 否 | 否 | 否 | 无 | 消息内容 |
+| `status` | `message_status` | 否 | 否 | 否 | `complete` | 消息状态，支持 pending / streaming / complete / cancelled / error |
+| `metadata` | `jsonb` | 否 | 否 | 否 | `{}` | 消息级上下文，保存 URL Context、附件、thinking 等扩展信息 |
 | `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 发送时间 |
 
-### 5. 内部模型目录表
+说明：
+
+- `metadata` 必须是 JSON object。
+- user 消息要求状态为 `complete`，且正文、`metadata.attachments`、`metadata.urls` 至少存在其一。
+- assistant 消息允许 `pending`、`streaming` 的空正文过渡态，也允许 `cancelled` / `error` 空正文状态。
+
+### 5. 会话收藏表
+
+- 中文表名：会话收藏
+- 英文表名：`favorites`
+- 作用：保存用户收藏的会话
+
+| 字段名 | 类型 | 可空 | 主键 | 外键 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `id` | `uuid` | 否 | 是 | 否 | `gen_random_uuid()` | 收藏记录唯一标识 |
+| `user_id` | `uuid` | 否 | 否 | `auth.users.id` | 无 | 所属用户 |
+| `conversation_id` | `uuid` | 否 | 否 | `conversations.id` | 无 | 被收藏会话 |
+| `created_at` | `timestamptz` | 否 | 否 | 否 | `now()` | 收藏时间 |
+
+说明：
+
+- 收藏对象是会话，不是单条消息。
+- `favorites(user_id, conversation_id)` 保持唯一，避免重复收藏。
+- 删除用户或会话时，收藏记录随外键级联删除。
+
+### 6. 内部模型目录表
 
 - 中文表名：内部模型目录
 - 英文表名：`model_catalog`
@@ -146,7 +179,7 @@
 - `model_catalog` 不开放给普通用户直接维护
 - fetch 到的模型若能按 `model_id` 命中目录，就使用目录能力补全不完整的上游参数
 
-### 6. 用户拉取模型表
+### 7. 用户拉取模型表
 
 - 中文表名：用户拉取模型
 - 英文表名：`model_fetched`
@@ -189,6 +222,7 @@
 - `profiles.user_id`
 - `conversations.id`
 - `messages.id`
+- `favorites.id`
 - `model_catalog.id`
 - `model_fetched.id`
 
@@ -197,6 +231,8 @@
 - `profiles.user_id -> auth.users.id`
 - `conversations.user_id -> auth.users.id`
 - `messages.conversation_id -> conversations.id`
+- `favorites.user_id -> auth.users.id`
+- `favorites.conversation_id -> conversations.id`
 - `conversations.model_id -> model_fetched.id`
 - `model_fetched.user_id -> auth.users.id`
 - `model_fetched.catalog_id -> model_catalog.id`
@@ -208,8 +244,10 @@
 - `model_catalog.model_id` 全局唯一
 - `model_fetched(user_id, model_id)` 唯一
 - 每个用户最多一个启用中的默认模型
+- 同一用户不能重复收藏同一会话
 - `conversations.status` 取值为 `active` / `archived`
 - `messages.sender_type` 取值为 `user` / `assistant`
+- `messages.status` 取值为 `pending` / `streaming` / `complete` / `cancelled` / `error`
 
 ---
 
@@ -219,9 +257,15 @@
 
 - `conversations.user_id`
 - `conversations(user_id, status)`
+- `conversations(user_id, status, updated_at desc)`
 - `conversations.updated_at`
+- `conversations.archived_at`
+- `conversations.model_id`
 - `messages.conversation_id`
 - `messages(conversation_id, created_at)`
+- `messages.created_at`
+- `favorites.conversation_id`
+- `favorites(user_id, created_at desc)`
 - `model_catalog(default_enabled, sort_order, label)`
 - `model_fetched(user_id, is_enabled, sort_order, label)`
 - `model_fetched(user_id, model_id)`
@@ -240,10 +284,12 @@
 
 - `messages.conversation_id` 应使用级联删除
 - 删除会话后不应残留孤立消息
+- `favorites.conversation_id` 应使用级联删除
+- 删除会话后不应残留孤立收藏记录
 
 ### 删除用户
 
-- `profiles.user_id`、`conversations.user_id` 与 `model_fetched.user_id` 都应跟随用户边界处理
+- `profiles.user_id`、`conversations.user_id`、`favorites.user_id` 与 `model_fetched.user_id` 都应跟随用户边界处理
 - 用户拉取模型属于用户私有配置，不应跨用户共享
 
 ### 模型目录
@@ -266,10 +312,11 @@
 - 系统配置层：
   - `model_catalog`
   - `model_fetched`
+- 已验证会话组织扩展：
+  - `favorites`
 
 这篇笔记不混入的扩展实体：
 
-- `favorites`
 - `search_records`
 - 后台管理相关表
 - 尚未确认落库的模型扩展字段

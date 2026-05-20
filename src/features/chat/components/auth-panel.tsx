@@ -291,27 +291,24 @@ export function AuthPanel({
       initial={false}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(133,188,255,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(200,226,255,0.32),transparent_30%)]" />
-      <section className="relative w-full max-w-[31rem] rounded-[18px] border border-border/65 bg-white/86 p-6 shadow-[0_24px_72px_rgba(62,96,154,0.1)] backdrop-blur-xl sm:p-8">
-        <div className="mx-auto w-full max-w-[27rem]">
+      <section className="relative w-full max-w-[30rem] rounded-[18px] border border-border/65 bg-white/86 p-6 shadow-[0_24px_72px_rgba(62,96,154,0.1)] backdrop-blur-xl sm:p-7">
+        <div className="mx-auto w-full max-w-[26rem]">
           <div className="inline-flex items-center gap-2 rounded-[12px] border border-border/60 bg-background/70 px-3 py-1 text-[0.72rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
             <SparklesIcon className="size-3.5" />
             WebAI
           </div>
 
-          <div className="mt-5 space-y-3">
-            <h1 className="max-w-[14ch] text-4xl font-semibold tracking-[0.01em] text-foreground sm:text-[3.0rem]">
+          <div className="mt-5 space-y-2">
+            <h1 className="max-w-[14ch] text-4xl font-semibold tracking-[0.01em] text-foreground sm:text-[2.7rem]">
               登录
             </h1>
-            <p className="max-w-[42ch] text-sm leading-6 text-muted-foreground sm:text-[0.95rem]">
-              使用密码或邮箱验证码进入你的会话工作区。
-            </p>
-            <p className="max-w-[42ch] text-xs leading-5 text-slate-500">
-              首次使用邮箱验证码或 GitHub 登录时，会自动创建账户。
+            <p className="max-w-[34ch] text-sm leading-6 text-muted-foreground">
+              进入你的会话工作区。首次验证码或 GitHub 登录会自动创建账户。
             </p>
           </div>
 
           <div
-            className="mt-8 grid grid-cols-2 gap-1 rounded-[14px] border border-border/65 bg-background/70 p-1"
+            className="mt-6 grid grid-cols-2 gap-1 rounded-[14px] border border-border/65 bg-background/70 p-1"
             role="tablist"
             aria-label="登录方式"
           >
@@ -437,7 +434,7 @@ export function AuthPanel({
                 {isEmailCodeVerifying ? "验证中..." : "验证码登录"}
               </Button>
               <p className="text-xs leading-5 text-slate-500">
-                验证码通常很快送达；如果没有看到，可以稍等片刻并检查垃圾邮件或拦截规则。
+                没收到？稍等片刻，或检查垃圾邮件。
               </p>
             </form>
           )}

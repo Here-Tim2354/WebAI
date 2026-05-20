@@ -8,9 +8,9 @@
 
 状态：
 
-- `extension`
-- 对应 migration 与代码路径围绕会话收藏展开
-- Supabase 环境需要包含收藏相关 migration
+- `verified extension`
+- 对应 migration、代码路径与云端 schema 都围绕会话收藏展开
+- `2026-05-20` 已通过 Supabase CLI 确认云端存在 `favorites`
 - 收藏入口、头像菜单入口和收藏区空态需要在真实数据下保持清楚
 - 是否迁入 `10_verified/` 等 Phase 4.3 多数据场景观察后再定
 
@@ -24,6 +24,18 @@
 - `user_id`
 - `conversation_id`
 - `created_at`
+
+当前约束：
+
+- `favorites.id` 为主键
+- `favorites.user_id -> auth.users.id on delete cascade`
+- `favorites.conversation_id -> conversations.id on delete cascade`
+- `favorites(user_id, conversation_id)` 唯一，避免同一用户重复收藏同一会话
+
+当前索引：
+
+- `favorites_conversation_id_idx`
+- `favorites_user_id_created_at_idx`
 
 阶段判断：
 

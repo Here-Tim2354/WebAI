@@ -4,7 +4,8 @@ Project WebAI {
   WebAI database design.
   Core tables:
   auth.users / profiles / conversations / messages / model_catalog / model_fetched.
-  favorites and search_records stay in the overall design, but are reserved for a later scope.
+  favorites is a verified conversation-organization extension.
+  search_records was withdrawn and is not present in the current remote schema.
   '''
 }
 
@@ -16,6 +17,14 @@ Enum conversation_status {
 Enum message_sender_type {
   user
   assistant
+}
+
+Enum message_status {
+  pending
+  streaming
+  complete
+  cancelled
+  error
 }
 
 Table auth.users [headercolor: #D9EAFE] {
@@ -71,6 +80,8 @@ Table messages [headercolor: #B7DBFF] {
   conversation_id uuid [not null]
   sender_type message_sender_type [not null]
   content text [not null]
+  status message_status [not null, default: 'complete']
+  metadata jsonb [not null, default: '{}']
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
@@ -81,41 +92,24 @@ Table messages [headercolor: #B7DBFF] {
 
   Note: '''
   Stores user prompts and assistant replies.
+  metadata carries URL Context, attachments and thinking-related message context.
   '''
 }
 
 Table favorites [headercolor: #F4F8FC] {
   id uuid [pk, not null]
   user_id uuid [not null]
-  message_id uuid [not null]
+  conversation_id uuid [not null]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    user_id
-    message_id
-    (user_id, message_id) [unique]
+    conversation_id
+    (user_id, created_at)
+    (user_id, conversation_id) [unique]
   }
 
   Note: '''
-  Extension entity for message favorites.
-  Reserved for a later implementation batch.
-  '''
-}
-
-Table search_records [headercolor: #F4F8FC] {
-  id uuid [pk, not null]
-  user_id uuid [not null]
-  keyword varchar(100) [not null]
-  created_at timestamptz [not null, default: `now()`]
-
-  indexes {
-    user_id
-    created_at
-  }
-
-  Note: '''
-  Extension entity for user search history.
-  Reserved for a later implementation batch.
+  Verified extension entity for conversation favorites.
   '''
 }
 
@@ -189,7 +183,6 @@ Ref: conversations.user_id > auth.users.id
 Ref: conversations.model_id > model_fetched.id
 Ref: messages.conversation_id > conversations.id
 Ref: favorites.user_id > auth.users.id
-Ref: favorites.message_id > messages.id
-Ref: search_records.user_id > auth.users.id
+Ref: favorites.conversation_id > conversations.id
 Ref: model_fetched.user_id > auth.users.id
 Ref: model_fetched.catalog_id > model_catalog.id

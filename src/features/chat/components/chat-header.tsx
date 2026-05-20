@@ -22,6 +22,19 @@ import { Conversation } from "@/lib/schemas/conversation";
 import { AIModel } from "@/lib/schemas/model";
 import { ModelIcon } from "./model-icon";
 
+function GitHubMarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+    >
+      <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.61-3.37-1.18-3.37-1.18a2.65 2.65 0 0 0-1.11-1.46c-.91-.62.07-.61.07-.61a2.1 2.1 0 0 1 1.53 1.03 2.13 2.13 0 0 0 2.91.83 2.14 2.14 0 0 1 .63-1.34c-2.22-.25-4.56-1.11-4.56-4.95a3.87 3.87 0 0 1 1.03-2.68 3.6 3.6 0 0 1 .1-2.64s.84-.27 2.75 1.02a9.47 9.47 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64a3.86 3.86 0 0 1 1.03 2.68c0 3.85-2.34 4.7-4.57 4.95a2.39 2.39 0 0 1 .68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+    </svg>
+  );
+}
+
 type ChatHeaderProps = {
   activeConversation: Conversation | undefined;
   activeConversationId: string | null;
@@ -155,6 +168,23 @@ export function ChatHeader({
         </div>
 
         <div className="flex items-center justify-end gap-2">
+          <Tooltip side="bottom" content="GitHub 仓库">
+            <Button
+              render={
+                <a
+                  href="https://github.com/Here-Tim2354/WebAI"
+                  target="_blank"
+                  rel="noreferrer"
+                />
+              }
+              variant="outline"
+              size="icon-sm"
+              className="h-9 w-10 rounded-[12px] border-border/70 bg-background/82 text-muted-foreground shadow-none"
+              aria-label="打开 WebAI GitHub 仓库"
+            >
+              <GitHubMarkIcon className="size-4" />
+            </Button>
+          </Tooltip>
           <Tooltip side="bottom" content="收藏">
             <Button
               variant="outline"

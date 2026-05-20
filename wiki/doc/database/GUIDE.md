@@ -49,8 +49,12 @@
 
 ## 数据库状态
 
+- 已于 `2026-05-20` 通过 Supabase CLI 对云端项目 `webai_base`（ref: `ekswdwnxsugmtkdxfmnd`）导出并核对 `public` / `storage` schema
+- 云端 `public` 业务表当前包括：`profiles`、`conversations`、`messages`、`favorites`、`model_catalog`、`model_fetched`
+- `search_records` 和旧 `search_user_conversations` 不存在于当前云端 schema，应继续视为已撤回搜索方向，不进入当前数据库说明主线
 - Supabase 环境采用 `model_catalog + model_fetched` 的 Gemini-only 模型结构
 - `model_catalog` 是服务端内部能力参照表，不作为用户模型列表直接暴露
 - `model_fetched` 是用户通过 Gemini 设置拉取后的模型列表，支持启用 / 停用和默认模型选择
-- 默认能力目录覆盖 Gemini 2.5 到 Gemini 3.1 的主流文本 / 多模态模型，不包含图片生成、视频生成、Live 和 TTS 模型
+- 默认能力目录当前包含 7 条 Gemini seed：`gemini-3-flash-preview`、`gemini-3-pro-preview`、`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-2.5-flash-lite`
+- Storage bucket 当前包括公开图标 bucket `ai_svgs`，以及私有 bucket `message_attachments`、`profile_avatars`
 - 用户头像使用私有 Storage bucket `profile_avatars`，展示资料仍落在 `profiles`

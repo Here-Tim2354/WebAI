@@ -14,10 +14,10 @@ aliases:
 
 关联笔记：
 - [[library/library-footprints]]
-- [[frontend/ui-primitives]]
-- [[message-list]]
-- [[conversation-sidebar]]
-- [[chat-input]]
+- [[frontend/ui/button|UI primitives]]
+- [[frontend/components/message-list|message-list]]
+- [[frontend/components/conversation-sidebar|conversation-sidebar]]
+- [[frontend/components/chat-input|chat-input]]
 
 ## 1. 当前落点
 
