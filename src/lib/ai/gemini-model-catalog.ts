@@ -36,6 +36,19 @@ const fullTextModelCapabilities = {
 
 export const GEMINI_MODEL_CATALOG = [
   {
+    modelId: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    description:
+      "Gemini 3.5 Flash：Gemini 3.5 系列快速多模态模型，适合日常聊天、代码、长上下文和多步 Agent 任务。",
+    icon: GEMINI_MODEL_ICON_URL,
+    inputTokenLimit: 1_048_576,
+    outputTokenLimit: 65_536,
+    capabilities: fullTextModelCapabilities,
+    defaultEnabled: true,
+    isDefault: true,
+    sortOrder: 5,
+  },
+  {
     modelId: "gemini-3-flash-preview",
     label: "Gemini 3 Flash Preview",
     description:
@@ -45,7 +58,7 @@ export const GEMINI_MODEL_CATALOG = [
     outputTokenLimit: 65_536,
     capabilities: fullTextModelCapabilities,
     defaultEnabled: true,
-    isDefault: true,
+    isDefault: false,
     sortOrder: 10,
   },
   {

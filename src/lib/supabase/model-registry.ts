@@ -142,6 +142,38 @@ export async function ensureDefaultFetchedModels(
     return;
   }
 
+  const preferredDefaultModelId = defaultRows.find(
+    (row) => row.is_default,
+  )?.model_id;
+
+  if (preferredDefaultModelId) {
+    const { data: existingPreferredDefault, error: existingDefaultError } =
+      await supabase
+        .from("model_fetched")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("model_id", preferredDefaultModelId)
+        .maybeSingle();
+
+    if (existingDefaultError) {
+      throw existingDefaultError;
+    }
+
+    if (!existingPreferredDefault) {
+      // catalog 首选默认模型发生变化时，先释放用户维度的默认唯一约束。
+      // 只在新首选默认模型尚不存在时执行，避免用户后续手动切换默认项被反复覆盖。
+      const { error: resetDefaultError } = await supabase
+        .from("model_fetched")
+        .update({ is_default: false })
+        .eq("user_id", userId)
+        .eq("is_default", true);
+
+      if (resetDefaultError) {
+        throw resetDefaultError;
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("model_fetched")
     .upsert(defaultRows, {
@@ -368,7 +400,7 @@ export async function replaceFetchedGeminiModels(
 
   if (staleIds.length > 0) {
     // 重新拉取模型是“用端点最新列表覆盖用户列表”的语义。
-    // 三个默认模型承担兜底入口，即使端点暂时不返回也不能被清掉。
+    // 系统保护模型承担兜底入口，即使端点暂时不返回也不能被清掉。
     const { error: deleteStaleError } = await supabase
       .from("model_fetched")
       .delete()

@@ -13,7 +13,7 @@
 - 前端模型选择读取已启用模型列表
 - 服务端按 `model_fetched.id` 解析 Gemini 上游模型名
 - Supabase 环境采用 Gemini-only `model_catalog + model_fetched` 模型结构
-- 云端 `model_catalog` 当前有 7 条 Gemini seed，默认模型模板为 `Gemini 3 Flash Preview`
+- 新增 `gemini-3.5-flash` 后，`model_catalog` 预期有 8 条 Gemini seed，首选默认模型模板为 `Gemini 3.5 Flash`
 - `messages.metadata` 已进入云端表结构，用于保存 URL Context、附件和 thinking 等消息级上下文
 
 ## 暂不进入数据库主线

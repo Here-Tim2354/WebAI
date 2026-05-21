@@ -38,7 +38,7 @@ SUPABASE_SECRET_KEY=<service role key>
 APP_ORIGIN=http://localhost:4000
 NEXT_PUBLIC_APP_URL=http://localhost:4000
 GEMINI_API_KEY=<your Gemini API key>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 GEMINI_BASE_URL=
 DEV_AUTH_EMAIL=dev@example.com
 ```

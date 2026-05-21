@@ -18,7 +18,7 @@
 - `APP_ORIGIN=https://webai.tim2354.bytecola.cn`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `GEMINI_MODEL=gemini-3-flash-preview`
+- `GEMINI_MODEL=gemini-3.5-flash`
 - `GEMINI_BASE_URL`
 
 生产部署命令：

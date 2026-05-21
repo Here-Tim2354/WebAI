@@ -36,9 +36,10 @@
 
 ## 云端 seed 状态
 
-`2026-05-20` 通过 Supabase CLI 确认，云端 `model_catalog` 当前包含 7 条 seed：
+`2026-05-21` 新增 `gemini-3.5-flash` 后，`model_catalog` 预期包含 8 条 seed：
 
-- `gemini-3-flash-preview`：默认模型模板，默认启用
+- `gemini-3.5-flash`：首选默认模型模板，默认启用
+- `gemini-3-flash-preview`：默认启用的兜底模型
 - `gemini-3-pro-preview`
 - `gemini-3.1-pro-preview`
 - `gemini-3.1-flash-lite-preview`

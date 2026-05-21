@@ -1,7 +1,7 @@
 export const CURRENT_RELEASE_NOTE = {
-  id: "v1.1",
-  title: "V1.1 更新日志",
-  sourcePath: "wiki/Optimization/version/V1.1.md",
+  id: "v1.2",
+  title: "V1.2 更新日志",
+  sourcePath: "wiki/Optimization/version/V1.2.md",
 } as const;
 
 export type ReleaseNote = {

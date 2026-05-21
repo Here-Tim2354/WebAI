@@ -10,7 +10,7 @@ const optionalUrlSchema = z.preprocess((value) => {
 }, z.string().url("GEMINI_BASE_URL 必须是合法 URL。").optional());
 
 const serverEnvSchema = z.object({
-  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash"),
   GEMINI_BASE_URL: optionalUrlSchema,
 });
 

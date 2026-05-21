@@ -55,6 +55,6 @@
 - Supabase 环境采用 `model_catalog + model_fetched` 的 Gemini-only 模型结构
 - `model_catalog` 是服务端内部能力参照表，不作为用户模型列表直接暴露
 - `model_fetched` 是用户通过 Gemini 设置拉取后的模型列表，支持启用 / 停用和默认模型选择
-- 默认能力目录当前包含 7 条 Gemini seed：`gemini-3-flash-preview`、`gemini-3-pro-preview`、`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-2.5-flash-lite`
+- 默认能力目录预期包含 8 条 Gemini seed：`gemini-3.5-flash`、`gemini-3-flash-preview`、`gemini-3-pro-preview`、`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-2.5-flash-lite`
 - Storage bucket 当前包括公开图标 bucket `ai_svgs`，以及私有 bucket `message_attachments`、`profile_avatars`
 - 用户头像使用私有 Storage bucket `profile_avatars`，展示资料仍落在 `profiles`
